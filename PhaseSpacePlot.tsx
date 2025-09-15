@@ -1,4 +1,4 @@
-import { memo, useRef, useEffect } from 'react';
+import { memo, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
@@ -11,11 +11,36 @@ import './PhaseSpacePlot.css';
  * Based on the MATLAB algorithm's phase space visualization approach.
  * @component
  */
-type PhaseSpacePlotProps = {
-  debug?: boolean; // 开启调试编辑功能（点组/补丁的增删改查）
+export type PatchDTO = {
+  id: number;
+  main: [number, number, number];
+  u: [number, number, number];
+  v: [number, number, number];
 };
 
-const PhaseSpacePlotComponent = ({ debug = false }: PhaseSpacePlotProps) => {
+export type PhaseSpacePlotHandle = {
+  addPatch: (center?: { x: number; y: number; z: number }) => number | null;
+  deleteSelectedPatch: () => void;
+  clearSelection: () => void;
+  getPatches: () => PatchDTO[];
+  setPatches: (patches: PatchDTO[]) => void;
+  focusOnTrajectory: () => void;
+};
+
+type ExternalControls = {
+  signal?: Float32Array | Float64Array | number[]; // 单通道信号
+  displayStartPosition?: number; // 1-based，与现有 store 保持一致
+  displayEndPosition?: number;   // 1-based
+  tau?: number;
+};
+
+type PhaseSpacePlotProps = {
+  debug?: boolean; // 开启调试编辑功能（点组/补丁的增删改查）
+  external?: ExternalControls; // 可选：外部以 props 方式控制相空间输入
+  onPatchesChange?: (patches: PatchDTO[]) => void; // 可选：补丁变化回调
+};
+
+const PhaseSpacePlotComponent = ({ debug = false, external, onPatchesChange }: PhaseSpacePlotProps, ref: any) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -24,6 +49,7 @@ const PhaseSpacePlotComponent = ({ debug = false }: PhaseSpacePlotProps) => {
   const lineRef = useRef<THREE.Line | null>(null);
   const animationFrameRef = useRef<number | undefined>(undefined);
   const gizmoRef = useRef<TransformControls | null>(null);
+  const boundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null>(null);
 
   // Patch(补丁/点组)编辑相关
   type Patch = {
@@ -168,6 +194,91 @@ const PhaseSpacePlotComponent = ({ debug = false }: PhaseSpacePlotProps) => {
     return patch;
   };
 
+  // 序列化/反序列化补丁集合
+  function serializePatches(): PatchDTO[] {
+    const out: PatchDTO[] = [];
+    patchesRef.current.forEach(p => {
+      const m = p.points.main.position, u = p.points.u.position, v = p.points.v.position;
+      out.push({ id: p.id, main: [m.x, m.y, m.z], u: [u.x, u.y, u.z], v: [v.x, v.y, v.z] });
+    });
+    return out;
+  }
+
+  function rebuildPatchesFromDTO(arr: PatchDTO[]) {
+    const scene = sceneRef.current; if (!scene) return;
+    // 清空现有
+    patchesRef.current.forEach(p => {
+      p.objects.forEach(obj => {
+        scene.remove(obj);
+        const anyObj = obj as any;
+        if (anyObj.geometry) anyObj.geometry.dispose();
+        if (anyObj.material) Array.isArray(anyObj.material) ? anyObj.material.forEach((m: any) => m.dispose()) : anyObj.material.dispose();
+      });
+    });
+    patchesRef.current.clear();
+
+    let maxId = -1;
+    arr.forEach(dto => {
+      const patchId = dto.id;
+      maxId = Math.max(maxId, patchId);
+      const mainPoint = createPoint(new THREE.Vector3(...dto.main), patchId, 'main');
+      const uPoint = createPoint(new THREE.Vector3(...dto.u), patchId, 'u');
+      const vPoint = createPoint(new THREE.Vector3(...dto.v), patchId, 'v');
+      const lineMaterial = new THREE.LineBasicMaterial({ color: baseColors.line, transparent: true });
+      const uLine = new THREE.Line(new THREE.BufferGeometry(), lineMaterial.clone()); uLine.userData = { type: 'line', patchId, role: 'u' };
+      const vLine = new THREE.Line(new THREE.BufferGeometry(), lineMaterial.clone()); vLine.userData = { type: 'line', patchId, role: 'v' };
+      const quadMaterial = new THREE.MeshBasicMaterial({ color: baseColors.quad, side: THREE.DoubleSide, transparent: true, opacity: 0.15 });
+      const quad = new THREE.Mesh(new THREE.BufferGeometry(), quadMaterial); quad.userData = { type: 'quad', patchId };
+      const patch: Patch = { id: patchId, points: { main: mainPoint, u: uPoint, v: vPoint }, lines: { u: uLine, v: vLine }, quad, objects: [mainPoint, uPoint, vPoint, uLine, vLine, quad] };
+      updatePatchGeometry(patch);
+      patch.objects.forEach(obj => scene.add(obj));
+      patchesRef.current.set(patchId, patch);
+    });
+    patchIdCounterRef.current = Math.max(patchIdCounterRef.current, maxId + 1);
+    clearSelection();
+  }
+
+  function triggerPatchesChange() {
+    if (onPatchesChange) onPatchesChange(serializePatches());
+  }
+
+  // 对焦到当前轨迹中心
+  function focusOnTrajectory() {
+    if (!cameraRef.current || !controlsRef.current || !boundsRef.current) return;
+    const { minX, maxX, minY, maxY, minZ, maxZ } = boundsRef.current;
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const centerZ = (minZ + maxZ) / 2;
+    const rangeX = maxX - minX, rangeY = maxY - minY, rangeZ = maxZ - minZ;
+    const maxRange = Math.max(rangeX, rangeY, rangeZ) || 1;
+    const distance = maxRange * 2.0;
+    cameraRef.current.position.set(
+      centerX + distance * 0.7,
+      centerY + distance * 0.7,
+      centerZ + distance * 0.7
+    );
+    cameraRef.current.lookAt(centerX, centerY, centerZ);
+    controlsRef.current.target.set(centerX, centerY, centerZ);
+    controlsRef.current.update();
+  }
+
+  // 对外暴露的句柄（给上层 UI 调用）
+  useImperativeHandle(ref, () => ({
+    addPatch: (center) => {
+      const pos = new THREE.Vector3(center?.x ?? THREE.MathUtils.randFloatSpread(10), center?.y ?? 2, center?.z ?? THREE.MathUtils.randFloatSpread(10));
+      const p = createPatch(pos);
+      if (!p) return null;
+      setSelection(p, p.points.main);
+      triggerPatchesChange();
+      return p.id;
+    },
+    deleteSelectedPatch: () => { const sel = selectedPatchRef.current; if (sel) { deletePatch(sel.id); triggerPatchesChange(); } },
+    clearSelection: () => { clearSelection(); },
+    getPatches: () => serializePatches(),
+    setPatches: (patches: PatchDTO[]) => { rebuildPatchesFromDTO(patches); triggerPatchesChange(); },
+    focusOnTrajectory: () => focusOnTrajectory(),
+  }), []);
+
   // 从store获取ECG数据和显示范围
   const ecgData = useProjectStore(state => state.ecgData); // 保留用于元数据
   const processedSignalBuffer = useProjectStore(state => state.processedSignalBuffer);
@@ -290,12 +401,12 @@ const PhaseSpacePlotComponent = ({ debug = false }: PhaseSpacePlotProps) => {
         THREE.MathUtils.randFloatSpread(10), 2, THREE.MathUtils.randFloatSpread(10)
       );
       const newPatch = createPatch(newPatchPos);
-      if (newPatch) setSelection(newPatch, newPatch.points.main);
+      if (newPatch) { setSelection(newPatch, newPatch.points.main); triggerPatchesChange(); }
     };
     const deleteAction = () => {
       if (!debug) return;
       const sel = selectedPatchRef.current;
-      if (sel) deletePatch(sel.id);
+      if (sel) { deletePatch(sel.id); triggerPatchesChange(); }
     };
     const keydownHandler = (e: KeyboardEvent) => {
       if (!debug) return;
@@ -314,6 +425,7 @@ const PhaseSpacePlotComponent = ({ debug = false }: PhaseSpacePlotProps) => {
     if (debug) {
       createPatch(new THREE.Vector3(0, 2, 0));
       createPatch(new THREE.Vector3(-4, 1, -3));
+      triggerPatchesChange();
     }
 
     // 清理函数
@@ -352,7 +464,7 @@ const PhaseSpacePlotComponent = ({ debug = false }: PhaseSpacePlotProps) => {
 
   // 当ECG数据或显示范围变化时更新相空间图 - 从processedSignalBuffer读取（唯一真实来源）
   useEffect(() => {
-    if (!processedSignalBuffer || !sceneRef.current || !ecgData?.metadata || selectedSignalIndex < 0) return;
+    if (!sceneRef.current) return;
 
     const scene = sceneRef.current;
 
@@ -364,29 +476,32 @@ const PhaseSpacePlotComponent = ({ debug = false }: PhaseSpacePlotProps) => {
       lineRef.current = null;
     }
 
-    // 从processedSignalBuffer获取选中信号的数据
-    const processedView = new Float64Array(processedSignalBuffer);
-    if (processedView.length === 0) return;
+    // 选择数据来源：优先 external.signal，否则从 store 的 processedSignalBuffer
+    let signalData: Float64Array | Float32Array | number[] | null = null;
+    let startPos1 = external?.displayStartPosition ?? displayStartPosition;
+    let endPos1 = external?.displayEndPosition ?? displayEndPosition;
+    const tau = external?.tau ?? phaseSpaceTau; // 时间延迟参数
 
-    const numSignals = ecgData.signals?.length || 1;
-    const samplesPerSignal = processedView.length / numSignals;
-
-    if (selectedSignalIndex >= numSignals) return;
-
-    const signalStartIndex = selectedSignalIndex * samplesPerSignal;
-    const signalEndIndex = signalStartIndex + samplesPerSignal;
-    const signalData = processedView.subarray(signalStartIndex, signalEndIndex);
+    if (external?.signal && external.signal.length > 0) {
+      signalData = external.signal;
+    } else if (processedSignalBuffer && ecgData?.metadata && selectedSignalIndex >= 0) {
+      const processedView = new Float64Array(processedSignalBuffer);
+      if (processedView.length === 0) return;
+      const numSignals = ecgData.signals?.length || 1;
+      const samplesPerSignal = processedView.length / numSignals;
+      if (selectedSignalIndex >= numSignals) return;
+      const signalStartIndex = selectedSignalIndex * samplesPerSignal;
+      const signalEndIndex = signalStartIndex + samplesPerSignal;
+      signalData = processedView.subarray(signalStartIndex, signalEndIndex);
+    }
 
     if (!signalData || signalData.length === 0) return;
 
-    // 计算显示范围
-    const startIdx = Math.max(0, displayStartPosition - 1); // 转换为0基索引
-    const endIdx = Math.min(signalData.length - 1, displayEndPosition - 1);
+    // 计算显示范围（将1基位置转换为0基索引）
+    const startIdx = Math.max(0, (startPos1 ?? 1) - 1);
+    const endIdx = Math.min(signalData.length - 1, (endPos1 ?? (signalData.length)) - 1);
 
     if (startIdx >= endIdx) return;
-
-    // 延迟嵌入参数 (基于MATLAB代码)
-    const tau = phaseSpaceTau; // 时间延迟，从store获取
 
     // 提取信号段
     const signalSegment = signalData.subarray(startIdx, endIdx + 1);
@@ -462,10 +577,11 @@ const PhaseSpacePlotComponent = ({ debug = false }: PhaseSpacePlotProps) => {
       }
     }
 
-    // 更新MATLAB风格坐标轴
+    // 保存轨迹边界并更新MATLAB风格坐标轴
+    boundsRef.current = { minX, maxX, minY, maxY, minZ, maxZ };
     createMatlabStyleAxes(scene, minX, maxX, minY, maxY, minZ, maxZ);
 
-  }, [processedSignalBuffer, processedDataVersion, ecgData?.metadata, ecgData?.signals?.length, selectedSignalIndex, displayStartPosition, displayEndPosition, phaseSpaceTau]);
+  }, [processedSignalBuffer, processedDataVersion, ecgData?.metadata, ecgData?.signals?.length, selectedSignalIndex, displayStartPosition, displayEndPosition, phaseSpaceTau, external?.signal, external?.displayStartPosition, external?.displayEndPosition, external?.tau]);
 
   // 创建MATLAB风格的3D坐标轴系统
   function createMatlabStyleAxes(scene: THREE.Scene, minX: number, maxX: number, minY: number, maxY: number, minZ: number, maxZ: number) {
@@ -790,5 +906,6 @@ const PhaseSpacePlotComponent = ({ debug = false }: PhaseSpacePlotProps) => {
   );
 };
 
-export const PhaseSpacePlot = memo(PhaseSpacePlotComponent);
+export const PhaseSpacePlot = memo(forwardRef(PhaseSpacePlotComponent));
+// @ts-ignore
 PhaseSpacePlot.displayName = 'PhaseSpacePlot';
