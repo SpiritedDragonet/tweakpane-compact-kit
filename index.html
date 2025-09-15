@@ -49,6 +49,9 @@
       <div class="row"><button id="addPatchBtn" class="btn">增加一个组 (A)</button><button id="delPatchBtn" class="btn">删除选中组 (Del)</button></div>
     </div>
   </div>
+  <div id="viewport" style="position: fixed; inset: 0;">
+    <!-- three.js 画布将被挂载到这里，UI 与视口解耦 -->
+  </div>
 
   <script type="module">
     import * as THREE from 'three';
@@ -63,7 +66,7 @@
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    document.body.appendChild(renderer.domElement);
+    document.getElementById('viewport').appendChild(renderer.domElement);
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true;
 
@@ -406,8 +409,9 @@
     const pointer = new THREE.Vector2();
     renderer.domElement.addEventListener('pointerdown', (event) => {
       if (gizmo.dragging) return;
-      pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-      pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
       const objs = Array.from(patches.values()).flatMap(p => p.objects);
       const hits = raycaster.intersectObjects(objs, false);
@@ -489,4 +493,3 @@
   </script>
 </body>
 </html>
-
