@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <title>three.js 统一坐标轴拖动+2D圆点 Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #0e0f12; overflow: hidden; }
+    #hud {
+      position: fixed; left: 10px; top: 10px; z-index: 10;
+      background: rgba(0,0,0,0.5); color: #e8e8e8; padding: 10px 12px; border-radius: 8px;
+      font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      user-select: none;
+    }
+    #hud b { color: #fff; }
+    a { color: #7dd3fc; text-decoration: none; }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="hud">
+    <div><b>操作</b></div>
+    <div>• 点击一个点选中，然后沿彩色轴拖动（坐标轴统一为世界方向）</div>
+    <div>• Q：世界/本地 | W/E/R：移动/旋转/缩放</div>
+    <div>• X/Y/Z：开关各轴 | +/-：调整手柄尺寸 | Esc：取消选择</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0e0f12);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(6, 6, 8);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    document.body.appendChild(renderer.domElement);
+
+    const orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.enableDamping = true;
+
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x2a2a2a, 0.7);
+    scene.add(hemi);
+
+    const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+    dir.position.set(5, 10, 7);
+    scene.add(dir);
+
+    const grid = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+    if (Array.isArray(grid.material)) {
+      grid.material.forEach(m => { m.transparent = true; m.opacity = 0.35; });
+    } else {
+      grid.material.transparent = true;
+      grid.material.opacity = 0.35;
+    }
+    scene.add(grid);
+
+    const pointsGroup = new THREE.Group();
+    scene.add(pointsGroup);
+
+    // **新功能：创建白色圆形的纹理**
+    function createWhiteCircleTexture(size = 64) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext('2d');
+
+      context.beginPath();
+      // 绘制一个白色的圆，用于后续材质着色
+      context.arc(size / 2, size / 2, size / 2 * 0.9, 0, Math.PI * 2);
+      context.fillStyle = 'white';
+      context.fill();
+
+      // 可选：添加一个细边框让圆更清晰
+      context.lineWidth = 1;
+      context.strokeStyle = 'rgba(100, 100, 100, 0.5)'; // 浅灰色边框
+      context.stroke();
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true; // 确保纹理更新
+      return texture;
+    }
+
+    const whiteCircleTexture = createWhiteCircleTexture(64); // 只创建一次纹理
+    const SPRITE_SIZE = 0.3; // 控制二维小圆的显示大小
+
+    const baseColor = new THREE.Color('#57b6ff');
+
+    const COUNT = 40;
+    for (let i = 0; i < COUNT; i++) {
+      // **替换为 SpriteMaterial 和 Sprite**
+      const mat = new THREE.SpriteMaterial({
+        map: whiteCircleTexture, // 使用白色圆纹理
+        color: baseColor.clone(), // 通过材质的 color 属性进行着色
+        transparent: true,
+        alphaTest: 0.01, // 优化透明度，避免黑色边缘
+      });
+      const point = new THREE.Sprite(mat);
+
+      point.position.set(
+        THREE.MathUtils.randFloatSpread(10),
+        THREE.MathUtils.randFloatSpread(6) + 1,
+        THREE.MathUtils.randFloatSpread(10)
+      );
+      // Sprite 对象本身通常不需要旋转，它的 visual 部分总是面向摄像机
+      // 但是 TransformControls 依然会使用它的 rotation/quaternion 来决定 local space
+      point.rotation.set(0, 0, 0); // 确保内部旋转为0，以便TransformControls的local space与世界对齐
+
+      point.scale.set(SPRITE_SIZE, SPRITE_SIZE, 1); // 设置 Sprite 的显示大小
+
+      point.userData.baseColor = point.material.color.getHex();
+      point.name = `Point_${i}`;
+      pointsGroup.add(point);
+    }
+
+    // TransformControls
+    const gizmo = new TransformControls(camera, renderer.domElement);
+    gizmo.setMode('translate');
+    gizmo.setSpace('local'); // 仍使用 local，但我们会强制 object 的 rotation 为 identity
+    gizmo.setSize(0.9);
+    scene.add(gizmo);
+
+    gizmo.addEventListener('dragging-changed', (e) => {
+      orbit.enabled = !e.value;
+    });
+
+    // 轴辅助器
+    const axesHelper = new THREE.AxesHelper(0.5);
+    axesHelper.visible = false;
+    scene.add(axesHelper);
+
+    // 选中点
+    let selected = null;
+    function setSelected(obj) {
+      if (selected === obj) return;
+
+      if (selected) {
+        // **恢复原色**
+        selected.material.color.set(new THREE.Color(selected.userData.baseColor));
+      }
+      selected = obj || null;
+
+      if (selected) {
+        // **设置高亮色**
+        selected.material.color.set('#ffcc00');
+        gizmo.attach(selected);
+
+        // 轴辅助器放到点旁边，显示并重置旋转（固定方向）
+        axesHelper.position.copy(selected.position);
+        axesHelper.visible = true;
+        axesHelper.rotation.set(0, 0, 0); // 确保辅助器也面向世界坐标
+      } else {
+        gizmo.detach();
+        axesHelper.visible = false;
+      }
+    }
+
+    // 射线拾取
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    function updatePointerFromEvent(event) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    }
+
+    renderer.domElement.addEventListener('pointerdown', (event) => {
+      if (gizmo.dragging) return;
+
+      updatePointerFromEvent(event);
+      raycaster.setFromCamera(pointer, camera);
+      // Sprite 是一个平面，所以它能被射线拾取到
+      const hits = raycaster.intersectObjects(pointsGroup.children, false);
+      if (hits.length) {
+        setSelected(hits[0].object);
+      } else {
+        setSelected(null);
+      }
+    });
+
+    renderer.domElement.addEventListener('pointermove', (event) => {
+      if (gizmo.dragging) return;
+      updatePointerFromEvent(event);
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(pointsGroup.children, false);
+      renderer.domElement.style.cursor = hits.length ? 'pointer' : 'default';
+    });
+
+    // 强制 TransformControls 的旋转为单位四元数，保持坐标轴方向不变
+    // 监听每帧更新
+    function fixGizmoRotation() {
+      if (gizmo.object) {
+        // 在 TransformControls 的 local 模式下，它的方向是根据被附着对象的 rotation 来的
+        // 通过强制对象的 rotation 为 identity，确保 TransformControls 的 local 轴与世界轴对齐
+        // 注意：这里是修改了被操作对象的旋转，虽然 Sprite 的视觉效果不受其 rotation 影响
+        // 但对于 TransformControls 来说，这会影响其 local 坐标系的方向
+        if (gizmo.dragging && gizmo.mode === 'translate') { // 通常只在移动模式下关心这个
+           gizmo.object.quaternion.identity();
+        }
+      }
+    }
+
+    // 键盘快捷键
+    window.addEventListener('keydown', (event) => {
+      const k = event.key.toLowerCase();
+      // Q 键切换坐标系 (local/world)，但因为我们强制了点没有旋转，所以 local 和 world 模式下的轴方向会是一样的
+      if (k === 'q') gizmo.setSpace(gizmo.space === 'local' ? 'world' : 'local');
+      if (k === 'w') gizmo.setMode('translate');
+      if (k === 'e') gizmo.setMode('rotate'); // 理论上对 Sprite 旋转没有视觉效果，但 TransformControls 仍可操作其内部旋转
+      if (k === 'r') gizmo.setMode('scale');
+
+      if (k === 'x') gizmo.showX = !gizmo.showX;
+      if (k === 'y') gizmo.showY = !gizmo.showY;
+      if (k === 'z') gizmo.showZ = !gizmo.showZ;
+
+      if (k === 'escape') setSelected(null);
+
+      if (k === '+' || k === '=') gizmo.setSize(gizmo.size + 0.1);
+      if (k === '-' || k === '_') gizmo.setSize(Math.max(0.1, gizmo.size - 0.1));
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    function animate() {
+      orbit.update();
+      fixGizmoRotation(); // 每帧检查并修正 Gizmo 的旋转，确保坐标轴统一
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+    animate();
+  </script>
+</body>
+</html>

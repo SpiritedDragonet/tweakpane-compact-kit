@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <title>Phase Space + Patch 编辑 综合调试页</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #0e0f12; color: #e8e8e8; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    #ui {
+      position: fixed; left: 10px; top: 10px; z-index: 10; display: flex; flex-direction: column; gap: 10px; width: 320px;
+    }
+    .panel {
+      background: rgba(0,0,0,0.55); padding: 10px 14px; border-radius: 8px; border: 1px solid #333; font-size: 12px; line-height: 1.5;
+    }
+    .panel b { color: #fff; font-size: 13px; }
+    .row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .row label { min-width: 70px; color: #cfcfcf; }
+    .row input[type="number"] { width: 80px; font-size: 12px; background: #111; color: #ddd; border: 1px solid #444; border-radius: 4px; padding: 4px 6px; }
+    .row input[type="range"] { flex: 1; }
+    .btn { background: #333; color: #eee; border: 1px solid #555; padding: 8px 12px; border-radius: 5px; cursor: pointer; }
+    .btn:hover { background: #444; }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="ui">
+    <div class="panel">
+      <b>操作指南</b><br>
+      • 鼠标拖拽旋转，滚轮缩放视角<br>
+      • 点击点/线/面选中组；拖动控制柄移动点<br>
+      • W/E/R：移动/旋转/缩放；Q：切换坐标系；Esc：取消选择
+    </div>
+    <div class="panel">
+      <b>相空间参数</b>
+      <div class="row"><label>τ (Tau)</label><input id="tauRange" type="range" min="1" max="50" step="1" value="8"><input id="tauNum" type="number" min="1" max="50" step="1" value="8"></div>
+      <div class="row"><label>Start</label><input id="startNum" type="number" min="0" step="1" value="0"><label>End</label><input id="endNum" type="number" min="1" step="1" value="1500"></div>
+      <div class="row"><button id="regenBtn" class="btn">重新生成信号</button></div>
+    </div>
+    <div class="panel">
+      <b>补丁编辑</b>
+      <div class="row"><button id="addPatchBtn" class="btn">增加一个组 (A)</button><button id="delPatchBtn" class="btn">删除选中组 (Del)</button></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+    // 基本场景
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0e0f12);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(30, 24, 36);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+    const orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.enableDamping = true;
+
+    // 光源与网格
+    scene.add(new THREE.AmbientLight(0xcccccc, 0.5));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
+    const grid = new THREE.GridHelper(50, 50, 0x444444, 0x222222);
+    scene.add(grid);
+
+    // ---------------- 相空间折线 ----------------
+    let line = null; // THREE.Line
+    const lineMaterial = new THREE.LineBasicMaterial({ vertexColors: true });
+
+    function generatePseudoECG(N = 3000, fs = 250) {
+      const out = new Float32Array(N);
+      for (let i = 0; i < N; i++) {
+        const t = i / fs;              // 时间（秒）
+        const rr = 1.0;                // 1Hz 心率
+        const phase = (t % rr) / rr;   // 0..1 相位
+        const base = 0.05 * Math.sin(2 * Math.PI * 0.6 * t) + 0.03 * Math.sin(2 * Math.PI * 1.2 * t);
+        const rPeak = Math.exp(-Math.pow((phase - 0.05) / 0.015, 2)) * 1.2;
+        const tWave = Math.exp(-Math.pow((phase - 0.4) / 0.05, 2)) * 0.25;
+        const noise = (Math.random() - 0.5) * 0.02;
+        out[i] = base + rPeak + tWave + noise;
+      }
+      return out;
+    }
+
+    let signal = generatePseudoECG();
+
+    const tauRange = document.getElementById('tauRange');
+    const tauNum = document.getElementById('tauNum');
+    const startNum = document.getElementById('startNum');
+    const endNum = document.getElementById('endNum');
+    const regenBtn = document.getElementById('regenBtn');
+
+    function syncTauInputs(v) { tauRange.value = String(v); tauNum.value = String(v); }
+
+    function updatePhasePlot() {
+      const tau = parseInt(tauNum.value, 10) || 8;
+      const start = Math.max(0, parseInt(startNum.value, 10) || 0);
+      const end = Math.min(signal.length - 1, parseInt(endNum.value, 10) || (signal.length - 1));
+      if (start >= end) return;
+
+      const seg = signal.subarray(start, end + 1);
+      const N = seg.length - 2 * tau - 1;
+      if (N <= 0) return;
+
+      const points = [];
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      let minZ = Infinity, maxZ = -Infinity;
+      for (let i = 0; i < N; i++) {
+        const x = seg[i];
+        const y = seg[i + tau];
+        const z = seg[i + 2 * tau];
+        points.push(new THREE.Vector3(x, y, z));
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+      }
+      if (!points.length) return;
+
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const colors = new Float32Array(points.length * 3);
+      for (let i = 0; i < points.length; i++) {
+        const t = i / (points.length - 1);
+        colors[i * 3] = t;
+        colors[i * 3 + 1] = 0.2;
+        colors[i * 3 + 2] = 1 - t;
+      }
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      if (line) {
+        scene.remove(line); line.geometry.dispose();
+      }
+      line = new THREE.Line(geometry, lineMaterial);
+      scene.add(line);
+
+      // 相机/控制器对齐
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      const centerZ = (minZ + maxZ) / 2;
+      const rangeX = maxX - minX, rangeY = maxY - minY, rangeZ = maxZ - minZ;
+      const maxRange = Math.max(rangeX, rangeY, rangeZ) || 1;
+      const distance = maxRange * 2.2;
+      camera.position.set(centerX + distance * 0.8, centerY + distance * 0.8, centerZ + distance * 0.8);
+      camera.lookAt(centerX, centerY, centerZ);
+      orbit.target.set(centerX, centerY, centerZ);
+      orbit.update();
+
+      // 轴
+      createMatlabStyleAxes(scene, minX, maxX, minY, maxY, minZ, maxZ);
+    }
+
+    // ---------------- MATLAB风格坐标轴 ----------------
+    function createMatlabStyleAxes(scene, minX, maxX, minY, maxY, minZ, maxZ) {
+      const old = scene.children.filter(c => c.userData && c.userData.isMatlabAxis);
+      old.forEach(o => scene.remove(o));
+
+      const rangeX = maxX - minX; const rangeY = maxY - minY; const rangeZ = maxZ - minZ;
+      const margin = 0.1;
+      const extendedMinX = minX - rangeX * margin;
+      const extendedMaxX = maxX + rangeX * margin;
+      const extendedMinY = minY - rangeY * margin;
+      const extendedMaxY = maxY + rangeY * margin;
+      const extendedMinZ = minZ - rangeZ * margin;
+      const extendedMaxZ = maxZ + rangeZ * margin;
+
+      const axisMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+      const gridMaterial = new THREE.LineBasicMaterial({ color: 0x808080 });
+      const tickMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+
+      const mark = (obj) => { obj.userData.isMatlabAxis = true; };
+
+      // 3条主轴
+      const xAxis = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(extendedMinX, extendedMinY, extendedMinZ),
+        new THREE.Vector3(extendedMaxX, extendedMinY, extendedMinZ)
+      ]), axisMaterial); mark(xAxis); scene.add(xAxis);
+
+      const yAxis = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(extendedMinX, extendedMinY, extendedMinZ),
+        new THREE.Vector3(extendedMinX, extendedMaxY, extendedMinZ)
+      ]), axisMaterial); mark(yAxis); scene.add(yAxis);
+
+      const zAxis = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(extendedMinX, extendedMinY, extendedMinZ),
+        new THREE.Vector3(extendedMinX, extendedMinY, extendedMaxZ)
+      ]), axisMaterial); mark(zAxis); scene.add(zAxis);
+
+      const numGridLines = 5;
+      for (let i = 1; i < numGridLines; i++) {
+        const x = minX + (maxX - minX) * i / numGridLines;
+        const g1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(x, extendedMinY, extendedMinZ),
+          new THREE.Vector3(x, extendedMaxY, extendedMinZ)
+        ]), gridMaterial); mark(g1); scene.add(g1);
+        const g2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(x, extendedMinY, extendedMinZ),
+          new THREE.Vector3(x, extendedMinY, extendedMaxZ)
+        ]), gridMaterial); mark(g2); scene.add(g2);
+      }
+      for (let i = 1; i < numGridLines; i++) {
+        const y = minY + (maxY - minY) * i / numGridLines;
+        const g1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(extendedMinX, y, extendedMinZ),
+          new THREE.Vector3(extendedMaxX, y, extendedMinZ)
+        ]), gridMaterial); mark(g1); scene.add(g1);
+        const g2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(extendedMinX, y, extendedMinZ),
+          new THREE.Vector3(extendedMinX, y, extendedMaxZ)
+        ]), gridMaterial); mark(g2); scene.add(g2);
+      }
+      for (let i = 1; i < numGridLines; i++) {
+        const z = minZ + (maxZ - minZ) * i / numGridLines;
+        const g1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(extendedMinX, extendedMinY, z),
+          new THREE.Vector3(extendedMaxX, extendedMinY, z)
+        ]), gridMaterial); mark(g1); scene.add(g1);
+        const g2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(extendedMinX, extendedMinY, z),
+          new THREE.Vector3(extendedMinX, extendedMaxY, z)
+        ]), gridMaterial); mark(g2); scene.add(g2);
+      }
+
+      const tickLength = Math.min(rangeX, rangeY, rangeZ) * 0.02;
+      const numTicks = 5;
+      // X/Y/Z 轴刻度
+      for (let i = 0; i <= numTicks; i++) {
+        const x = minX + (maxX - minX) * i / numTicks;
+        const t = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(x, extendedMinY, extendedMinZ),
+          new THREE.Vector3(x, extendedMinY - tickLength, extendedMinZ)
+        ]), tickMaterial); mark(t); scene.add(t);
+      }
+      for (let i = 0; i <= numTicks; i++) {
+        const y = minY + (maxY - minY) * i / numTicks;
+        const t = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(extendedMinX, y, extendedMinZ),
+          new THREE.Vector3(extendedMinX - tickLength, y, extendedMinZ)
+        ]), tickMaterial); mark(t); scene.add(t);
+      }
+      for (let i = 0; i <= numTicks; i++) {
+        const z = minZ + (maxZ - minZ) * i / numTicks;
+        const t = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(extendedMinX, extendedMinY, z),
+          new THREE.Vector3(extendedMinX - tickLength, extendedMinY, z)
+        ]), tickMaterial); mark(t); scene.add(t);
+      }
+
+      // 文本标签
+      createAxisLabels(scene, minX, maxX, minY, maxY, minZ, maxZ, extendedMinX, extendedMinY, extendedMinZ, tickLength);
+    }
+
+    function createAxisLabels(scene, minX, maxX, minY, maxY, minZ, maxZ, extendedMinX, extendedMinY, extendedMinZ, tickLength) {
+      const mark = (obj) => { obj.userData.isMatlabAxis = true; };
+      const createTextTexture = (text, fontSize = 18) => {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 256; canvas.height = 64;
+        context.fillStyle = '#000000';
+        context.font = `${fontSize}px Times New Roman`;
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(text, 128, 32);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.minFilter = THREE.LinearFilter;
+        return texture;
+      };
+
+      const axisLabelScale = Math.min(maxX - minX, maxY - minY, maxZ - minZ) * 0.1;
+
+      const xSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: createTextTexture('sigL(i)', 20) }));
+      xSprite.position.set((minX + maxX) / 2, extendedMinY - tickLength * 8, extendedMinZ);
+      xSprite.scale.set(axisLabelScale, axisLabelScale * 0.3, 1); mark(xSprite); scene.add(xSprite);
+
+      const ySprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: createTextTexture('sigL(i+τ)', 20) }));
+      ySprite.position.set(extendedMinX - tickLength * 8, (minY + maxY) / 2, extendedMinZ);
+      ySprite.scale.set(axisLabelScale, axisLabelScale * 0.3, 1); mark(ySprite); scene.add(ySprite);
+
+      const zSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: createTextTexture('sigL(i+2τ)', 20) }));
+      zSprite.position.set(extendedMinX - tickLength * 6, extendedMinY, (minZ + maxZ) / 2);
+      zSprite.scale.set(axisLabelScale, axisLabelScale * 0.3, 1); mark(zSprite); scene.add(zSprite);
+
+      const numTicks = 5; const valueScale = axisLabelScale * 0.6;
+      for (let i = 0; i <= numTicks; i++) {
+        const x = minX + (maxX - minX) * i / numTicks;
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: createTextTexture(x.toFixed(2), 14) }));
+        s.position.set(x, extendedMinY - tickLength * 4, extendedMinZ);
+        s.scale.set(valueScale, valueScale * 0.4, 1); mark(s); scene.add(s);
+      }
+      for (let i = 0; i <= numTicks; i++) {
+        const y = minY + (maxY - minY) * i / numTicks;
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: createTextTexture(y.toFixed(2), 14) }));
+        s.position.set(extendedMinX - tickLength * 4, y, extendedMinZ);
+        s.scale.set(valueScale, valueScale * 0.4, 1); mark(s); scene.add(s);
+      }
+      for (let i = 0; i <= numTicks; i++) {
+        const z = minZ + (maxZ - minZ) * i / numTicks;
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: createTextTexture(z.toFixed(2), 14) }));
+        s.position.set(extendedMinX - tickLength * 3, extendedMinY - tickLength * 2, z);
+        s.scale.set(valueScale, valueScale * 0.4, 1); mark(s); scene.add(s);
+      }
+    }
+
+    // ---------------- 补丁编辑（与 index.html 一致的交互） ----------------
+    const patches = new Map();
+    let patchIdCounter = 0;
+    let selectedPatch = null;
+    const whiteCircleTexture = createWhiteCircleTexture();
+    const SPRITE_SIZE = 0.3 / 4;
+    const baseColors = {
+      main: new THREE.Color('#ff6b6b'),
+      u: new THREE.Color('#4d96ff'),
+      v: new THREE.Color('#51cf66'),
+      line: new THREE.Color('#aaaaaa'),
+      quad: new THREE.Color('#ffffff'),
+    };
+    const highlightColor = new THREE.Color('#ffdd59');
+
+    const gizmo = new TransformControls(camera, renderer.domElement);
+    gizmo.setSize(0.7);
+    gizmo.addEventListener('dragging-changed', e => { orbit.enabled = !e.value; });
+    gizmo.addEventListener('objectChange', () => { if (selectedPatch) updatePatchGeometry(selectedPatch); });
+    scene.add(gizmo);
+
+    function createWhiteCircleTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64; canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.beginPath(); ctx.arc(32, 32, 30, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill();
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createPoint(position, patchId, role) {
+      const mat = new THREE.SpriteMaterial({ map: whiteCircleTexture, color: baseColors[role].clone(), transparent: true, alphaTest: 0.01 });
+      const point = new THREE.Sprite(mat);
+      point.position.copy(position); point.scale.set(SPRITE_SIZE, SPRITE_SIZE, 1);
+      point.userData = { type: 'point', patchId, role };
+      return point;
+    }
+
+    function createPatch(centerPos) {
+      const patchId = patchIdCounter++;
+      const mainPoint = createPoint(centerPos, patchId, 'main');
+      const uPoint = createPoint(centerPos.clone().add(new THREE.Vector3(1, 0, 0)), patchId, 'u');
+      const vPoint = createPoint(centerPos.clone().add(new THREE.Vector3(0, 0, 1)), patchId, 'v');
+      const lineMaterial = new THREE.LineBasicMaterial({ color: baseColors.line, transparent: true });
+      const uLine = new THREE.Line(new THREE.BufferGeometry(), lineMaterial.clone()); uLine.userData = { type: 'line', patchId, role: 'u' };
+      const vLine = new THREE.Line(new THREE.BufferGeometry(), lineMaterial.clone()); vLine.userData = { type: 'line', patchId, role: 'v' };
+      const quadMaterial = new THREE.MeshBasicMaterial({ color: baseColors.quad, side: THREE.DoubleSide, transparent: true, opacity: 0.15 });
+      const quad = new THREE.Mesh(new THREE.BufferGeometry(), quadMaterial); quad.userData = { type: 'quad', patchId };
+      const patch = { id: patchId, points: { main: mainPoint, u: uPoint, v: vPoint }, lines: { u: uLine, v: vLine }, quad, objects: [mainPoint, uPoint, vPoint, uLine, vLine, quad] };
+      updatePatchGeometry(patch); patch.objects.forEach(o => scene.add(o)); patches.set(patchId, patch); return patch;
+    }
+
+    function updatePatchGeometry(patch) {
+      const { main, u, v } = patch.points;
+      patch.lines.u.geometry.setFromPoints([main.position, u.position]);
+      patch.lines.v.geometry.setFromPoints([main.position, v.position]);
+      const p4 = new THREE.Vector3().addVectors(u.position, v.position).sub(main.position);
+      const positions = new Float32Array([...main.position.toArray(), ...u.position.toArray(), ...p4.toArray(), ...v.position.toArray()]);
+      const indices = [0, 1, 2, 0, 2, 3];
+      const geom = new THREE.BufferGeometry(); geom.setAttribute('position', new THREE.BufferAttribute(positions, 3)); geom.setIndex(indices); geom.computeVertexNormals();
+      patch.quad.geometry.dispose(); patch.quad.geometry = geom;
+    }
+
+    function clearSelection() {
+      if (!selectedPatch) return;
+      Object.values(selectedPatch.points).forEach(p => p.material.color.copy(baseColors[p.userData.role]));
+      Object.values(selectedPatch.lines).forEach(l => l.material.color.copy(baseColors.line));
+      selectedPatch.quad.material.opacity = 0.15;
+      gizmo.detach(); selectedPatch = null;
+    }
+
+    function setSelection(patch, clickedObject) {
+      if (selectedPatch && selectedPatch.id === patch.id) {
+        if (clickedObject && clickedObject.userData.type === 'point' && gizmo.object !== clickedObject) gizmo.attach(clickedObject);
+        return;
+      }
+      clearSelection(); selectedPatch = patch;
+      Object.values(patch.points).forEach(p => p.material.color.copy(highlightColor));
+      Object.values(patch.lines).forEach(l => l.material.color.copy(highlightColor));
+      patch.quad.material.opacity = 0.4;
+      gizmo.attach(clickedObject && clickedObject.userData.type === 'point' ? clickedObject : patch.points.main);
+    }
+
+    function deletePatch(patchId) {
+      const patch = patches.get(patchId); if (!patch) return;
+      if (selectedPatch && selectedPatch.id === patchId) clearSelection();
+      patch.objects.forEach(obj => { scene.remove(obj); if (obj.geometry) obj.geometry.dispose(); if (obj.material) (Array.isArray(obj.material) ? obj.material.forEach(m => m.dispose()) : obj.material.dispose()); });
+      patches.delete(patchId);
+    }
+
+    // 拾取
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    renderer.domElement.addEventListener('pointerdown', (event) => {
+      if (gizmo.dragging) return;
+      pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const objs = Array.from(patches.values()).flatMap(p => p.objects);
+      const hits = raycaster.intersectObjects(objs, false);
+      if (hits.length) {
+        const hit = hits[0].object; const p = patches.get(hit.userData.patchId); if (p) setSelection(p, hit);
+      } else {
+        clearSelection();
+      }
+    });
+
+    // UI 绑定
+    document.getElementById('addPatchBtn').addEventListener('click', () => {
+      const pos = new THREE.Vector3(THREE.MathUtils.randFloatSpread(10), 2, THREE.MathUtils.randFloatSpread(10));
+      const p = createPatch(pos); setSelection(p, p.points.main);
+    });
+    document.getElementById('delPatchBtn').addEventListener('click', () => { if (selectedPatch) deletePatch(selectedPatch.id); });
+    window.addEventListener('keydown', (e) => {
+      switch (e.key.toLowerCase()) {
+        case 'q': gizmo.setSpace(gizmo.space === 'local' ? 'world' : 'local'); break;
+        case 'w': gizmo.setMode('translate'); break;
+        case 'e': gizmo.setMode('rotate'); break;
+        case 'r': gizmo.setMode('scale'); break;
+        case 'escape': clearSelection(); break;
+        case 'a': {
+          const pos = new THREE.Vector3(THREE.MathUtils.randFloatSpread(10), 2, THREE.MathUtils.randFloatSpread(10));
+          const p = createPatch(pos); setSelection(p, p.points.main); break; }
+        case 'delete': case 'backspace': if (selectedPatch) deletePatch(selectedPatch.id); break;
+      }
+    });
+
+    // 初始两个组
+    createPatch(new THREE.Vector3(0, 2, 0));
+    createPatch(new THREE.Vector3(-4, 1, -3));
+
+    // 相机远近影响点透明度
+    const camPos = new THREE.Vector3();
+    const ptPos = new THREE.Vector3();
+    function updateSpriteOpacityByDistance() {
+      camera.getWorldPosition(camPos);
+      patches.forEach(patch => {
+        Object.values(patch.points).forEach(point => {
+          point.getWorldPosition(ptPos);
+          const dist = camPos.distanceTo(ptPos);
+          const FADE_MIN_DIST = 15, FADE_MAX_DIST = 40;
+          const opacityFactor = 1.0 - THREE.MathUtils.smoothstep(dist, FADE_MIN_DIST, FADE_MAX_DIST);
+          point.material.opacity = Math.max(0.2, opacityFactor);
+        });
+      });
+    }
+
+    // 相空间 UI 事件
+    tauRange.addEventListener('input', () => { syncTauInputs(tauRange.value); updatePhasePlot(); });
+    tauNum.addEventListener('input', () => { syncTauInputs(tauNum.value); updatePhasePlot(); });
+    regenBtn.addEventListener('click', () => { signal = generatePseudoECG(); endNum.value = String(signal.length - 1); updatePhasePlot(); });
+    startNum.addEventListener('change', updatePhasePlot);
+    endNum.addEventListener('change', updatePhasePlot);
+
+    // 初始化数值范围
+    startNum.min = '0'; startNum.max = String(signal.length - 2);
+    endNum.min = '1'; endNum.max = String(signal.length - 1); endNum.value = '2000';
+    updatePhasePlot();
+
+    // 自适应窗口
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // 动画循环
+    function animate() {
+      requestAnimationFrame(animate);
+      orbit.update();
+      updateSpriteOpacityByDistance();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
+

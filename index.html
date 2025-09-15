@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <title>three.js 点组编辑 Demo (增删改查)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #0e0f12; color: #e8e8e8; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    #info-panel {
+      position: fixed; left: 10px; top: 10px; z-index: 10;
+      background: rgba(0,0,0,0.6); padding: 10px 15px; border-radius: 8px;
+      font-size: 13px; line-height: 1.6; user-select: none;
+    }
+    #info-panel b { color: #fff; font-size: 14px; }
+    #controls-panel {
+      position: fixed; left: 10px; top: 180px; z-index: 10;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .btn {
+      background: #333; color: #eee; border: 1px solid #555; padding: 8px 12px;
+      border-radius: 5px; cursor: pointer; transition: background 0.2s;
+    }
+    .btn:hover { background: #444; }
+    .btn:disabled { background: #222; color: #666; cursor: not-allowed; border-color: #333; }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="info-panel">
+    <b>操作指南</b><br>
+    • 点击点/线/面选中整个组<br>
+    • 拖动控制柄移动点<br>
+    • W/E/R: 移动/旋转/缩放模式<br>
+    • Q: 切换坐标系 | Esc: 取消选择
+  </div>
+
+  <div id="controls-panel">
+    <button id="addBtn" class="btn">增加一个组 (A)</button>
+    <button id="deleteBtn" class="btn" disabled>删除选中组 (Del)</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+    // --- 基本设置 ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0e0f12);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(8, 8, 10);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+    const orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.enableDamping = true;
+
+    // --- 灯光与网格 ---
+    scene.add(new THREE.AmbientLight(0xcccccc, 0.5));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
+    const grid = new THREE.GridHelper(30, 30, 0x444444, 0x222222);
+    scene.add(grid);
+
+    // --- 全局变量与数据结构 ---
+    const patches = new Map(); // 使用 Map 存储所有组，方便通过 ID 查找和删除
+    let patchIdCounter = 0;
+    let selectedPatch = null;
+
+    const SPRITE_SIZE = 0.3 / 4; // 直径是原来的 1/4
+    const FADE_MIN_DIST = 15;
+    const FADE_MAX_DIST = 40;
+
+    const baseColors = {
+      main: new THREE.Color('#ff6b6b'), // 主点
+      u: new THREE.Color('#4d96ff'),    // U点
+      v: new THREE.Color('#51cf66'),    // V点
+      line: new THREE.Color('#aaaaaa'),
+      quad: new THREE.Color('#ffffff'),
+    };
+    const highlightColor = new THREE.Color('#ffdd59');
+
+    // --- 变换控制器 ---
+    const gizmo = new TransformControls(camera, renderer.domElement);
+    gizmo.setSize(0.7);
+    scene.add(gizmo);
+    gizmo.addEventListener('dragging-changed', e => orbit.enabled = !e.value);
+    gizmo.addEventListener('objectChange', () => {
+      if (selectedPatch) {
+        updatePatchGeometry(selectedPatch);
+      }
+    });
+
+    // --- 共享资源 ---
+    const createWhiteCircleTexture = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64; canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.beginPath();
+      ctx.arc(32, 32, 30, 0, 2 * Math.PI);
+      ctx.fillStyle = 'white';
+      ctx.fill();
+      return new THREE.CanvasTexture(canvas);
+    };
+    const whiteCircleTexture = createWhiteCircleTexture();
+
+    // --- 核心功能函数 ---
+
+    // 创建一个点 (Sprite)
+    function createPoint(position, patchId, role) {
+      const mat = new THREE.SpriteMaterial({
+        map: whiteCircleTexture,
+        color: baseColors[role].clone(),
+        transparent: true,
+        alphaTest: 0.01,
+      });
+      const point = new THREE.Sprite(mat);
+      point.position.copy(position);
+      point.scale.set(SPRITE_SIZE, SPRITE_SIZE, 1);
+      point.userData = { type: 'point', patchId, role };
+      return point;
+    }
+
+    // 创建一个新组 (Patch)
+    function createPatch(centerPos) {
+      const patchId = patchIdCounter++;
+      
+      // 1. 创建三个点
+      const mainPoint = createPoint(centerPos, patchId, 'main');
+      const uPoint = createPoint(centerPos.clone().add(new THREE.Vector3(1, 0, 0)), patchId, 'u');
+      const vPoint = createPoint(centerPos.clone().add(new THREE.Vector3(0, 0, 1)), patchId, 'v');
+      
+      // 2. 创建两条线
+      const lineMaterial = new THREE.LineBasicMaterial({ color: baseColors.line, transparent: true });
+      const uLine = new THREE.Line(new THREE.BufferGeometry(), lineMaterial.clone());
+      const vLine = new THREE.Line(new THREE.BufferGeometry(), lineMaterial.clone());
+      uLine.userData = { type: 'line', patchId, role: 'u' };
+      vLine.userData = { type: 'line', patchId, role: 'v' };
+
+      // 3. 创建平行四边形
+      const quadMaterial = new THREE.MeshBasicMaterial({
+        color: baseColors.quad,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.15,
+      });
+      const quad = new THREE.Mesh(new THREE.BufferGeometry(), quadMaterial);
+      quad.userData = { type: 'quad', patchId };
+
+      // 4. 组装 Patch 对象
+      const patch = {
+        id: patchId,
+        points: { main: mainPoint, u: uPoint, v: vPoint },
+        lines: { u: uLine, v: vLine },
+        quad: quad,
+        objects: [mainPoint, uPoint, vPoint, uLine, vLine, quad],
+      };
+
+      // 5. 更新几何并添加到场景
+      updatePatchGeometry(patch);
+      patch.objects.forEach(obj => scene.add(obj));
+      
+      patches.set(patchId, patch);
+      return patch;
+    }
+
+    // 更新一个组的线和四边形几何
+    function updatePatchGeometry(patch) {
+      const { main, u, v } = patch.points;
+      
+      // 更新线
+      patch.lines.u.geometry.setFromPoints([main.position, u.position]);
+      patch.lines.v.geometry.setFromPoints([main.position, v.position]);
+      
+      // 更新四边形
+      const p4 = new THREE.Vector3().addVectors(u.position, v.position).sub(main.position);
+      const positions = new Float32Array([
+        ...main.position.toArray(),
+        ...u.position.toArray(),
+        ...p4.toArray(),
+        ...v.position.toArray(),
+      ]);
+      const indices = [0, 1, 2, 0, 2, 3];
+      patch.quad.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      patch.quad.geometry.setIndex(indices);
+      patch.quad.geometry.computeVertexNormals();
+      patch.quad.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // 删除一个组
+    function deletePatch(patchId) {
+      const patch = patches.get(patchId);
+      if (!patch) return;
+
+      if (selectedPatch && selectedPatch.id === patchId) {
+        clearSelection();
+      }
+
+      patch.objects.forEach(obj => {
+        scene.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) Array.isArray(obj.material) ? obj.material.forEach(m => m.dispose()) : obj.material.dispose();
+      });
+
+      patches.delete(patchId);
+    }
+
+    // 清除当前选择
+    function clearSelection() {
+      if (!selectedPatch) return;
+      
+      const patch = selectedPatch;
+      Object.values(patch.points).forEach(p => p.material.color.copy(baseColors[p.userData.role]));
+      Object.values(patch.lines).forEach(l => l.material.color.copy(baseColors.line));
+      patch.quad.material.opacity = 0.15;
+      
+      gizmo.detach();
+      selectedPatch = null;
+      document.getElementById('deleteBtn').disabled = true;
+    }
+
+    // 设置选中组
+    function setSelection(patch, clickedObject) {
+      if (selectedPatch && selectedPatch.id === patch.id) {
+          if (clickedObject.userData.type === 'point' && gizmo.object !== clickedObject) {
+              gizmo.attach(clickedObject);
+          }
+          return;
+      }
+      
+      clearSelection();
+      
+      selectedPatch = patch;
+      
+      // 高亮整个组
+      Object.values(patch.points).forEach(p => p.material.color.copy(highlightColor));
+      Object.values(patch.lines).forEach(l => l.material.color.copy(highlightColor));
+      patch.quad.material.opacity = 0.4;
+      
+      // 将 gizmo 附着到被点击的点上，如果没有点则附着到主点
+      const targetPoint = (clickedObject && clickedObject.userData.type === 'point') ? clickedObject : patch.points.main;
+      gizmo.attach(targetPoint);
+      
+      document.getElementById('deleteBtn').disabled = false;
+    }
+
+    // --- 事件监听 ---
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    renderer.domElement.addEventListener('pointerdown', (event) => {
+      if (gizmo.dragging) return;
+
+      pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+
+      const allInteractiveObjects = Array.from(patches.values()).flatMap(p => p.objects);
+      const hits = raycaster.intersectObjects(allInteractiveObjects, false);
+
+      if (hits.length > 0) {
+        const firstHit = hits[0].object;
+        const patch = patches.get(firstHit.userData.patchId);
+        if (patch) {
+          setSelection(patch, firstHit);
+        }
+      } else {
+        clearSelection();
+      }
+    });
+    
+    // UI 按钮和快捷键
+    const addBtn = document.getElementById('addBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+
+    const addAction = () => {
+        const newPatchPos = new THREE.Vector3(
+            THREE.MathUtils.randFloatSpread(10), 2, THREE.MathUtils.randFloatSpread(10)
+        );
+        const newPatch = createPatch(newPatchPos);
+        setSelection(newPatch, newPatch.points.main);
+    };
+    
+    const deleteAction = () => {
+        if (selectedPatch) {
+            deletePatch(selectedPatch.id);
+        }
+    };
+
+    addBtn.addEventListener('click', addAction);
+    deleteBtn.addEventListener('click', deleteAction);
+
+    window.addEventListener('keydown', (e) => {
+      switch (e.key.toLowerCase()) {
+        case 'q': gizmo.setSpace(gizmo.space === 'local' ? 'world' : 'local'); break;
+        case 'w': gizmo.setMode('translate'); break;
+        case 'e': gizmo.setMode('rotate'); break;
+        case 'r': gizmo.setMode('scale'); break;
+        case 'escape': clearSelection(); break;
+        case 'a': addAction(); break;
+        case 'delete': case 'backspace': deleteAction(); break;
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    
+    // 创建初始的组
+    createPatch(new THREE.Vector3(0, 2, 0));
+    createPatch(new THREE.Vector3(-4, 1, -3));
+
+    // --- 动画循环 ---
+    const cameraWorldPos = new THREE.Vector3();
+    const pointWorldPos = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      orbit.update();
+      
+      // 动态调整点的不透明度以体现远近
+      camera.getWorldPosition(cameraWorldPos);
+      patches.forEach(patch => {
+        Object.values(patch.points).forEach(point => {
+          point.getWorldPosition(pointWorldPos);
+          const dist = cameraWorldPos.distanceTo(pointWorldPos);
+          // smoothstep(val, min, max) -> 0 if val<=min, 1 if val>=max
+          // 我们想要反过来，近的亮，远的暗
+          const opacityFactor = 1.0 - THREE.MathUtils.smoothstep(dist, FADE_MIN_DIST, FADE_MAX_DIST);
+          point.material.opacity = Math.max(0.2, opacityFactor); // 保证最远也有0.2的不透明度
+        });
+      });
+
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>

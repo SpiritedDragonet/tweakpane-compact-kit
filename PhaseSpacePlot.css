@@ -1,0 +1,33 @@
+.phase-space-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ccc;
+  text-align: center;
+  font-size: 14px;
+  background-color: rgba(28, 37, 44, 0.8);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  pointer-events: none;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.phase-space-overlay div:last-child {
+  font-size: 12px;
+  color: #888;
+  margin-top: 8px;
+}
+
+.phase-space-overlay.error {
+  color: #ff6b6b;
+}
+
+.phase-space-overlay.error div:last-child {
+  color: #ff6b6b;
+} 
