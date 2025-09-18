@@ -87,7 +87,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     quad: new THREE.Color('#ffffff'),
   } as const;
   const highlightColor = new THREE.Color('#ffdd59');
-  const LINE_OPACITY = 0.9;
+  const LINE_OPACITY = 0.99;
   const LINE_OPACITY_SELECTED = 1.0;
   function randomColorHex() {
     const h = Math.random();
@@ -168,7 +168,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     (sel.lines.v.material as THREE.LineBasicMaterial).color.copy(baseColors.v);
     (sel.lines.u.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY;
     (sel.lines.v.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY;
-    (sel.quad.material as THREE.MeshBasicMaterial).opacity = 0.15;
+    (sel.quad.material as THREE.MeshBasicMaterial).opacity = 0.165;
     (sel.quad.material as THREE.MeshBasicMaterial).color.copy(sel.color);
     gizmoRef.current?.detach();
     selectedPatchRef.current = null;
@@ -187,7 +187,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     // Keep u/v line colors, only raise opacity for selection
     (p.lines.u.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY_SELECTED;
     (p.lines.v.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY_SELECTED;
-    (p.quad.material as THREE.MeshBasicMaterial).opacity = 0.4;
+    (p.quad.material as THREE.MeshBasicMaterial).opacity = 0.44;
     selectedClickedObjectRef.current = clickedObject ?? null;
     ensureAttachTarget(p);
   }
@@ -343,7 +343,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     const lineMaterial = new THREE.LineBasicMaterial({ color: baseColors.line, transparent: true, opacity: LINE_OPACITY });
     const uLine = new THREE.Line(new THREE.BufferGeometry(), lineMaterial.clone()); uLine.userData = { type: 'line', patchId: id, role: 'u' }; (uLine.material as THREE.LineBasicMaterial).color.copy(baseColors.u);
     const vLine = new THREE.Line(new THREE.BufferGeometry(), lineMaterial.clone()); vLine.userData = { type: 'line', patchId: id, role: 'v' }; (vLine.material as THREE.LineBasicMaterial).color.copy(baseColors.v);
-    const quadMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.15 });
+    const quadMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.165 });
     const quad = new THREE.Mesh(new THREE.BufferGeometry(), quadMaterial); quad.userData = { type: 'quad', patchId: id };
     group.add(mainPoint, uPoint, vPoint, uLine, vLine, quad);
     const color = new THREE.Color(randomColorHex());
@@ -390,7 +390,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       const lineMaterial = new THREE.LineBasicMaterial({ color: baseColors.line, transparent: true, opacity: LINE_OPACITY });
       const uLine = new THREE.Line(new THREE.BufferGeometry(), lineMaterial.clone()); uLine.userData = { type: 'line', patchId: id, role: 'u' }; (uLine.material as THREE.LineBasicMaterial).color.copy(baseColors.u);
       const vLine = new THREE.Line(new THREE.BufferGeometry(), lineMaterial.clone()); vLine.userData = { type: 'line', patchId: id, role: 'v' }; (vLine.material as THREE.LineBasicMaterial).color.copy(baseColors.v);
-      const quadMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.15 });
+      const quadMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.165 });
       const quad = new THREE.Mesh(new THREE.BufferGeometry(), quadMaterial); quad.userData = { type: 'quad', patchId: id };
       group.add(mainPoint, uPoint, vPoint, uLine, vLine, quad);
       const color = new THREE.Color(dto.color ?? randomColorHex());
