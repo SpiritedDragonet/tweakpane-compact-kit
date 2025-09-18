@@ -38,9 +38,12 @@ type Props = {
   debug?: boolean;
   pointPixelSize?: number; // desired on-screen size for point sprites (in pixels)
   onPatchesChange?: (patches: PatchDTO[]) => void;
+  // Controls how close auto-framing gets relative to the original 2.0× span
+  // e.g., 10 => 10x closer than original (d = maxSpan * 2.0 / 10 = 0.2 * maxSpan)
+  frameCloseness?: number;
 };
 
-export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, onPatchesChange }, ref) {
+export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, onPatchesChange, frameCloseness = 10 }, ref) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -81,6 +84,14 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   // Track last bounds we auto-framed for, and whether user interacted with camera
   const lastFramedBoundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null>(null);
   const userInteractedRef = useRef(false);
+  // Adjustable default framing closeness (10x by default)
+  const frameClosenessRef = useRef<number>(frameCloseness);
+  useEffect(() => { frameClosenessRef.current = Math.max(1e-6, frameCloseness || 10); }, [frameCloseness]);
+  const computeDesiredDistance = (span: number) => {
+    const closeness = Math.max(1e-6, frameClosenessRef.current);
+    // Original was 2.0 * span; closer => divide by closeness
+    return span * (2.0 / closeness);
+  };
 
   const baseColors = {
     main: new THREE.Color('#ff6b6b'),
@@ -463,7 +474,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       const { minX, maxX, minY, maxY, minZ, maxZ } = b;
       const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
       const rX = maxX - minX, rY = maxY - minY, rZ = maxZ - minZ;
-      const d = (Math.max(rX, rY, rZ) || 1) * 0.1; // 20x closer than original (2.0)
+      const d = computeDesiredDistance(Math.max(rX, rY, rZ) || 1);
       cam.position.set(cx + d * 0.7, cy + d * 0.7, cz + d * 0.7);
       cam.lookAt(cx, cy, cz);
       orbit.target.set(cx, cy, cz); orbit.update();
@@ -773,7 +784,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       if (!shouldFrame) {
         // Also reframe if camera is extremely far relative to desired framing
         const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
-        const desired = (Math.max(maxX - minX, maxY - minY, maxZ - minZ) || 1) * 0.1 * 1.1; // 20x closer baseline with small slack
+        const desired = computeDesiredDistance(Math.max(maxX - minX, maxY - minY, maxZ - minZ) || 1) * 1.1; // small slack
         const center = new THREE.Vector3(cx, cy, cz);
         const distNow = cam.position.distanceTo(center);
         if (distNow > desired * 6) shouldFrame = true;
@@ -781,7 +792,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       if (shouldFrame) {
         const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
         const rX = maxX - minX, rY = maxY - minY, rZ = maxZ - minZ;
-        const d = (Math.max(rX, rY, rZ) || 1) * 0.1; // 20x closer than original (2.0)
+        const d = computeDesiredDistance(Math.max(rX, rY, rZ) || 1);
         cam.position.set(cx + d * 0.7, cy + d * 0.7, cz + d * 0.7);
         cam.lookAt(cx, cy, cz); orbit.target.set(cx, cy, cz); orbit.update();
         hasFramedOnceRef.current = true;

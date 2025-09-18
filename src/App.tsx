@@ -22,6 +22,7 @@ export const App: React.FC = () => {
   const [start, setStart] = useState<number>(0);
   const [end, setEnd] = useState<number>(2000);
   const [pointSizePx, setPointSizePx] = useState<number>(15);
+  const [frameCloseness, setFrameCloseness] = useState<number>(10); // 默认近景倍数
   const [patches, setPatches] = useState<PatchDTO[]>([]);
   const [toolMode, setToolMode] = useState<'translate'|'rotate'|'scale'>('translate');
   const [toolSpace, setToolSpace] = useState<'local'|'world'>('local');
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
             external={external}
             debug={true}
             pointPixelSize={pointSizePx}
+            frameCloseness={frameCloseness}
             onPatchesChange={setPatches}
           />
         </div>
@@ -64,6 +66,30 @@ export const App: React.FC = () => {
             <label style={{ minWidth: 70, color: '#cfcfcf' }}>τ (Tau)</label>
             <input type="range" min={1} max={50} step={1} value={tau} onChange={(e) => setTau(parseInt(e.target.value, 10))} style={{ flex: 1 }} />
             <input type="number" min={1} max={50} step={1} value={tau} onChange={(e) => setTau(parseInt(e.target.value, 10) || 8)} style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+            <label style={{ minWidth: 70, color: '#cfcfcf' }}>近景倍数</label>
+            <input
+              type="range"
+              min={2}
+              max={40}
+              step={1}
+              value={frameCloseness}
+              onChange={(e) => setFrameCloseness(parseInt(e.target.value, 10))}
+              style={{ flex: 1 }}
+            />
+            <input
+              type="number"
+              min={1}
+              max={100}
+              step={1}
+              value={frameCloseness}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                setFrameCloseness(Number.isFinite(v) ? Math.max(1, Math.min(100, v)) : 10);
+              }}
+              style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
+            />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
             <label style={{ minWidth: 70, color: '#cfcfcf' }}>Start</label>
