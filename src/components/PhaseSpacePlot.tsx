@@ -78,6 +78,9 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   // Track when to auto-frame: only on first plot or when signal object changes
   const hasFramedOnceRef = useRef(false);
   const lastSignalObjRef = useRef<any>(null);
+  // Track last bounds we auto-framed for, and whether user interacted with camera
+  const lastFramedBoundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null>(null);
+  const userInteractedRef = useRef(false);
 
   const baseColors = {
     main: new THREE.Color('#ff6b6b'),
@@ -464,6 +467,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       cam.position.set(cx + d * 0.7, cy + d * 0.7, cz + d * 0.7);
       cam.lookAt(cx, cy, cz);
       orbit.target.set(cx, cy, cz); orbit.update();
+      lastFramedBoundsRef.current = { minX, maxX, minY, maxY, minZ, maxZ };
     },
   }), []);
 
@@ -490,6 +494,8 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true;
     orbitRef.current = orbit;
+    // Mark any camera interaction so we won't auto-frame on param-only tweaks
+    orbit.addEventListener('start', () => { userInteractedRef.current = true; });
 
     // Lights
     scene.add(new THREE.AmbientLight(0xcccccc, 0.5));
@@ -759,14 +765,19 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
 
     const cam = cameraRef.current, orbit = orbitRef.current; if (cam && orbit) {
       const signalChanged = lastSignalObjRef.current !== external.signal;
-      const shouldFrame = !hasFramedOnceRef.current || signalChanged;
+      const prev = lastFramedBoundsRef.current;
+      const sizeOld = prev ? Math.max(prev.maxX - prev.minX, prev.maxY - prev.minY, prev.maxZ - prev.minZ) : null;
+      const sizeNew = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
+      const sizeRatio = sizeOld && sizeNew > 1e-9 ? Math.max(sizeOld, sizeNew) / Math.max(1e-9, Math.min(sizeOld, sizeNew)) : Infinity;
+      const shouldFrame = !hasFramedOnceRef.current || signalChanged || (!userInteractedRef.current && (sizeRatio > 2.0));
       if (shouldFrame) {
         const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
         const rX = maxX - minX, rY = maxY - minY, rZ = maxZ - minZ;
         const d = (Math.max(rX, rY, rZ) || 1) * 0.2; // 10x closer than original (2.0)
         cam.position.set(cx + d * 0.7, cy + d * 0.7, cz + d * 0.7);
-      cam.lookAt(cx, cy, cz); orbit.target.set(cx, cy, cz); orbit.update();
+        cam.lookAt(cx, cy, cz); orbit.target.set(cx, cy, cz); orbit.update();
         hasFramedOnceRef.current = true;
+        lastFramedBoundsRef.current = { minX, maxX, minY, maxY, minZ, maxZ };
       }
       lastSignalObjRef.current = external.signal;
     }
