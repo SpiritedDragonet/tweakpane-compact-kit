@@ -463,7 +463,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       const { minX, maxX, minY, maxY, minZ, maxZ } = b;
       const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
       const rX = maxX - minX, rY = maxY - minY, rZ = maxZ - minZ;
-      const d = (Math.max(rX, rY, rZ) || 1) * 0.2; // 10x closer than original (2.0)
+      const d = (Math.max(rX, rY, rZ) || 1) * 0.1; // 20x closer than original (2.0)
       cam.position.set(cx + d * 0.7, cy + d * 0.7, cz + d * 0.7);
       cam.lookAt(cx, cy, cz);
       orbit.target.set(cx, cy, cz); orbit.update();
@@ -769,11 +769,19 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       const sizeOld = prev ? Math.max(prev.maxX - prev.minX, prev.maxY - prev.minY, prev.maxZ - prev.minZ) : null;
       const sizeNew = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
       const sizeRatio = sizeOld && sizeNew > 1e-9 ? Math.max(sizeOld, sizeNew) / Math.max(1e-9, Math.min(sizeOld, sizeNew)) : Infinity;
-      const shouldFrame = !hasFramedOnceRef.current || signalChanged || (!userInteractedRef.current && (sizeRatio > 2.0));
+      let shouldFrame = !hasFramedOnceRef.current || signalChanged || (!userInteractedRef.current && (sizeRatio > 2.0));
+      if (!shouldFrame) {
+        // Also reframe if camera is extremely far relative to desired framing
+        const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
+        const desired = (Math.max(maxX - minX, maxY - minY, maxZ - minZ) || 1) * 0.1 * 1.1; // 20x closer baseline with small slack
+        const center = new THREE.Vector3(cx, cy, cz);
+        const distNow = cam.position.distanceTo(center);
+        if (distNow > desired * 6) shouldFrame = true;
+      }
       if (shouldFrame) {
         const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
         const rX = maxX - minX, rY = maxY - minY, rZ = maxZ - minZ;
-        const d = (Math.max(rX, rY, rZ) || 1) * 0.2; // 10x closer than original (2.0)
+        const d = (Math.max(rX, rY, rZ) || 1) * 0.1; // 20x closer than original (2.0)
         cam.position.set(cx + d * 0.7, cy + d * 0.7, cz + d * 0.7);
         cam.lookAt(cx, cy, cz); orbit.target.set(cx, cy, cz); orbit.update();
         hasFramedOnceRef.current = true;
