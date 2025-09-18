@@ -460,7 +460,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       const { minX, maxX, minY, maxY, minZ, maxZ } = b;
       const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
       const rX = maxX - minX, rY = maxY - minY, rZ = maxZ - minZ;
-      const d = (Math.max(rX, rY, rZ) || 1) * 2.0;
+      const d = (Math.max(rX, rY, rZ) || 1) * 1.2; // closer default framing
       cam.position.set(cx + d * 0.7, cy + d * 0.7, cz + d * 0.7);
       cam.lookAt(cx, cy, cz);
       orbit.target.set(cx, cy, cz); orbit.update();
@@ -763,9 +763,9 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       if (shouldFrame) {
         const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
         const rX = maxX - minX, rY = maxY - minY, rZ = maxZ - minZ;
-        const d = (Math.max(rX, rY, rZ) || 1) * 2.0;
-        cam.position.set(cx + d * 0.7, cy + d * 0.7, cz + d * 0.7);
-        cam.lookAt(cx, cy, cz); orbit.target.set(cx, cy, cz); orbit.update();
+      const d = (Math.max(rX, rY, rZ) || 1) * 1.2; // closer default framing
+      cam.position.set(cx + d * 0.7, cy + d * 0.7, cz + d * 0.7);
+      cam.lookAt(cx, cy, cz); orbit.target.set(cx, cy, cz); orbit.update();
         hasFramedOnceRef.current = true;
       }
       lastSignalObjRef.current = external.signal;
