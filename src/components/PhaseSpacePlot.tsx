@@ -43,7 +43,7 @@ type Props = {
   frameCloseness?: number;
 };
 
-export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, onPatchesChange, frameCloseness = 10 }, ref) {
+export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, onPatchesChange, frameCloseness = 2 }, ref) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -86,7 +86,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const userInteractedRef = useRef(false);
   // Adjustable default framing closeness (10x by default)
   const frameClosenessRef = useRef<number>(frameCloseness);
-  useEffect(() => { frameClosenessRef.current = Math.max(1e-6, frameCloseness || 10); }, [frameCloseness]);
+  useEffect(() => { frameClosenessRef.current = Math.max(1e-6, frameCloseness || 2); }, [frameCloseness]);
   const computeDesiredDistance = (span: number) => {
     const closeness = Math.max(1e-6, frameClosenessRef.current);
     // Original was 2.0 * span; closer => divide by closeness
@@ -103,7 +103,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     const { minX, maxX, minY, maxY, minZ, maxZ } = b;
     const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
     const span = Math.max(maxX - minX, maxY - minY, maxZ - minZ) || 1;
-    const desired = span * (2.0 / Math.max(1e-6, frameCloseness || 10));
+    const desired = span * (2.0 / Math.max(1e-6, frameCloseness || 2));
     const center = new THREE.Vector3(cx, cy, cz);
     const dir = cam.position.clone().sub(center);
     if (dir.lengthSq() < 1e-12) dir.set(0.7, 0.7, 0.7);

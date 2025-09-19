@@ -22,7 +22,7 @@ export const App: React.FC = () => {
   const [start, setStart] = useState<number>(0);
   const [end, setEnd] = useState<number>(2000);
   const [pointSizePx, setPointSizePx] = useState<number>(15);
-  const [frameCloseness, setFrameCloseness] = useState<number>(10); // 默认近景倍数
+  const [frameCloseness, setFrameCloseness] = useState<number>(2); // 默认近景倍数（更贴近你的偏好）
   const [patches, setPatches] = useState<PatchDTO[]>([]);
   const [toolMode, setToolMode] = useState<'translate'|'rotate'|'scale'>('translate');
   const [toolSpace, setToolSpace] = useState<'local'|'world'>('local');
@@ -80,13 +80,13 @@ export const App: React.FC = () => {
             />
             <input
               type="number"
-              min={1}
+              min={2}
               max={100}
               step={1}
               value={frameCloseness}
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
-                setFrameCloseness(Number.isFinite(v) ? Math.max(1, Math.min(100, v)) : 10);
+                setFrameCloseness(Number.isFinite(v) ? Math.max(2, Math.min(100, v)) : 2);
               }}
               style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
             />
