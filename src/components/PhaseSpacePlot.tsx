@@ -83,6 +83,8 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const [ready, setReady] = useState(false);
   const lastPointerRef = useRef<{x:number;y:number}>({ x: 0, y: 0 });
   const rotateRadPerPixelRef = useRef<number>(0.01);
+  // Uniform scaling vertical sensitivity: exp(-dy * alpha) mapped to [0.1, 20]
+  const uniformScaleAlphaRef = useRef<number>(Math.log(20) / 280); // ~280px to reach 20x
   // Track when to auto-frame: only on first plot or when signal object changes
   const hasFramedOnceRef = useRef(false);
   const lastSignalObjRef = useRef<any>(null);
@@ -355,10 +357,8 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
 
       // Route based on handle
       if (!axisName || axisName === 'E' || axisName === 'XYZ' || axisName.length > 1) {
-        // Overall scaling (center cube): identical feel/mapping as Z-axis
-        const compZ = Math.max(1e-6, s.z);
-        const stepUniform = mapScale(compZ);
-        applyUniform(stepUniform);
+        // Skip center-handle scale here; handled in pointermove for strict 2D mapping
+        return;
       } else if (axisName === 'X' || axisName === 'Y' || axisName === 'Z') {
         const comp = axisName === 'X' ? s.x : axisName === 'Y' ? s.y : s.z;
         const stepAxis = mapScale(Math.max(1e-6, comp));
@@ -669,41 +669,58 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         if (!gizmo || !camera) return;
         if (!gizmo.dragging) { lastPointerRef.current = { x: event.clientX, y: event.clientY }; return; }
         const mode = (gizmo as any).mode as 'translate'|'rotate'|'scale';
-        if (mode !== 'rotate') { lastPointerRef.current = { x: event.clientX, y: event.clientY }; return; }
+        if (mode !== 'rotate' && mode !== 'scale') { lastPointerRef.current = { x: event.clientX, y: event.clientY }; return; }
         const sel = selectedPatchRef.current; const pivot = pivotRef.current; const snap = dragSnapshotRef.current;
         if (!sel || !pivot || !snap || snap.patchId !== sel.id) { lastPointerRef.current = { x: event.clientX, y: event.clientY }; return; }
         const pointerStart = snap.pointerStart ?? lastPointerRef.current;
-        const dx = event.clientX - pointerStart.x;
-        const dy = event.clientY - pointerStart.y;
-        const rad = (dx - dy * 0.2) * rotateRadPerPixelRef.current;
-        const space = (gizmo as any).space as 'local'|'world';
         const axisName = (gizmo as any).axis as string | null;
-        let axisWorld = new THREE.Vector3(0,1,0);
-        const camDir = new THREE.Vector3();
-        camera.getWorldDirection(camDir);
-        if (!axisName || axisName === 'E' || axisName === 'XYZ' || axisName.length > 1) {
-          axisWorld.copy(camDir);
-        } else if (axisName.includes('X')) axisWorld.set(1,0,0);
-        else if (axisName.includes('Y')) axisWorld.set(0,1,0);
-        else if (axisName.includes('Z')) axisWorld.set(0,0,1);
-        if (space === 'local') {
-          const groupQuat = new THREE.Quaternion(); sel.group.getWorldQuaternion(groupQuat);
-          axisWorld.applyQuaternion(groupQuat);
+        if (mode === 'rotate') {
+          const dx = event.clientX - pointerStart.x;
+          const dy = event.clientY - pointerStart.y;
+          const rad = (dx - dy * 0.2) * rotateRadPerPixelRef.current;
+          const space = (gizmo as any).space as 'local'|'world';
+          let axisWorld = new THREE.Vector3(0,1,0);
+          const camDir = new THREE.Vector3(); camera.getWorldDirection(camDir);
+          if (!axisName || axisName === 'E' || axisName === 'XYZ' || axisName.length > 1) axisWorld.copy(camDir);
+          else if (axisName.includes('X')) axisWorld.set(1,0,0);
+          else if (axisName.includes('Y')) axisWorld.set(0,1,0);
+          else if (axisName.includes('Z')) axisWorld.set(0,0,1);
+          if (space === 'local') { const groupQuat = new THREE.Quaternion(); sel.group.getWorldQuaternion(groupQuat); axisWorld.applyQuaternion(groupQuat); }
+          axisWorld.normalize();
+          const invGroup = new THREE.Quaternion(); sel.group.getWorldQuaternion(invGroup).invert();
+          const axisLocal = axisWorld.clone().applyQuaternion(invGroup).normalize();
+          const deltaLocal = new THREE.Quaternion().setFromAxisAngle(axisLocal, rad);
+          const pivotLocal0 = snap.pivotLocal0;
+          const rotateFrom0 = (orig: THREE.Vector3, dst: THREE.Vector3) => {
+            const rel0 = orig.clone().sub(pivotLocal0).applyQuaternion(deltaLocal);
+            dst.copy(pivotLocal0.clone().add(rel0));
+          };
+          rotateFrom0(snap.main0, sel.points.main.position);
+          rotateFrom0(snap.u0, sel.points.u.position);
+          rotateFrom0(snap.v0, sel.points.v.position);
+          updatePatchGeometry(sel); emitChange(); pivot.quaternion.identity();
+          lastPointerRef.current = { x: event.clientX, y: event.clientY };
+          return;
         }
-        axisWorld.normalize();
-        const invGroup = new THREE.Quaternion(); sel.group.getWorldQuaternion(invGroup).invert();
-        const axisLocal = axisWorld.clone().applyQuaternion(invGroup).normalize();
-        const deltaLocal = new THREE.Quaternion().setFromAxisAngle(axisLocal, rad);
-        const pivotLocal0 = snap.pivotLocal0;
-        const rotateFrom0 = (orig: THREE.Vector3, dst: THREE.Vector3) => {
-          const rel0 = orig.clone().sub(pivotLocal0).applyQuaternion(deltaLocal);
-          dst.copy(pivotLocal0.clone().add(rel0));
-        };
-        rotateFrom0(snap.main0, sel.points.main.position);
-        rotateFrom0(snap.u0, sel.points.u.position);
-        rotateFrom0(snap.v0, sel.points.v.position);
-        updatePatchGeometry(sel); emitChange();
-        pivot.quaternion.identity();
+        // Scale with strict 2D mapping for center handle
+        if (mode === 'scale' && (!axisName || axisName === 'E' || axisName === 'XYZ' || axisName.length > 1)) {
+          const dy = event.clientY - pointerStart.y; // up (negative) => enlarge
+          const alpha = uniformScaleAlphaRef.current;
+          let step = Math.exp(-dy * alpha);
+          step = Math.min(20, Math.max(0.1, step));
+          const pivotLocal0 = snap.pivotLocal0;
+          const scalePointFrom0 = (orig: THREE.Vector3, dst: THREE.Vector3) => {
+            const rel0 = orig.clone().sub(pivotLocal0).multiplyScalar(step);
+            dst.copy(pivotLocal0.clone().add(rel0));
+          };
+          scalePointFrom0(snap.main0, sel.points.main.position);
+          scalePointFrom0(snap.u0, sel.points.u.position);
+          scalePointFrom0(snap.v0, sel.points.v.position);
+          updatePatchGeometry(sel); emitChange();
+          lastPointerRef.current = { x: event.clientX, y: event.clientY };
+          return;
+        }
+        // For other scale cases, let objectChange handle it
         lastPointerRef.current = { x: event.clientX, y: event.clientY };
       };
       renderer.domElement.addEventListener('pointermove', onPointerMove);
