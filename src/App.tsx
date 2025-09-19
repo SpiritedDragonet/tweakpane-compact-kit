@@ -148,7 +148,7 @@ export const App: React.FC = () => {
               })()}
             </div>
             {(() => {
-              const disabled = selection.patchId == null;
+              const disabled = selection.patchId == null || selection.role == null;
               const getPatch = () => patches.find(pp => pp.id === selection.patchId) || null;
               const applyOp = (op: string) => {
                 const p = getPatch(); if (!p) return;
@@ -176,20 +176,35 @@ export const App: React.FC = () => {
                     default: return vec;
                   }
                 };
-                const newM = transform(m, op);
-                const uRel: [number,number,number] = [u[0]-m[0], u[1]-m[1], u[2]-m[2]];
-                const vRel: [number,number,number] = [v[0]-m[0], v[1]-m[1], v[2]-m[2]];
-                const newUAbs = isRel ? ((() => { const r = transform(uRel, op); return [m[0]+r[0], m[1]+r[1], m[2]+r[2]] as [number,number,number]; })()) : transform(u, op);
-                const newVAbs = isRel ? ((() => { const r = transform(vRel, op); return [m[0]+r[0], m[1]+r[1], m[2]+r[2]] as [number,number,number]; })()) : transform(v, op);
-                plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
-                plotRef.current?.updatePointWorld(p.id, 'u', { x: newUAbs[0], y: newUAbs[1], z: newUAbs[2] });
-                plotRef.current?.updatePointWorld(p.id, 'v', { x: newVAbs[0], y: newVAbs[1], z: newVAbs[2] });
+                const role = selection.role as 'main'|'u'|'v';
+                if (role === 'main') {
+                  const newM = transform(m, op); // p uses absolute in both modes
+                  plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
+                } else if (role === 'u') {
+                  if (isRel) {
+                    const uRel: [number,number,number] = [u[0]-m[0], u[1]-m[1], u[2]-m[2]];
+                    const r = transform(uRel, op); const newUAbs: [number,number,number] = [m[0]+r[0], m[1]+r[1], m[2]+r[2]];
+                    plotRef.current?.updatePointWorld(p.id, 'u', { x: newUAbs[0], y: newUAbs[1], z: newUAbs[2] });
+                  } else {
+                    const newU = transform(u, op);
+                    plotRef.current?.updatePointWorld(p.id, 'u', { x: newU[0], y: newU[1], z: newU[2] });
+                  }
+                } else if (role === 'v') {
+                  if (isRel) {
+                    const vRel: [number,number,number] = [v[0]-m[0], v[1]-m[1], v[2]-m[2]];
+                    const r = transform(vRel, op); const newVAbs: [number,number,number] = [m[0]+r[0], m[1]+r[1], m[2]+r[2]];
+                    plotRef.current?.updatePointWorld(p.id, 'v', { x: newVAbs[0], y: newVAbs[1], z: newVAbs[2] });
+                  } else {
+                    const newV = transform(v, op);
+                    plotRef.current?.updatePointWorld(p.id, 'v', { x: newV[0], y: newV[1], z: newV[2] });
+                  }
+                }
               };
               const Btn = (props: { label: string; title: string; op: string }) => (
                 <button
                   disabled={disabled}
                   onClick={() => applyOp(props.op)}
-                  title={disabled ? '请选择一个组' : props.title}
+                  title={disabled ? '请选择一个组并选中具体点' : props.title}
                   style={{ background: disabled ? '#1a1a1a' : '#2b2b2b', color: '#eee', border: '1px solid #555', padding: '6px', borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer' }}
                 >{props.label}</button>
               );
@@ -213,7 +228,7 @@ export const App: React.FC = () => {
                     <button
                       disabled={disabled}
                       onClick={() => applyOp('MAIN_D')}
-                      title={disabled ? '请选择一个组' : '主对角线（X=Y=Z=(X+Y+Z)/3）'}
+                      title={disabled ? '请选择一个组并选中具体点' : '主对角线（X=Y=Z=(X+Y+Z)/3）'}
                       style={{ width: '100%', background: disabled ? '#1a1a1a' : '#2b2b2b', color: '#eee', border: '1px solid #555', padding: '6px 8px', borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer' }}
                     >主对角线</button>
                   </div>
