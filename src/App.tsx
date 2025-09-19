@@ -26,6 +26,8 @@ export const App: React.FC = () => {
   const [patches, setPatches] = useState<PatchDTO[]>([]);
   const [toolMode, setToolMode] = useState<'translate'|'rotate'|'scale'>('translate');
   const [toolSpace, setToolSpace] = useState<'local'|'world'>('local');
+  // Per-group coordinate display mode: 'global' (absolute) or 'local' (relative to main for u/v)
+  const [coordModeById, setCoordModeById] = useState<Record<number, 'global' | 'local'>>({});
   const plotRef = useRef<PhaseSpacePlotHandle>(null);
 
   useEffect(() => {
@@ -136,6 +138,26 @@ export const App: React.FC = () => {
         </div>
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
           <b style={{ color: '#fff', fontSize: 13 as any }}>组列表</b>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button
+              onClick={() => {
+                // Set all groups to global display
+                const next: Record<number, 'global'|'local'> = {};
+                patches.forEach(pp => { next[pp.id] = 'global'; });
+                setCoordModeById(next);
+              }}
+              style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 10px', borderRadius: 5, cursor: 'pointer' }}
+            >全部设为全局</button>
+            <button
+              onClick={() => {
+                // Set all groups to local display
+                const next: Record<number, 'global'|'local'> = {};
+                patches.forEach(pp => { next[pp.id] = 'local'; });
+                setCoordModeById(next);
+              }}
+              style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 10px', borderRadius: 5, cursor: 'pointer' }}
+            >全部设为局部</button>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
             {patches.map(p => (
               <div key={p.id} style={{ border: '1px solid #444', borderRadius: 6, padding: 8, background: 'rgba(0,0,0,0.35)' }}>
@@ -154,6 +176,17 @@ export const App: React.FC = () => {
                     title='主点/面的颜色'
                     style={{ width: 36, height: 24, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
                   />
+                  {(() => {
+                    const mode = coordModeById[p.id] ?? 'global';
+                    const nextMode = mode === 'global' ? 'local' : 'global';
+                    return (
+                      <button
+                        onClick={() => setCoordModeById(prev => ({ ...prev, [p.id]: nextMode }))}
+                        title='切换该组坐标显示（全局/局部）'
+                        style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 10px', borderRadius: 5, cursor: 'pointer' }}
+                      >坐标显示: {mode === 'global' ? '全局' : '局部'}</button>
+                    );
+                  })()}
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                   <button
@@ -189,12 +222,35 @@ export const App: React.FC = () => {
                         <input
                           type='number'
                           step={0.01}
-                          value={(p as any)[role][idx].toFixed ? (p as any)[role][idx].toFixed(3) : (p as any)[role][idx]}
+                          value={(() => {
+                            // Compute display value based on coord mode
+                            const mode = coordModeById[p.id] ?? 'global';
+                            const worldArr = (p as any)[role] as [number, number, number];
+                            if (role === 'main' || mode === 'global') {
+                              const v = worldArr[idx];
+                              return (v as any).toFixed ? (v as any).toFixed(3) : v;
+                            }
+                            // Local: show relative to main for u/v
+                            const rel = worldArr[idx] - (p.main as [number,number,number])[idx];
+                            return (rel as any).toFixed ? (rel as any).toFixed(3) : rel;
+                          })()}
                           onChange={(e) => {
                             const val = parseFloat(e.target.value);
-                            const cur = (p as any)[role] as [number,number,number];
-                            const next = { x: cur[0], y: cur[1], z: cur[2] } as any;
-                            next[axis] = isNaN(val) ? cur[idx] : val;
+                            const mode = coordModeById[p.id] ?? 'global';
+                            const curWorld = (p as any)[role] as [number,number,number];
+                            const next = { x: curWorld[0], y: curWorld[1], z: curWorld[2] } as any;
+                            const mainArr = p.main as [number, number, number];
+                            // Main always uses world coordinates
+                            if (role === 'main') {
+                              next[axis] = isNaN(val) ? curWorld[idx] : val;
+                            } else if (mode === 'local') {
+                              // Convert local delta to world
+                              const worldVal = (isNaN(val) ? (curWorld[idx] - mainArr[idx]) : val) + mainArr[idx];
+                              next[axis] = worldVal;
+                            } else {
+                              // Global display/edit
+                              next[axis] = isNaN(val) ? curWorld[idx] : val;
+                            }
                             plotRef.current?.updatePointWorld(p.id, role, next);
                           }}
                           style={{ width: 80, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
