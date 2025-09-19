@@ -239,12 +239,24 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     if (cur && cur.id === p.id) {
       if (clickedObject) selectedClickedObjectRef.current = clickedObject;
       ensureAttachTarget(p);
+      // Update fat edge overlay when switching target within same patch
+      const anyClicked: any = clickedObject as any;
+      if (anyClicked && anyClicked.userData && anyClicked.userData.type === 'line') {
+        const role = (anyClicked.userData.role as 'u'|'v');
+        createOrUpdateFatEdge(p, role);
+      } else {
+        if (fatEdgeRef.current?.line && sceneRef.current) {
+          sceneRef.current.remove(fatEdgeRef.current.line);
+        }
+        fatEdgeRef.current = null;
+      }
       // Notify UI even when switching point within the same group
       if (clickedObject) {
-        let role: 'main'|'u'|'v'|null = null;
+        let role: 'main'|'u'|'v'|'edge_u'|'edge_v'|null = null;
         const anyClicked: any = clickedObject as any;
-        if (anyClicked && anyClicked.userData && anyClicked.userData.type === 'point') {
-          role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
+        if (anyClicked && anyClicked.userData) {
+          if (anyClicked.userData.type === 'point') role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
+          else if (anyClicked.userData.type === 'line') role = ((anyClicked.userData.role as 'u'|'v') === 'u') ? 'edge_u' : 'edge_v';
         }
         onSelectionChange?.({ patchId: p.id, role });
       }
@@ -293,7 +305,13 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       const geom = new LineGeometry();
       geom.setPositions(positions);
       const mat = new LineMaterial({ color: role === 'u' ? baseColors.u.getHex() : baseColors.v.getHex(), linewidth: 4, transparent: true, opacity: 1.0, depthTest: false });
-      // resolution will be set in resize observer
+      // set resolution immediately
+      const renderer = rendererRef.current;
+      if (renderer) {
+        const size = new THREE.Vector2();
+        renderer.getSize(size);
+        (mat as any).resolution?.set?.(size.x, size.y);
+      }
       const line2 = new Line2(geom, mat);
       line2.computeLineDistances();
       line2.renderOrder = 1000;
@@ -302,7 +320,14 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     } else {
       const geom = (fatEdgeRef.current.line!.geometry as LineGeometry);
       geom.setPositions(positions);
-      (fatEdgeRef.current.line!.material as LineMaterial).color = (role === 'u' ? baseColors.u : baseColors.v) as any;
+      const mat = (fatEdgeRef.current.line!.material as LineMaterial);
+      mat.color.set(role === 'u' ? baseColors.u.getHex() : baseColors.v.getHex());
+      const renderer = rendererRef.current;
+      if (renderer) {
+        const size = new THREE.Vector2();
+        renderer.getSize(size);
+        (mat as any).resolution?.set?.(size.x, size.y);
+      }
       fatEdgeRef.current.role = role;
     }
   }
