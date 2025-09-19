@@ -137,26 +137,27 @@ export const App: React.FC = () => {
           </div>
         </div>
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
-          <b style={{ color: '#fff', fontSize: 13 as any }}>组列表</b>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button
-              onClick={() => {
-                // Set all groups to global display
-                const next: Record<number, 'global'|'local'> = {};
-                patches.forEach(pp => { next[pp.id] = 'global'; });
-                setCoordModeById(next);
-              }}
-              style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 10px', borderRadius: 5, cursor: 'pointer' }}
-            >全部设为全局</button>
-            <button
-              onClick={() => {
-                // Set all groups to local display
-                const next: Record<number, 'global'|'local'> = {};
-                patches.forEach(pp => { next[pp.id] = 'local'; });
-                setCoordModeById(next);
-              }}
-              style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 10px', borderRadius: 5, cursor: 'pointer' }}
-            >全部设为局部</button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            <b style={{ color: '#fff', fontSize: 13 as any, whiteSpace: 'nowrap' }}>组列表</b>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+              <span style={{ color: '#aaa' }}>全部坐标:</span>
+              <button
+                onClick={() => {
+                  const next: Record<number, 'global'|'local'> = {};
+                  patches.forEach(pp => { next[pp.id] = 'global'; });
+                  setCoordModeById(next);
+                }}
+                style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+              >全局</button>
+              <button
+                onClick={() => {
+                  const next: Record<number, 'global'|'local'> = {};
+                  patches.forEach(pp => { next[pp.id] = 'local'; });
+                  setCoordModeById(next);
+                }}
+                style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+              >局部</button>
+            </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
             {patches.map(p => (
@@ -176,42 +177,49 @@ export const App: React.FC = () => {
                     title='主点/面的颜色'
                     style={{ width: 36, height: 24, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
                   />
-                  {(() => {
-                    const mode = coordModeById[p.id] ?? 'global';
-                    const nextMode = mode === 'global' ? 'local' : 'global';
-                    return (
-                      <button
-                        onClick={() => setCoordModeById(prev => ({ ...prev, [p.id]: nextMode }))}
-                        title='切换该组坐标显示（全局/局部）'
-                        style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 10px', borderRadius: 5, cursor: 'pointer' }}
-                      >坐标显示: {mode === 'global' ? '全局' : '局部'}</button>
-                    );
-                  })()}
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                  <button
-                    onClick={() => {
-                      // Invert: swap u and v positions
-                      const u = p.u as [number, number, number];
-                      const v = p.v as [number, number, number];
-                      plotRef.current?.updatePointWorld(p.id, 'u', { x: v[0], y: v[1], z: v[2] });
-                      plotRef.current?.updatePointWorld(p.id, 'v', { x: u[0], y: u[1], z: u[2] });
-                    }}
-                    style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 10px', borderRadius: 5, cursor: 'pointer' }}
-                  >反转</button>
-                  <button
-                    onClick={() => {
-                      // Rotate: u -> main position; main -> v position; v -> opposite corner of parallelogram
-                      const m = p.main as [number, number, number];
-                      const u = p.u as [number, number, number];
-                      const v = p.v as [number, number, number];
-                      const opp = [u[0] + v[0] - m[0], u[1] + v[1] - m[1], u[2] + v[2] - m[2]] as [number, number, number];
-                      plotRef.current?.updatePointWorld(p.id, 'u', { x: m[0], y: m[1], z: m[2] });
-                      plotRef.current?.updatePointWorld(p.id, 'main', { x: v[0], y: v[1], z: v[2] });
-                      plotRef.current?.updatePointWorld(p.id, 'v', { x: opp[0], y: opp[1], z: opp[2] });
-                    }}
-                    style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 10px', borderRadius: 5, cursor: 'pointer' }}
-                  >轮换</button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                    {(() => {
+                      const mode = coordModeById[p.id] ?? 'global';
+                      return (
+                        <>
+                          <span style={{ color: '#aaa' }}>坐标:</span>
+                          <button
+                            onClick={() => setCoordModeById(prev => ({ ...prev, [p.id]: 'global' }))}
+                            style={{ background: mode === 'global' ? '#4a4a4a' : '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                          >全局</button>
+                          <button
+                            onClick={() => setCoordModeById(prev => ({ ...prev, [p.id]: 'local' }))}
+                            style={{ background: mode === 'local' ? '#4a4a4a' : '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                          >局部</button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, whiteSpace: 'nowrap' }}>
+                    <button
+                      onClick={() => {
+                        const u = p.u as [number, number, number];
+                        const v = p.v as [number, number, number];
+                        plotRef.current?.updatePointWorld(p.id, 'u', { x: v[0], y: v[1], z: v[2] });
+                        plotRef.current?.updatePointWorld(p.id, 'v', { x: u[0], y: u[1], z: u[2] });
+                      }}
+                      style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >反转</button>
+                    <button
+                      onClick={() => {
+                        const m = p.main as [number, number, number];
+                        const u = p.u as [number, number, number];
+                        const v = p.v as [number, number, number];
+                        const opp = [u[0] + v[0] - m[0], u[1] + v[1] - m[1], u[2] + v[2] - m[2]] as [number, number, number];
+                        plotRef.current?.updatePointWorld(p.id, 'u', { x: m[0], y: m[1], z: m[2] });
+                        plotRef.current?.updatePointWorld(p.id, 'main', { x: v[0], y: v[1], z: v[2] });
+                        plotRef.current?.updatePointWorld(p.id, 'v', { x: opp[0], y: opp[1], z: opp[2] });
+                      }}
+                      style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >轮换</button>
+                  </div>
                 </div>
                 {(['main','u','v'] as const).map(role => (
                   <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
