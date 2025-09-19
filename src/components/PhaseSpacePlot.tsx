@@ -2,6 +2,9 @@ import React, { forwardRef, memo, useEffect, useImperativeHandle, useRef, useSta
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 
 export type PatchDTO = {
   id: number;
@@ -85,6 +88,10 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const rotateRadPerPixelRef = useRef<number>(0.01);
   // Uniform scaling vertical sensitivity: exp(-dy * alpha) mapped to [0.1, 20]
   const uniformScaleAlphaRef = useRef<number>(Math.log(20) / 280); // ~280px to reach 20x
+  // Track pivot world position during edge-translate drags
+  const lastPivotDuringDragRef = useRef<THREE.Vector3 | null>(null);
+  // Fat-line overlay for selected edge
+  const fatEdgeRef = useRef<{ role?: 'u'|'v'; line?: Line2 } | null>(null);
   // Track when to auto-frame: only on first plot or when signal object changes
   const hasFramedOnceRef = useRef(false);
   const lastSignalObjRef = useRef<any>(null);
@@ -199,6 +206,10 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     geom.setIndex(indices);
     geom.computeVertexNormals();
     patch.quad.geometry.dispose(); patch.quad.geometry = geom;
+    // Update fat edge overlay if it targets this patch
+    if (selectedPatchRef.current && selectedPatchRef.current.id === patch.id && fatEdgeRef.current?.line && fatEdgeRef.current?.role) {
+      createOrUpdateFatEdge(patch, fatEdgeRef.current.role);
+    }
   }
 
   function clearSelection() {
@@ -210,9 +221,11 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     (sel.lines.v.material as THREE.LineBasicMaterial).color.copy(baseColors.v);
     (sel.lines.u.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY;
     (sel.lines.v.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY;
-    // reset line thickness
-    (sel.lines.u.material as THREE.LineBasicMaterial).linewidth = 1;
-    (sel.lines.v.material as THREE.LineBasicMaterial).linewidth = 1;
+    // remove fat edge overlay if any
+    if (fatEdgeRef.current?.line && sceneRef.current) {
+      sceneRef.current.remove(fatEdgeRef.current.line);
+    }
+    fatEdgeRef.current = null;
     (sel.quad.material as THREE.MeshBasicMaterial).opacity = 0.165;
     (sel.quad.material as THREE.MeshBasicMaterial).color.copy(sel.color);
     gizmoRef.current?.detach();
@@ -243,11 +256,14 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     // Keep u/v line colors, only raise opacity for selection
     (p.lines.u.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY_SELECTED;
     (p.lines.v.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY_SELECTED;
-    // If clicked a line, make it thicker (note: linewidth not widely supported in WebGL)
+    // If clicked a line, create/update fat overlay using Line2
     if (clickedObject && (clickedObject as any).userData?.type === 'line') {
       const role = (clickedObject as any).userData?.role as 'u'|'v';
-      const mat = role === 'u' ? (p.lines.u.material as THREE.LineBasicMaterial) : (p.lines.v.material as THREE.LineBasicMaterial);
-      mat.linewidth = 3;
+      createOrUpdateFatEdge(p, role);
+    } else {
+      // clear overlay
+      if (fatEdgeRef.current?.line && sceneRef.current) sceneRef.current.remove(fatEdgeRef.current.line);
+      fatEdgeRef.current = null;
     }
     (p.quad.material as THREE.MeshBasicMaterial).opacity = 0.44;
     selectedClickedObjectRef.current = clickedObject ?? null;
@@ -264,6 +280,31 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       }
     }
     onSelectionChange?.({ patchId: p.id, role });
+  }
+
+  function createOrUpdateFatEdge(p: Patch, role: 'u'|'v') {
+    const scene = sceneRef.current; if (!scene) return;
+    const aLocal = p.points.main.position.clone();
+    const bLocal = (role === 'u' ? p.points.u.position : p.points.v.position).clone();
+    const aWorld = p.group.localToWorld(aLocal.clone());
+    const bWorld = p.group.localToWorld(bLocal.clone());
+    const positions = [aWorld.x, aWorld.y, aWorld.z, bWorld.x, bWorld.y, bWorld.z];
+    if (!fatEdgeRef.current || !fatEdgeRef.current.line) {
+      const geom = new LineGeometry();
+      geom.setPositions(positions);
+      const mat = new LineMaterial({ color: role === 'u' ? baseColors.u.getHex() : baseColors.v.getHex(), linewidth: 4, transparent: true, opacity: 1.0, depthTest: false });
+      // resolution will be set in resize observer
+      const line2 = new Line2(geom, mat);
+      line2.computeLineDistances();
+      line2.renderOrder = 1000;
+      scene.add(line2);
+      fatEdgeRef.current = { role, line: line2 };
+    } else {
+      const geom = (fatEdgeRef.current.line!.geometry as LineGeometry);
+      geom.setPositions(positions);
+      (fatEdgeRef.current.line!.material as LineMaterial).color = (role === 'u' ? baseColors.u : baseColors.v) as any;
+      fatEdgeRef.current.role = role;
+    }
   }
 
   function ensureAttachTarget(p: Patch) {
@@ -639,19 +680,19 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
             } else {
               lastMainDuringDragRef.current = null;
             }
-          }
-        } else {
-          if (pivotRef.current) { 
-            gizmo.detach();
-            scene.remove(pivotRef.current); 
-            pivotRef.current = null; 
-            if (sel) {
-              const clicked: any = selectedClickedObjectRef.current;
-              if (clicked && clicked.userData?.type === 'point' && mode === 'translate') gizmo.attach(clicked); else gizmo.attach(sel.group);
+            // record pivot world pos for edge-translate
+            const clicked: any = selectedClickedObjectRef.current;
+            if (clicked && clicked.userData?.type === 'line' && mode === 'translate' && pivotRef.current && !lockedMainSetRef.current.has(sel.id)) {
+              const wp = new THREE.Vector3(); pivotRef.current.getWorldPosition(wp); lastPivotDuringDragRef.current = wp.clone();
+            } else {
+              lastPivotDuringDragRef.current = null;
             }
           }
+        } else {
+          // Keep pivot at last location to preserve axes position
           dragSnapshotRef.current = null;
           lastMainDuringDragRef.current = null;
+          lastPivotDuringDragRef.current = null;
           if (sel) { updatePatchGeometry(sel); emitChange(); }
         }
       });
@@ -671,6 +712,21 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
               sel.points.u.position.add(delta);
               sel.points.v.position.add(delta);
               lastMainDuringDragRef.current.copy(curMain);
+            }
+          }
+          // Edge translate: move endpoints with pivot delta (unlocked)
+          if (mode === 'translate' && pivotRef.current && lastPivotDuringDragRef.current) {
+            const clicked: any = selectedClickedObjectRef.current;
+            const locked = lockedMainSetRef.current.has(sel.id);
+            if (clicked && clicked.userData?.type === 'line' && !locked) {
+              const prevW = lastPivotDuringDragRef.current.clone();
+              const curW = new THREE.Vector3(); pivotRef.current.getWorldPosition(curW);
+              const prevL = sel.group.worldToLocal(prevW.clone());
+              const curL = sel.group.worldToLocal(curW.clone());
+              const deltaL = curL.clone().sub(prevL);
+              sel.points.main.position.add(deltaL);
+              if (clicked.userData.role === 'u') sel.points.u.position.add(deltaL); else sel.points.v.position.add(deltaL);
+              lastPivotDuringDragRef.current.copy(curW);
             }
           }
           updatePatchGeometry(sel); emitChange();
@@ -804,6 +860,10 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      if (fatEdgeRef.current?.line) {
+        const mat = fatEdgeRef.current.line.material as LineMaterial;
+        (mat as any).resolution?.set?.(w, h);
+      }
     });
     resizeObserver.observe(mount);
 
