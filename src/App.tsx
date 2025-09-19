@@ -28,6 +28,8 @@ export const App: React.FC = () => {
   const [toolSpace, setToolSpace] = useState<'local'|'world'>('local');
   // Per-group coordinate display mode: 'global' (absolute) or 'local' (relative to main for u/v)
   const [coordModeById, setCoordModeById] = useState<Record<number, 'global' | 'local'>>({});
+  // Selection from 3D view for UI highlight
+  const [selection, setSelection] = useState<{ patchId: number | null; role: 'main'|'u'|'v'|null }>({ patchId: null, role: null });
   const plotRef = useRef<PhaseSpacePlotHandle>(null);
 
   useEffect(() => {
@@ -51,6 +53,7 @@ export const App: React.FC = () => {
             debug={true}
             pointPixelSize={pointSizePx}
             frameCloseness={frameCloseness}
+            onSelectionChange={setSelection}
             onPatchesChange={setPatches}
           />
         </div>
@@ -163,7 +166,7 @@ export const App: React.FC = () => {
             {patches.map(p => (
               <div key={p.id} style={{ border: '1px solid #444', borderRadius: 6, padding: 8, background: 'rgba(0,0,0,0.35)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: '#bbb', minWidth: 40 }}>ID {p.id}</span>
+                  <span style={{ color: selection.patchId === p.id ? '#ffdd59' : '#bbb', minWidth: 40, fontWeight: selection.patchId === p.id ? 700 : 400 }}>ID {p.id}</span>
                   <input
                     value={p.name ?? ''}
                     placeholder={`组 ${p.id}`}
@@ -223,7 +226,13 @@ export const App: React.FC = () => {
                 </div>
                 {(['main','u','v'] as const).map(role => (
                   <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                    <span style={{ color: '#aaa', width: 36 }}>{role}</span>
+                    {(() => {
+                      const isSelectedRole = selection.patchId === p.id && selection.role === role;
+                      const label = role === 'main' ? 'p' : role;
+                      return (
+                        <span style={{ color: isSelectedRole ? '#ffdd59' : '#aaa', width: 36, fontWeight: isSelectedRole ? 700 : 400 }}>{label}</span>
+                      );
+                    })()}
                     {(['x','y','z'] as const).map((axis, idx) => (
                       <div key={axis} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <span style={{ color: '#777' }}>{axis.toUpperCase()}</span>

@@ -41,9 +41,11 @@ type Props = {
   // Controls how close auto-framing gets relative to the original 2.0× span
   // e.g., 10 => 10x closer than original (d = maxSpan * 2.0 / 10 = 0.2 * maxSpan)
   frameCloseness?: number;
+  // Selection change callback for UI highlight
+  onSelectionChange?: (sel: { patchId: number | null; role: 'main' | 'u' | 'v' | null }) => void;
 };
 
-export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, onPatchesChange, frameCloseness = 2 }, ref) {
+export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, onPatchesChange, frameCloseness = 2, onSelectionChange }, ref) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -207,6 +209,8 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     (sel.quad.material as THREE.MeshBasicMaterial).color.copy(sel.color);
     gizmoRef.current?.detach();
     selectedPatchRef.current = null;
+    // Notify UI
+    onSelectionChange?.({ patchId: null, role: null });
   }
 
   function setSelection(p: Patch, clickedObject?: THREE.Object3D) {
@@ -225,6 +229,13 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     (p.quad.material as THREE.MeshBasicMaterial).opacity = 0.44;
     selectedClickedObjectRef.current = clickedObject ?? null;
     ensureAttachTarget(p);
+    // Notify UI with selected role if a point was clicked
+    let role: 'main'|'u'|'v'|null = null;
+    const anyClicked: any = clickedObject as any;
+    if (anyClicked && anyClicked.userData && anyClicked.userData.type === 'point') {
+      role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
+    }
+    onSelectionChange?.({ patchId: p.id, role });
   }
 
   function ensureAttachTarget(p: Patch) {
