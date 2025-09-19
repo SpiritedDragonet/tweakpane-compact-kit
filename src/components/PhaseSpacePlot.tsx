@@ -355,34 +355,17 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
 
       // Route based on handle
       if (!axisName || axisName === 'E' || axisName === 'XYZ' || axisName.length > 1) {
-        // Overall scaling (center cube)
-        // Robustly derive raw scale from the component that deviates most from 1
-        const comps = [s.x, s.y, s.z];
-        let pick = comps[0];
-        let best = Math.abs(comps[0] - 1);
-        for (let i = 1; i < 3; i++) { const d = Math.abs(comps[i] - 1); if (d > best) { best = d; pick = comps[i]; } }
-        const stepUniform = mapScale(Math.max(1e-6, pick));
+        // Overall scaling (center cube): identical feel/mapping as Z-axis
+        const compZ = Math.max(1e-6, s.z);
+        const stepUniform = mapScale(compZ);
         applyUniform(stepUniform);
       } else if (axisName === 'X' || axisName === 'Y' || axisName === 'Z') {
-        let comp = axisName === 'X' ? s.x : axisName === 'Y' ? s.y : s.z;
-        // Fallback: some environments may report scale on a different component; pick the largest deviation
-        if (Math.abs(comp - 1) < 1e-6) {
-          const comps = [s.x, s.y, s.z];
-          let pick = comps[0];
-          let best = Math.abs(comps[0] - 1);
-          for (let i = 1; i < 3; i++) { const d = Math.abs(comps[i] - 1); if (d > best) { best = d; pick = comps[i]; } }
-          comp = pick;
-        }
+        const comp = axisName === 'X' ? s.x : axisName === 'Y' ? s.y : s.z;
         const stepAxis = mapScale(Math.max(1e-6, comp));
         applyDirectional(axisName, stepAxis);
       } else {
-        // Fallback to uniform if an unexpected axis code appears
-        const comps = [s.x, s.y, s.z];
-        let pick = comps[0];
-        let best = Math.abs(comps[0] - 1);
-        for (let i = 1; i < 3; i++) { const d = Math.abs(comps[i] - 1); if (d > best) { best = d; pick = comps[i]; } }
-        const stepUniform = mapScale(Math.max(1e-6, pick));
-        applyUniform(stepUniform);
+        // Unknown axis: do nothing
+        return;
       }
 
       updatePatchGeometry(p);
