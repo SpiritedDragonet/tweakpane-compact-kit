@@ -356,8 +356,9 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       // Route based on handle
       if (!axisName || axisName === 'E' || axisName === 'XYZ' || axisName.length > 1) {
         // Overall scaling (center cube)
-        const avg = Math.max(1e-6, (s.x + s.y + s.z) / 3);
-        const stepUniform = mapScale(avg);
+        // Adopt Z-axis handle's feel and mapping: derive step from Z component
+        const compZ = Math.max(1e-6, s.z);
+        const stepUniform = mapScale(compZ);
         applyUniform(stepUniform);
       } else if (axisName === 'X' || axisName === 'Y' || axisName === 'Z') {
         const comp = axisName === 'X' ? s.x : axisName === 'Y' ? s.y : s.z;
