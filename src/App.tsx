@@ -30,7 +30,7 @@ export const App: React.FC = () => {
   const [coordModeById, setCoordModeById] = useState<Record<number, 'global' | 'local'>>({});
   const [lockMainById, setLockMainById] = useState<Record<number, boolean>>({});
   // Selection from 3D view for UI highlight
-  const [selection, setSelection] = useState<{ patchId: number | null; role: 'main'|'u'|'v'|null }>({ patchId: null, role: null });
+  const [selection, setSelection] = useState<{ patchId: number | null; role: 'main'|'u'|'v'|'edge_u'|'edge_v'|null }>({ patchId: null, role: null });
   const plotRef = useRef<PhaseSpacePlotHandle>(null);
 
   useEffect(() => {
@@ -209,6 +209,32 @@ export const App: React.FC = () => {
                     const newV = transform(v, op);
                     plotRef.current?.updatePointWorld(p.id, 'v', { x: newV[0], y: newV[1], z: newV[2] });
                   }
+                } else if (role === 'edge_u') {
+                  if (isRel) {
+                    const uRel: [number,number,number] = [u[0]-m[0], u[1]-m[1], u[2]-m[2]];
+                    const rU = transform(uRel, op); const newUAbs: [number,number,number] = [m[0]+rU[0], m[1]+rU[1], m[2]+rU[2]];
+                    const newM = transform(m, op);
+                    plotRef.current?.updatePointWorld(p.id, 'u', { x: newUAbs[0], y: newUAbs[1], z: newUAbs[2] });
+                    plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
+                  } else {
+                    const newU = transform(u, op);
+                    const newM = transform(m, op);
+                    plotRef.current?.updatePointWorld(p.id, 'u', { x: newU[0], y: newU[1], z: newU[2] });
+                    plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
+                  }
+                } else if (role === 'edge_v') {
+                  if (isRel) {
+                    const vRel: [number,number,number] = [v[0]-m[0], v[1]-m[1], v[2]-m[2]];
+                    const rV = transform(vRel, op); const newVAbs: [number,number,number] = [m[0]+rV[0], m[1]+rV[1], m[2]+rV[2]];
+                    const newM = transform(m, op);
+                    plotRef.current?.updatePointWorld(p.id, 'v', { x: newVAbs[0], y: newVAbs[1], z: newVAbs[2] });
+                    plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
+                  } else {
+                    const newV = transform(v, op);
+                    const newM = transform(m, op);
+                    plotRef.current?.updatePointWorld(p.id, 'v', { x: newV[0], y: newV[1], z: newV[2] });
+                    plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
+                  }
                 }
               };
               const Btn = (props: { label: string; title: string; op: string }) => (
@@ -350,10 +376,12 @@ export const App: React.FC = () => {
                 {(['main','u','v'] as const).map(role => (
                   <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                     {(() => {
-                      const isSelectedRole = selection.patchId === p.id && selection.role === role;
+                      const isPointSelected = selection.patchId === p.id && selection.role === role;
+                      const isEdgeSelected = selection.patchId === p.id && ((selection.role === 'edge_u' && (role === 'main' || role === 'u')) || (selection.role === 'edge_v' && (role === 'main' || role === 'v')));
+                      const active = isPointSelected || isEdgeSelected;
                       const label = role === 'main' ? 'p' : role;
                       return (
-                        <span style={{ color: isSelectedRole ? '#ffdd59' : '#aaa', width: 36, fontWeight: isSelectedRole ? 700 : 400 }}>{label}</span>
+                        <span style={{ color: active ? '#ffdd59' : '#aaa', width: 36, fontWeight: active ? 700 : 400 }}>{label}</span>
                       );
                     })()}
                     {(['x','y','z'] as const).map((axis, idx) => (

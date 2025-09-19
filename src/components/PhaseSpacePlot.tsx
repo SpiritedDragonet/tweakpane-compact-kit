@@ -43,7 +43,7 @@ type Props = {
   // e.g., 10 => 10x closer than original (d = maxSpan * 2.0 / 10 = 0.2 * maxSpan)
   frameCloseness?: number;
   // Selection change callback for UI highlight
-  onSelectionChange?: (sel: { patchId: number | null; role: 'main' | 'u' | 'v' | null }) => void;
+  onSelectionChange?: (sel: { patchId: number | null; role: 'main' | 'u' | 'v' | 'edge_u' | 'edge_v' | null }) => void;
 };
 
 export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, onPatchesChange, frameCloseness = 2, onSelectionChange }, ref) {
@@ -56,7 +56,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const gizmoRef = useRef<TransformControls | null>(null);
   const pivotRef = useRef<THREE.Object3D | null>(null);
   const selectedClickedObjectRef = useRef<THREE.Object3D | null>(null);
-  type DragSnapshot = { patchId: number; main0: THREE.Vector3; u0: THREE.Vector3; v0: THREE.Vector3; pivotLocal0: THREE.Vector3; scale0: number; pointerStart?: { x: number; y: number } };
+  type DragSnapshot = { patchId: number; main0: THREE.Vector3; u0: THREE.Vector3; v0: THREE.Vector3; pivotLocal0: THREE.Vector3; scale0: number; pointerStart?: { x: number; y: number }; edgeRole?: 'u'|'v' };
   const dragSnapshotRef = useRef<DragSnapshot | null>(null);
   const boundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -210,6 +210,9 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     (sel.lines.v.material as THREE.LineBasicMaterial).color.copy(baseColors.v);
     (sel.lines.u.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY;
     (sel.lines.v.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY;
+    // reset line thickness
+    (sel.lines.u.material as THREE.LineBasicMaterial).linewidth = 1;
+    (sel.lines.v.material as THREE.LineBasicMaterial).linewidth = 1;
     (sel.quad.material as THREE.MeshBasicMaterial).opacity = 0.165;
     (sel.quad.material as THREE.MeshBasicMaterial).color.copy(sel.color);
     gizmoRef.current?.detach();
@@ -240,14 +243,25 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     // Keep u/v line colors, only raise opacity for selection
     (p.lines.u.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY_SELECTED;
     (p.lines.v.material as THREE.LineBasicMaterial).opacity = LINE_OPACITY_SELECTED;
+    // If clicked a line, make it thicker (note: linewidth not widely supported in WebGL)
+    if (clickedObject && (clickedObject as any).userData?.type === 'line') {
+      const role = (clickedObject as any).userData?.role as 'u'|'v';
+      const mat = role === 'u' ? (p.lines.u.material as THREE.LineBasicMaterial) : (p.lines.v.material as THREE.LineBasicMaterial);
+      mat.linewidth = 3;
+    }
     (p.quad.material as THREE.MeshBasicMaterial).opacity = 0.44;
     selectedClickedObjectRef.current = clickedObject ?? null;
     ensureAttachTarget(p);
-    // Notify UI with selected role if a point was clicked
-    let role: 'main'|'u'|'v'|null = null;
+    // Notify UI with selected role if a point or line was clicked
+    let role: 'main'|'u'|'v'|'edge_u'|'edge_v'|null = null;
     const anyClicked: any = clickedObject as any;
-    if (anyClicked && anyClicked.userData && anyClicked.userData.type === 'point') {
-      role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
+    if (anyClicked && anyClicked.userData) {
+      if (anyClicked.userData.type === 'point') {
+        role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
+      } else if (anyClicked.userData.type === 'line') {
+        const r = (anyClicked.userData.role as 'u'|'v');
+        role = r === 'u' ? 'edge_u' : 'edge_v';
+      }
     }
     onSelectionChange?.({ patchId: p.id, role });
   }
@@ -258,15 +272,37 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     const clicked: any = selectedClickedObjectRef.current;
     const scene = sceneRef.current; if (!scene) return;
     const needPivot = (mode === 'rotate' || mode === 'scale');
+    const locked = lockedMainSetRef.current.has(p.id);
     if (!needPivot) {
       if (pivotRef.current) { scene.remove(pivotRef.current); pivotRef.current = null; }
-      if (clicked && clicked.userData?.type === 'point' && mode === 'translate') gizmo.attach(clicked); else gizmo.attach(p.group);
+      if (clicked && clicked.userData?.type === 'point') {
+        gizmo.attach(clicked);
+      } else if (clicked && clicked.userData?.type === 'line') {
+        if (locked) { gizmo.attach(p.group); }
+        else {
+          const pivot = new THREE.Object3D();
+          const a = p.points.main.position.clone();
+          const b = (clicked.userData.role === 'u' ? p.points.u.position : p.points.v.position).clone();
+          const midLocal = a.clone().add(b).multiplyScalar(0.5);
+          const midWorld = p.group.localToWorld(midLocal.clone());
+          pivot.position.copy(midWorld);
+          scene.add(pivot); pivotRef.current = pivot; gizmo.attach(pivot);
+        }
+      } else {
+        gizmo.attach(p.group);
+      }
       return;
     }
     // Create/position pivot at desired world position (clicked point or group center)
     const pivot = pivotRef.current ?? new THREE.Object3D();
     const wp = new THREE.Vector3();
-    if (clicked && clicked.userData?.type === 'point') (clicked as THREE.Object3D).getWorldPosition(wp); else p.group.getWorldPosition(wp);
+    if (clicked && clicked.userData?.type === 'point') (clicked as THREE.Object3D).getWorldPosition(wp);
+    else if (clicked && clicked.userData?.type === 'line' && !locked) {
+      const a = p.points.main.position.clone();
+      const b = (clicked.userData.role === 'u' ? p.points.u.position : p.points.v.position).clone();
+      const midLocal = a.clone().add(b).multiplyScalar(0.5);
+      p.group.localToWorld(midLocal); wp.copy(midLocal);
+    } else p.group.getWorldPosition(wp);
     pivot.position.copy(wp);
     pivot.quaternion.identity(); pivot.scale.set(1,1,1);
     if (!pivotRef.current) { scene.add(pivot); pivotRef.current = pivot; }
@@ -350,9 +386,18 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
           const perp = rel0.clone().sub(axisLocal.clone().multiplyScalar(t));
           dst.copy(pivotLocal0.clone().add(parallel).add(perp));
         };
-        scalePointAxisFrom0(main0, p.points.main.position);
-        scalePointAxisFrom0(u0, p.points.u.position);
-        scalePointAxisFrom0(v0, p.points.v.position);
+        const clicked: any = selectedClickedObjectRef.current;
+        const locked = lockedMainSetRef.current.has(p.id);
+        if (clicked && clicked.userData?.type === 'line' && !locked) {
+          const edgeRole = (clicked.userData.role as 'u'|'v');
+          scalePointAxisFrom0(main0, p.points.main.position);
+          if (edgeRole === 'u') scalePointAxisFrom0(u0, p.points.u.position);
+          else scalePointAxisFrom0(v0, p.points.v.position);
+        } else {
+          scalePointAxisFrom0(main0, p.points.main.position);
+          scalePointAxisFrom0(u0, p.points.u.position);
+          scalePointAxisFrom0(v0, p.points.v.position);
+        }
       };
 
       // Route based on handle
@@ -580,6 +625,10 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
                 scale0: measurePatchSpan(sel) / Math.max(1e-6, sel.baseSpan),
                 pointerStart: { ...lastPointerRef.current },
               };
+              const clicked: any = selectedClickedObjectRef.current;
+              if (clicked && clicked.userData?.type === 'line') {
+                dragSnapshotRef.current.edgeRole = (clicked.userData.role as 'u'|'v');
+              }
             } else {
               dragSnapshotRef.current = null;
             }
@@ -695,9 +744,18 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
             const rel0 = orig.clone().sub(pivotLocal0).applyQuaternion(deltaLocal);
             dst.copy(pivotLocal0.clone().add(rel0));
           };
-          rotateFrom0(snap.main0, sel.points.main.position);
-          rotateFrom0(snap.u0, sel.points.u.position);
-          rotateFrom0(snap.v0, sel.points.v.position);
+          const clickedRot: any = selectedClickedObjectRef.current;
+          const lockedRot = lockedMainSetRef.current.has(sel.id);
+          if (clickedRot && clickedRot.userData?.type === 'line' && !lockedRot) {
+            const edgeRole = (clickedRot.userData.role as 'u'|'v');
+            rotateFrom0(snap.main0, sel.points.main.position);
+            if (edgeRole === 'u') rotateFrom0(snap.u0, sel.points.u.position);
+            else rotateFrom0(snap.v0, sel.points.v.position);
+          } else {
+            rotateFrom0(snap.main0, sel.points.main.position);
+            rotateFrom0(snap.u0, sel.points.u.position);
+            rotateFrom0(snap.v0, sel.points.v.position);
+          }
           updatePatchGeometry(sel); emitChange(); pivot.quaternion.identity();
           lastPointerRef.current = { x: event.clientX, y: event.clientY };
           return;
@@ -713,9 +771,18 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
             const rel0 = orig.clone().sub(pivotLocal0).multiplyScalar(step);
             dst.copy(pivotLocal0.clone().add(rel0));
           };
-          scalePointFrom0(snap.main0, sel.points.main.position);
-          scalePointFrom0(snap.u0, sel.points.u.position);
-          scalePointFrom0(snap.v0, sel.points.v.position);
+          const clicked: any = selectedClickedObjectRef.current;
+          const locked = lockedMainSetRef.current.has(sel.id);
+          if (clicked && clicked.userData?.type === 'line' && !locked) {
+            const edgeRole = (clicked.userData.role as 'u'|'v');
+            scalePointFrom0(snap.main0, sel.points.main.position);
+            if (edgeRole === 'u') scalePointFrom0(snap.u0, sel.points.u.position);
+            else scalePointFrom0(snap.v0, sel.points.v.position);
+          } else {
+            scalePointFrom0(snap.main0, sel.points.main.position);
+            scalePointFrom0(snap.u0, sel.points.u.position);
+            scalePointFrom0(snap.v0, sel.points.v.position);
+          }
           updatePatchGeometry(sel); emitChange();
           lastPointerRef.current = { x: event.clientX, y: event.clientY };
           return;
