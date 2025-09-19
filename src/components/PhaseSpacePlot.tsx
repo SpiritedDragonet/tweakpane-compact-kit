@@ -93,6 +93,27 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     return span * (2.0 / closeness);
   };
 
+  // Reframe automatically when framing closeness changes.
+  // Preserve current camera direction, only change distance to center.
+  useEffect(() => {
+    const cam = cameraRef.current; const orbit = orbitRef.current; const b = boundsRef.current;
+    if (!cam || !orbit || !b) return;
+    if (!ready) return;
+    if (gizmoRef.current?.dragging) return;
+    const { minX, maxX, minY, maxY, minZ, maxZ } = b;
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
+    const span = Math.max(maxX - minX, maxY - minY, maxZ - minZ) || 1;
+    const desired = span * (2.0 / Math.max(1e-6, frameCloseness || 10));
+    const center = new THREE.Vector3(cx, cy, cz);
+    const dir = cam.position.clone().sub(center);
+    if (dir.lengthSq() < 1e-12) dir.set(0.7, 0.7, 0.7);
+    dir.normalize();
+    const newPos = center.clone().add(dir.multiplyScalar(desired));
+    cam.position.copy(newPos);
+    cam.lookAt(center);
+    orbit.target.set(cx, cy, cz); orbit.update();
+  }, [frameCloseness, ready]);
+
   const baseColors = {
     main: new THREE.Color('#ff6b6b'),
     u: new THREE.Color('#4d96ff'),
