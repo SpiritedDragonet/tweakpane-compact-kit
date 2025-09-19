@@ -218,6 +218,15 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     if (cur && cur.id === p.id) {
       if (clickedObject) selectedClickedObjectRef.current = clickedObject;
       ensureAttachTarget(p);
+      // Notify UI even when switching point within the same group
+      if (clickedObject) {
+        let role: 'main'|'u'|'v'|null = null;
+        const anyClicked: any = clickedObject as any;
+        if (anyClicked && anyClicked.userData && anyClicked.userData.type === 'point') {
+          role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
+        }
+        onSelectionChange?.({ patchId: p.id, role });
+      }
       return;
     }
     clearSelection();
