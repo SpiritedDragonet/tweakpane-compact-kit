@@ -138,6 +138,89 @@ export const App: React.FC = () => {
             <button onClick={() => plotRef.current?.addPatch()} style={{ background: '#333', color: '#eee', border: '1px solid #555', padding: '8px 12px', borderRadius: 5, cursor: 'pointer' }}>增加一个组 (A)</button>
             <button onClick={() => plotRef.current?.deleteSelectedPatch()} style={{ background: '#333', color: '#eee', border: '1px solid #555', padding: '8px 12px', borderRadius: 5, cursor: 'pointer' }}>删除选中组 (Del)</button>
           </div>
+          {/* 统一坐标操作区：作用于当前选中组 */}
+          <div style={{ marginTop: 10 }}>
+            <div style={{ color: '#aaa', marginBottom: 6 }}>
+              目标组: {selection.patchId != null ? `ID ${selection.patchId}` : '未选择'}；坐标模式: {(() => {
+                if (selection.patchId == null) return '-';
+                const mode = coordModeById[selection.patchId] ?? 'global';
+                return mode === 'global' ? '绝对' : '相对';
+              })()}
+            </div>
+            {(() => {
+              const disabled = selection.patchId == null;
+              const getPatch = () => patches.find(pp => pp.id === selection.patchId) || null;
+              const applyOp = (op: string) => {
+                const p = getPatch(); if (!p) return;
+                const mode = coordModeById[p.id] ?? 'global';
+                const isRel = mode === 'local';
+                const m = p.main as [number, number, number];
+                const u = p.u as [number, number, number];
+                const v = p.v as [number, number, number];
+                const transform = (vec: [number,number,number], kind: string) => {
+                  const [x,y,z] = vec;
+                  switch (kind) {
+                    case 'AX_X': return [x, 0, 0] as [number,number,number];
+                    case 'AX_Y': return [0, y, 0] as [number,number,number];
+                    case 'AX_Z': return [0, 0, z] as [number,number,number];
+                    case 'PL_XY': return [x, y, 0] as [number,number,number];
+                    case 'PL_YZ': return [0, y, z] as [number,number,number];
+                    case 'PL_ZX': return [x, 0, z] as [number,number,number];
+                    case 'DG_XY': { const s = (x + y) / 2; return [s, s, 0] as [number,number,number]; }
+                    case 'DG_YZ': { const s = (y + z) / 2; return [0, s, s] as [number,number,number]; }
+                    case 'DG_ZX': { const s = (z + x) / 2; return [s, 0, s] as [number,number,number]; }
+                    case 'DP_XY': { const s = (x + y) / 2; return [s, s, z] as [number,number,number]; }
+                    case 'DP_YZ': { const s = (y + z) / 2; return [x, s, s] as [number,number,number]; }
+                    case 'DP_ZX': { const s = (z + x) / 2; return [s, y, s] as [number,number,number]; }
+                    case 'MAIN_D': { const s = (x + y + z) / 3; return [s, s, s] as [number,number,number]; }
+                    default: return vec;
+                  }
+                };
+                const newM = transform(m, op);
+                const uRel: [number,number,number] = [u[0]-m[0], u[1]-m[1], u[2]-m[2]];
+                const vRel: [number,number,number] = [v[0]-m[0], v[1]-m[1], v[2]-m[2]];
+                const newUAbs = isRel ? ((() => { const r = transform(uRel, op); return [m[0]+r[0], m[1]+r[1], m[2]+r[2]] as [number,number,number]; })()) : transform(u, op);
+                const newVAbs = isRel ? ((() => { const r = transform(vRel, op); return [m[0]+r[0], m[1]+r[1], m[2]+r[2]] as [number,number,number]; })()) : transform(v, op);
+                plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
+                plotRef.current?.updatePointWorld(p.id, 'u', { x: newUAbs[0], y: newUAbs[1], z: newUAbs[2] });
+                plotRef.current?.updatePointWorld(p.id, 'v', { x: newVAbs[0], y: newVAbs[1], z: newVAbs[2] });
+              };
+              const Btn = (props: { label: string; title: string; op: string }) => (
+                <button
+                  disabled={disabled}
+                  onClick={() => applyOp(props.op)}
+                  title={disabled ? '请选择一个组' : props.title}
+                  style={{ background: disabled ? '#1a1a1a' : '#2b2b2b', color: '#eee', border: '1px solid #555', padding: '6px', borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer' }}
+                >{props.label}</button>
+              );
+              return (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                    <Btn label='X' title='对齐X轴（相对/绝对）' op='AX_X' />
+                    <Btn label='Y' title='对齐Y轴（相对/绝对）' op='AX_Y' />
+                    <Btn label='Z' title='对齐Z轴（相对/绝对）' op='AX_Z' />
+                    <Btn label='XY' title='对齐XY面（Z=0）' op='PL_XY' />
+                    <Btn label='YZ' title='对齐YZ面（X=0）' op='PL_YZ' />
+                    <Btn label='ZX' title='对齐ZX面（Y=0）' op='PL_ZX' />
+                    <Btn label='XY斜' title='XY对角线（X=Y=(X+Y)/2, Z=0）' op='DG_XY' />
+                    <Btn label='YZ斜' title='YZ对角线（Y=Z=(Y+Z)/2, X=0）' op='DG_YZ' />
+                    <Btn label='ZX斜' title='ZX对角线（Z=X=(Z+X)/2, Y=0）' op='DG_ZX' />
+                    <Btn label='XY斜面' title='XY对角面（X=Y=(X+Y)/2, Z保留）' op='DP_XY' />
+                    <Btn label='YZ斜面' title='YZ对角面（Y=Z=(Y+Z)/2, X保留）' op='DP_YZ' />
+                    <Btn label='ZX斜面' title='ZX对角面（Z=X=(Z+X)/2, Y保留）' op='DP_ZX' />
+                  </div>
+                  <div style={{ marginTop: 6 }}>
+                    <button
+                      disabled={disabled}
+                      onClick={() => applyOp('MAIN_D')}
+                      title={disabled ? '请选择一个组' : '主对角线（X=Y=Z=(X+Y+Z)/3）'}
+                      style={{ width: '100%', background: disabled ? '#1a1a1a' : '#2b2b2b', color: '#eee', border: '1px solid #555', padding: '6px 8px', borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer' }}
+                    >主对角线</button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         </div>
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -276,75 +359,6 @@ export const App: React.FC = () => {
                     ))}
                   </div>
                 ))}
-
-                {/* 操作栅格：4行×3列的小按钮 + 1×3的大按钮 */}
-                {(() => {
-                  const mode = coordModeById[p.id] ?? 'global';
-                  const isRel = mode === 'local';
-                  // helper to apply op to this group's points
-                  const applyOp = (op: string) => {
-                    const m = p.main as [number, number, number];
-                    const u = p.u as [number, number, number];
-                    const v = p.v as [number, number, number];
-                    const transform = (vec: [number,number,number], kind: string) => {
-                      const [x,y,z] = vec;
-                      switch (kind) {
-                        case 'AX_X': return [x, 0, 0] as [number,number,number];
-                        case 'AX_Y': return [0, y, 0] as [number,number,number];
-                        case 'AX_Z': return [0, 0, z] as [number,number,number];
-                        case 'PL_XY': return [x, y, 0] as [number,number,number];
-                        case 'PL_YZ': return [0, y, z] as [number,number,number];
-                        case 'PL_ZX': return [x, 0, z] as [number,number,number];
-                        case 'DG_XY': { const s = (x + y) / 2; return [s, s, 0] as [number,number,number]; }
-                        case 'DG_YZ': { const s = (y + z) / 2; return [0, s, s] as [number,number,number]; }
-                        case 'DG_ZX': { const s = (z + x) / 2; return [s, 0, s] as [number,number,number]; }
-                        case 'DP_XY': { const s = (x + y) / 2; return [s, s, z] as [number,number,number]; }
-                        case 'DP_YZ': { const s = (y + z) / 2; return [x, s, s] as [number,number,number]; }
-                        case 'DP_ZX': { const s = (z + x) / 2; return [s, y, s] as [number,number,number]; }
-                        case 'MAIN_D': { const s = (x + y + z) / 3; return [s, s, s] as [number,number,number]; }
-                        default: return vec;
-                      }
-                    };
-                    // main uses absolute always
-                    const newM = transform(m, op);
-                    // u,v: absolute in global mode; relative in local mode
-                    const uRel: [number,number,number] = [u[0]-m[0], u[1]-m[1], u[2]-m[2]];
-                    const vRel: [number,number,number] = [v[0]-m[0], v[1]-m[1], v[2]-m[2]];
-                    const newUAbs = isRel ? ((() => { const r = transform(uRel, op); return [m[0]+r[0], m[1]+r[1], m[2]+r[2]] as [number,number,number]; })()) : transform(u, op);
-                    const newVAbs = isRel ? ((() => { const r = transform(vRel, op); return [m[0]+r[0], m[1]+r[1], m[2]+r[2]] as [number,number,number]; })()) : transform(v, op);
-                    plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
-                    plotRef.current?.updatePointWorld(p.id, 'u', { x: newUAbs[0], y: newUAbs[1], z: newUAbs[2] });
-                    plotRef.current?.updatePointWorld(p.id, 'v', { x: newVAbs[0], y: newVAbs[1], z: newVAbs[2] });
-                  };
-                  const Btn = (props: { label: string; title: string; op: string }) => (
-                    <button
-                      onClick={() => applyOp(props.op)}
-                      title={props.title}
-                      style={{ background: '#2b2b2b', color: '#eee', border: '1px solid #555', padding: '6px', borderRadius: 4, cursor: 'pointer' }}
-                    >{props.label}</button>
-                  );
-                  return (
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                        <Btn label='X' title='对齐X轴（相对/绝对）' op='AX_X' />
-                        <Btn label='Y' title='对齐Y轴（相对/绝对）' op='AX_Y' />
-                        <Btn label='Z' title='对齐Z轴（相对/绝对）' op='AX_Z' />
-                        <Btn label='XY' title='对齐XY面（Z=0）' op='PL_XY' />
-                        <Btn label='YZ' title='对齐YZ面（X=0）' op='PL_YZ' />
-                        <Btn label='ZX' title='对齐ZX面（Y=0）' op='PL_ZX' />
-                        <Btn label='XY斜' title='XY对角线（X=Y=(X+Y)/2, Z=0）' op='DG_XY' />
-                        <Btn label='YZ斜' title='YZ对角线（Y=Z=(Y+Z)/2, X=0）' op='DG_YZ' />
-                        <Btn label='ZX斜' title='ZX对角线（Z=X=(Z+X)/2, Y=0）' op='DG_ZX' />
-                        <Btn label='XY斜面' title='XY对角面（X=Y=(X+Y)/2, Z保留）' op='DP_XY' />
-                        <Btn label='YZ斜面' title='YZ对角面（Y=Z=(Y+Z)/2, X保留）' op='DP_YZ' />
-                        <Btn label='ZX斜面' title='ZX对角面（Z=X=(Z+X)/2, Y保留）' op='DP_ZX' />
-                      </div>
-                      <div style={{ marginTop: 6 }}>
-                        <button onClick={() => applyOp('MAIN_D')} title='主对角线（X=Y=Z=(X+Y+Z)/3）' style={{ width: '100%', background: '#2b2b2b', color: '#eee', border: '1px solid #555', padding: '6px 8px', borderRadius: 4, cursor: 'pointer' }}>主对角线</button>
-                      </div>
-                    </div>
-                  );
-                })()}
               </div>
             ))}
           </div>
