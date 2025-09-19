@@ -28,6 +28,7 @@ export const App: React.FC = () => {
   const [toolSpace, setToolSpace] = useState<'local'|'world'>('local');
   // Per-group coordinate display mode: 'global' (absolute) or 'local' (relative to main for u/v)
   const [coordModeById, setCoordModeById] = useState<Record<number, 'global' | 'local'>>({});
+  const [lockMainById, setLockMainById] = useState<Record<number, boolean>>({});
   // Selection from 3D view for UI highlight
   const [selection, setSelection] = useState<{ patchId: number | null; role: 'main'|'u'|'v'|null }>({ patchId: null, role: null });
   const plotRef = useRef<PhaseSpacePlotHandle>(null);
@@ -179,7 +180,17 @@ export const App: React.FC = () => {
                 const role = selection.role as 'main'|'u'|'v';
                 if (role === 'main') {
                   const newM = transform(m, op); // p uses absolute in both modes
-                  plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
+                  const locked = !!lockMainById[p.id];
+                  if (locked) {
+                    const delta: [number,number,number] = [newM[0]-m[0], newM[1]-m[1], newM[2]-m[2]];
+                    const uNew: [number,number,number] = [p.u[0]+delta[0], p.u[1]+delta[1], p.u[2]+delta[2]] as any;
+                    const vNew: [number,number,number] = [p.v[0]+delta[0], p.v[1]+delta[1], p.v[2]+delta[2]] as any;
+                    plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
+                    plotRef.current?.updatePointWorld(p.id, 'u', { x: uNew[0], y: uNew[1], z: uNew[2] });
+                    plotRef.current?.updatePointWorld(p.id, 'v', { x: vNew[0], y: vNew[1], z: vNew[2] });
+                  } else {
+                    plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
+                  }
                 } else if (role === 'u') {
                   if (isRel) {
                     const uRel: [number,number,number] = [u[0]-m[0], u[1]-m[1], u[2]-m[2]];
@@ -298,7 +309,21 @@ export const App: React.FC = () => {
                       );
                     })()}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', gap: 8, whiteSpace: 'nowrap', alignItems: 'center' }}>
+                    {(() => {
+                      const locked = !!lockMainById[p.id];
+                      return (
+                        <button
+                          onClick={() => {
+                            const next = !locked;
+                            setLockMainById(prev => ({ ...prev, [p.id]: next }));
+                            plotRef.current?.setMainLocked?.(p.id, next);
+                          }}
+                          title='锁定主点：对p操作时平移整个组'
+                          style={{ background: locked ? '#4a4a4a' : '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer' }}
+                        >锁定主点</button>
+                      );
+                    })()}
                     <button
                       onClick={() => {
                         const u = p.u as [number, number, number];
@@ -357,7 +382,22 @@ export const App: React.FC = () => {
                             const mainArr = p.main as [number, number, number];
                             // Main always uses world coordinates
                             if (role === 'main') {
-                              next[axis] = isNaN(val) ? curWorld[idx] : val;
+                              const newVal = isNaN(val) ? curWorld[idx] : val;
+                              const delta = newVal - curWorld[idx];
+                              next[axis] = newVal;
+                              // If lock enabled, move u/v by the same delta on this axis
+                              if (lockMainById[p.id]) {
+                                const uW = p.u as [number,number,number];
+                                const vW = p.v as [number,number,number];
+                                const uNext = { x: uW[0], y: uW[1], z: uW[2] } as any;
+                                const vNext = { x: vW[0], y: vW[1], z: vW[2] } as any;
+                                uNext[axis] = (uW as any)[axis] + delta;
+                                vNext[axis] = (vW as any)[axis] + delta;
+                                plotRef.current?.updatePointWorld(p.id, 'main', next);
+                                plotRef.current?.updatePointWorld(p.id, 'u', uNext);
+                                plotRef.current?.updatePointWorld(p.id, 'v', vNext);
+                                return;
+                              }
                             } else if (mode === 'local') {
                               // Convert local delta to world
                               const worldVal = (isNaN(val) ? (curWorld[idx] - mainArr[idx]) : val) + mainArr[idx];

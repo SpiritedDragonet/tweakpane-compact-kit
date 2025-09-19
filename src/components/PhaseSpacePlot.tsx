@@ -24,6 +24,7 @@ export type PhaseSpacePlotHandle = {
   setTransformMode: (mode: 'translate'|'rotate'|'scale') => void;
   setTransformSpace: (space: 'local'|'world') => void;
   focusOnTrajectory: () => void;
+  setMainLocked: (patchId: number, locked: boolean) => void;
 };
 
 type ExternalControls = {
@@ -59,6 +60,8 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const dragSnapshotRef = useRef<DragSnapshot | null>(null);
   const boundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const lockedMainSetRef = useRef<Set<number>>(new Set());
+  const lastMainDuringDragRef = useRef<THREE.Vector3 | null>(null);
 
   type Patch = {
     id: number;
@@ -521,6 +524,9 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       orbit.target.set(cx, cy, cz); orbit.update();
       lastFramedBoundsRef.current = { minX, maxX, minY, maxY, minZ, maxZ };
     },
+    setMainLocked: (patchId: number, locked: boolean) => {
+      if (locked) lockedMainSetRef.current.add(patchId); else lockedMainSetRef.current.delete(patchId);
+    },
   }), []);
 
   useEffect(() => {
@@ -579,6 +585,13 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
             } else {
               dragSnapshotRef.current = null;
             }
+            // record main position for locked-main behavior on translate
+            const obj: any = (gizmo as any).object;
+            if (obj && obj.userData && obj.userData.type === 'point' && obj.userData.role === 'main' && lockedMainSetRef.current.has(sel.id) && mode === 'translate') {
+              lastMainDuringDragRef.current = sel.points.main.position.clone();
+            } else {
+              lastMainDuringDragRef.current = null;
+            }
           }
         } else {
           if (pivotRef.current) { 
@@ -591,6 +604,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
             }
           }
           dragSnapshotRef.current = null;
+          lastMainDuringDragRef.current = null;
           if (sel) { updatePatchGeometry(sel); emitChange(); }
         }
       });
@@ -601,6 +615,17 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
           applyPivotDelta(sel, mode, lastScale, lastQuat);
           emitChange();
         } else {
+          // If dragging main point and locked, shift u/v by delta to keep relative offsets
+          const obj: any = (gizmo as any).object;
+          if (mode === 'translate' && obj && obj.userData && obj.userData.type === 'point' && obj.userData.role === 'main' && lockedMainSetRef.current.has(sel.id) && lastMainDuringDragRef.current) {
+            const curMain = sel.points.main.position;
+            const delta = curMain.clone().sub(lastMainDuringDragRef.current);
+            if (delta.lengthSq() !== 0) {
+              sel.points.u.position.add(delta);
+              sel.points.v.position.add(delta);
+              lastMainDuringDragRef.current.copy(curMain);
+            }
+          }
           updatePatchGeometry(sel); emitChange();
         }
       });
