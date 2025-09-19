@@ -155,6 +155,31 @@ export const App: React.FC = () => {
                     style={{ width: 36, height: 24, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
                   />
                 </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                  <button
+                    onClick={() => {
+                      // Invert: swap u and v positions
+                      const u = p.u as [number, number, number];
+                      const v = p.v as [number, number, number];
+                      plotRef.current?.updatePointWorld(p.id, 'u', { x: v[0], y: v[1], z: v[2] });
+                      plotRef.current?.updatePointWorld(p.id, 'v', { x: u[0], y: u[1], z: u[2] });
+                    }}
+                    style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 10px', borderRadius: 5, cursor: 'pointer' }}
+                  >反转</button>
+                  <button
+                    onClick={() => {
+                      // Rotate: u -> main position; main -> v position; v -> opposite corner of parallelogram
+                      const m = p.main as [number, number, number];
+                      const u = p.u as [number, number, number];
+                      const v = p.v as [number, number, number];
+                      const opp = [u[0] + v[0] - m[0], u[1] + v[1] - m[1], u[2] + v[2] - m[2]] as [number, number, number];
+                      plotRef.current?.updatePointWorld(p.id, 'u', { x: m[0], y: m[1], z: m[2] });
+                      plotRef.current?.updatePointWorld(p.id, 'main', { x: v[0], y: v[1], z: v[2] });
+                      plotRef.current?.updatePointWorld(p.id, 'v', { x: opp[0], y: opp[1], z: opp[2] });
+                    }}
+                    style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 10px', borderRadius: 5, cursor: 'pointer' }}
+                  >轮换</button>
+                </div>
                 {(['main','u','v'] as const).map(role => (
                   <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                     <span style={{ color: '#aaa', width: 36 }}>{role}</span>
