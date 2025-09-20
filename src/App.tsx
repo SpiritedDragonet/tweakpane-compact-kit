@@ -32,6 +32,25 @@ export const App: React.FC = () => {
   // Selection from 3D view for UI highlight
   const [selection, setSelection] = useState<{ patchId: number | null; role: 'main'|'u'|'v'|'edge_u'|'edge_v'|null }>({ patchId: null, role: null });
   const plotRef = useRef<PhaseSpacePlotHandle>(null);
+  // New group naming UI (P/Q/R/S/J/T/U/V/custom)
+  const [newGroupNameKind, setNewGroupNameKind] = useState<'P'|'Q'|'R'|'S'|'J'|'T'|'U'|'V'|'custom'>('P');
+  const [customName, setCustomName] = useState<string>('');
+  const [customNameError, setCustomNameError] = useState<string>('');
+  const validateName = (s: string) => {
+    // Require a variable-like identifier: start with letter/_ then [A-Za-z0-9_]*
+    if (!s || !s.trim()) return '不能为空';
+    if (/\s/.test(s)) return '不能包含空格';
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(s)) return '仅限字母/数字/下划线，且不能以数字开头';
+    return '';
+  };
+  const getPlannedGroupName = (): string | null => {
+    if (newGroupNameKind === 'custom') {
+      const err = validateName(customName);
+      setCustomNameError(err);
+      return err ? null : customName;
+    }
+    return newGroupNameKind;
+  };
 
   useEffect(() => {
     setEnd(Math.min(signal.length - 1, 2000));
@@ -136,10 +155,6 @@ export const App: React.FC = () => {
         </div>
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
           <b style={{ color: '#fff', fontSize: 13 as any }}>补丁编辑</b>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <button onClick={() => plotRef.current?.addPatch()} style={{ background: '#333', color: '#eee', border: '1px solid #555', padding: '8px 12px', borderRadius: 5, cursor: 'pointer' }}>增加一个组 (A)</button>
-            <button onClick={() => plotRef.current?.deleteSelectedPatch()} style={{ background: '#333', color: '#eee', border: '1px solid #555', padding: '8px 12px', borderRadius: 5, cursor: 'pointer' }}>删除选中组 (Del)</button>
-          </div>
           {/* 统一坐标操作区：作用于当前选中组 */}
           <div style={{ marginTop: 10 }}>
             <div style={{ color: '#aaa', marginBottom: 6 }}>
@@ -296,6 +311,53 @@ export const App: React.FC = () => {
                 }}
                 style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
               >相对</button>
+            </div>
+          </div>
+          {/* 新增/删除移动到组列表，并在其上方放置命名选择器 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <label style={{ color: '#cfcfcf' }}>新组名称</label>
+              <select
+                value={newGroupNameKind}
+                onChange={(e) => { const v = e.target.value as any; setNewGroupNameKind(v); if (v !== 'custom') setCustomNameError(''); }}
+                style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
+              >
+                {['P','Q','R','S','J','T','U','V'].map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+                <option value='custom'>自定义</option>
+              </select>
+              {newGroupNameKind === 'custom' && (
+                <>
+                  <input
+                    value={customName}
+                    onChange={(e) => { const s = e.target.value; setCustomName(s); setCustomNameError(validateName(s)); }}
+                    placeholder='输入名称（变量名格式）'
+                    style={{ width: 180, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
+                  />
+                  {customNameError && (
+                    <span style={{ color: '#ff6b6b', fontSize: 12 }}>{customNameError}</span>
+                  )}
+                </>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => {
+                  const name = getPlannedGroupName();
+                  if (newGroupNameKind === 'custom' && !name) return; // invalid custom name
+                  const id = plotRef.current?.addPatch();
+                  if (id != null && name) {
+                    plotRef.current?.renamePatch(id, name);
+                  }
+                }}
+                style={{ background: '#333', color: '#eee', border: '1px solid #555', padding: '8px 12px', borderRadius: 5, cursor: 'pointer' }}
+              >增加一个组</button>
+              <button
+                onClick={() => plotRef.current?.deleteSelectedPatch()}
+                style={{ background: '#333', color: '#eee', border: '1px solid #555', padding: '8px 12px', borderRadius: 5, cursor: selection.patchId == null ? 'not-allowed' : 'pointer', opacity: selection.patchId == null ? 0.6 : 1 }}
+                disabled={selection.patchId == null}
+              >删除选中组</button>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
