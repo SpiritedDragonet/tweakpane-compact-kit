@@ -31,6 +31,45 @@ export const App: React.FC = () => {
   // Selection from 3D view for UI highlight
   const [selection, setSelection] = useState<{ patchId: number | null; role: 'main'|'u'|'v'|'edge_u'|'edge_v'|null }>({ patchId: null, role: null });
   const plotRef = useRef<PhaseSpacePlotHandle>(null);
+  // Undo/redo history (max 100 steps)
+  const MAX_HISTORY = 100;
+  const undoStackRef = useRef<PatchDTO[][]>([]);
+  const redoStackRef = useRef<PatchDTO[][]>([]);
+  const ignoreChangesRef = useRef(false);
+  const clonePatches = (arr: PatchDTO[]) => JSON.parse(JSON.stringify(arr)) as PatchDTO[];
+  const pushHistory = (arr: PatchDTO[]) => {
+    const stack = undoStackRef.current;
+    stack.push(clonePatches(arr));
+    while (stack.length > MAX_HISTORY) stack.shift();
+    redoStackRef.current = [];
+  };
+  const applySnapshot = (snap: PatchDTO[]) => {
+    ignoreChangesRef.current = true;
+    plotRef.current?.setPatches(clonePatches(snap));
+    setPatches(clonePatches(snap));
+    ignoreChangesRef.current = false;
+  };
+  const undo = () => {
+    const stack = undoStackRef.current; const redo = redoStackRef.current; if (stack.length <= 1) return;
+    const current = stack.pop()!; redo.push(current);
+    const prev = stack[stack.length - 1]; applySnapshot(prev);
+  };
+  const redoFn = () => {
+    const stack = undoStackRef.current; const redo = redoStackRef.current; if (redo.length === 0) return;
+    const next = redo.pop()!; stack.push(clonePatches(next)); applySnapshot(next);
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      const tag = (tgt?.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (tgt && (tgt as any).isContentEditable)) return;
+      const key = e.key; const ctrl = e.ctrlKey || e.metaKey; const shift = e.shiftKey;
+      if (ctrl && (key === 'z' || key === 'Z') && !shift) { e.preventDefault(); undo(); }
+      else if ((ctrl && (key === 'y' || key === 'Y')) || (e.metaKey && (key === 'z' || key === 'Z') && shift)) { e.preventDefault(); redoFn(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   // New group naming UI (P/Q/R/S/J/T/U/V/custom)
   const [newGroupNameKind, setNewGroupNameKind] = useState<'P'|'Q'|'R'|'S'|'J'|'T'|'U'|'V'|'custom'>('P');
   const [customName, setCustomName] = useState<string>('');
@@ -73,7 +112,11 @@ export const App: React.FC = () => {
             pointPixelSize={pointSizePx}
             frameCloseness={frameCloseness}
             onSelectionChange={setSelection}
-            onPatchesChange={setPatches}
+            onPatchesChange={(arr, meta) => {
+              setPatches(arr);
+              if (ignoreChangesRef.current) return;
+              if (meta?.commit) pushHistory(arr);
+            }}
           />
         </div>
       </div>
@@ -154,31 +197,7 @@ export const App: React.FC = () => {
             {(() => {
               const disabled = selection.patchId == null || selection.role == null;
               const getPatch = () => patches.find(pp => pp.id === selection.patchId) || null;
-              const applyOp = (op: string) => {
-                const p = getPatch(); if (!p) return;
-                const mode = coordModeById[p.id] ?? 'global';
-                const isRel = mode === 'local';
-                const m = p.main as [number, number, number];
-                const u = p.u as [number, number, number];
-                const v = p.v as [number, number, number];
-                const transform = (vec: [number,number,number], kind: string) => {
-                  const [x,y,z] = vec;
-                  switch (kind) {
-                    case 'AX_X': return [x, 0, 0] as [number,number,number];
-                    case 'AX_Y': return [0, y, 0] as [number,number,number];
-                    case 'AX_Z': return [0, 0, z] as [number,number,number];
-                    case 'PL_XY': return [x, y, 0] as [number,number,number];
-                    case 'PL_YZ': return [0, y, z] as [number,number,number];
-                    case 'PL_ZX': return [x, 0, z] as [number,number,number];
-                    case 'DG_XY': { const s = (x + y) / 2; return [s, s, 0] as [number,number,number]; }
-                    case 'DG_YZ': { const s = (y + z) / 2; return [0, s, s] as [number,number,number]; }
-                    case 'DG_ZX': { const s = (z + x) / 2; return [s, 0, s] as [number,number,number]; }
-                    case 'DP_XY': { const s = (x + y) / 2; return [s, s, z] as [number,number,number]; }
-                    case 'DP_YZ': { const s = (y + z) / 2; return [x, s, s] as [number,number,number]; }
-                    case 'DP_ZX': { const s = (z + x) / 2; return [s, y, s] as [number,number,number]; }
-                    case 'MAIN_D': { const s = (x + y + z) / 3; return [s, s, s] as [number,number,number]; }
-                    default: return vec;
-                  }
+              \n                plotRef.current?.commit?.('align-op');
                 };
                 const role = selection.role as 'main'|'u'|'v';
                 if (role === 'main') {
@@ -487,6 +506,8 @@ export const App: React.FC = () => {
                             }
                             plotRef.current?.updatePointWorld(p.id, role, next);
                           }}
+                          onBlur={() => plotRef.current?.commit?.('coords-edit')}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); plotRef.current?.commit?.('coords-edit'); } }}
                           style={{ width: 80, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
                         />
                       </div>
@@ -501,3 +522,6 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
+
+

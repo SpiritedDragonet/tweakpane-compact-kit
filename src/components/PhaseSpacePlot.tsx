@@ -28,6 +28,7 @@ export type PhaseSpacePlotHandle = {
   setTransformSpace: (space: 'local'|'world') => void;
   focusOnTrajectory: () => void;
   setMainLocked: (patchId: number, locked: boolean) => void;
+  commit: (reason?: string) => void;
 };
 
 type ExternalControls = {
@@ -41,7 +42,7 @@ type Props = {
   external: ExternalControls;
   debug?: boolean;
   pointPixelSize?: number; // desired on-screen size for point sprites (in pixels)
-  onPatchesChange?: (patches: PatchDTO[]) => void;
+  onPatchesChange?: (patches: PatchDTO[], meta?: { commit?: boolean; reason?: string }) => void;
   // Controls how close auto-framing gets relative to the original 2.0× span
   // e.g., 10 => 10x closer than original (d = maxSpan * 2.0 / 10 = 0.2 * maxSpan)
   frameCloseness?: number;
@@ -724,9 +725,9 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     clearSelection();
   }
 
-  function emitChange() {
+  function emitChange(commit = false, reason?: string) {
     if (!onPatchesChange) return;
-    onPatchesChange(serializePatchesWorld());
+    onPatchesChange(serializePatchesWorld(), commit ? { commit: true, reason } : undefined);
   }
 
   useImperativeHandle(ref, () => ({
@@ -749,27 +750,27 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       } else {
         pos = new THREE.Vector3(THREE.MathUtils.randFloatSpread(5), 0, THREE.MathUtils.randFloatSpread(5));
       }
-      const p = createPatch(pos); if (!p) return null; setSelection(p, p.points.main); emitChange(); return p.id;
+      const p = createPatch(pos); if (!p) return null; setSelection(p, p.points.main); emitChange(true, 'add-patch'); return p.id;
     },
-    deleteSelectedPatch: () => { const sel = selectedPatchRef.current; if (sel) { deletePatch(sel.id); emitChange(); } },
+    deleteSelectedPatch: () => { const sel = selectedPatchRef.current; if (sel) { deletePatch(sel.id); emitChange(true, 'delete-patch'); } },
     clearSelection: () => { clearSelection(); },
     getPatches: () => serializePatchesWorld(),
-    setPatches: (arr) => { rebuildPatchesFromDTO(arr); emitChange(); },
-    renamePatch: (patchId, name) => { const p = patchesRef.current.get(patchId); if (p) { p.name = name; emitChange(); } },
+    setPatches: (arr) => { rebuildPatchesFromDTO(arr); emitChange(true, 'apply-snapshot'); },
+    renamePatch: (patchId, name) => { const p = patchesRef.current.get(patchId); if (p) { p.name = name; emitChange(true, 'rename'); } },
     updatePatchColor: (patchId: number, colorHex: string) => {
       const p = patchesRef.current.get(patchId); if (!p) return;
       const c = new THREE.Color(colorHex);
       p.color.copy(c);
       (p.points.main.material as THREE.SpriteMaterial).color.copy(c);
       (p.quad.material as THREE.MeshBasicMaterial).color.copy(c);
-      emitChange();
+      emitChange(true, 'recolor');
     },
     updatePointWorld: (patchId, role, coord) => {
       const p = patchesRef.current.get(patchId); if (!p) return;
       const w = new THREE.Vector3(coord.x, coord.y, coord.z);
       const local = p.group.worldToLocal(w.clone());
       p.points[role].position.copy(local);
-      updatePatchGeometry(p); emitChange();
+      updatePatchGeometry(p); emitChange(false, 'point-change');
     },
     setTransformMode: (mode) => {
       modeRef.current = mode as any;
@@ -805,6 +806,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     setMainLocked: (patchId: number, locked: boolean) => {
       if (locked) lockedMainSetRef.current.add(patchId); else lockedMainSetRef.current.delete(patchId);
     },
+    commit: (reason?: string) => { emitChange(true, reason ?? 'manual-commit'); },
   }), []);
 
   useEffect(() => {
@@ -903,7 +905,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
           // Suppress scene picking for a short moment to avoid up->click
           suppressPickUntilRef.current = performance.now() + 180;
           uvOverHandleRef.current = false;
-          if (sel) { updatePatchGeometry(sel); emitChange(); if (modeRef.current === 'uv') updateUVDoubleAxisForSelection(sel); }
+          if (sel) { updatePatchGeometry(sel); emitChange(true, 'drag-end'); if (modeRef.current === 'uv') updateUVDoubleAxisForSelection(sel); }
         }
       });
       gizmo.addEventListener('objectChange', () => { 
@@ -1018,7 +1020,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         else uvAnchorRef.current = { target: 'group' };
       };
       const endUVDrag = () => {
-        uvUDragRef.current = null; uvVDragRef.current = null; uvAnyDraggingRef.current = false; orbit.enabled = true; const sel = selectedPatchRef.current; if (sel) { updatePatchGeometry(sel); emitChange(); if (modeRef.current === 'uv') updateUVDoubleAxisForSelection(sel); }
+        uvUDragRef.current = null; uvVDragRef.current = null; uvAnyDraggingRef.current = false; orbit.enabled = true; const sel = selectedPatchRef.current; if (sel) { updatePatchGeometry(sel); emitChange(true, 'uv-drag-end'); if (modeRef.current === 'uv') updateUVDoubleAxisForSelection(sel); }
       };
       const onUVObjectChange = (which: 'u'|'v') => {
         const sel = selectedPatchRef.current; if (!sel) return; const handle = which === 'u' ? uvHandleURef.current : uvHandleVRef.current; if (!handle) return; const rec = which === 'u' ? uvUDragRef.current : uvVDragRef.current; if (!rec) return;
