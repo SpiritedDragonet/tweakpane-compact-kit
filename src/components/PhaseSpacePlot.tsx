@@ -63,8 +63,24 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const uvHandleVRef = useRef<THREE.Object3D | null>(null);
   const uvCtrlURef = useRef<TransformControls | null>(null);
   const uvCtrlVRef = useRef<TransformControls | null>(null);
-  const uvUDragRef = useRef<{ patchId: number; target: 'group'|'point'; role?: 'main'|'u'|'v'; startPosWorld: THREE.Vector3; startGroupPos?: THREE.Vector3; startPointLocal?: THREE.Vector3 } | null>(null);
-  const uvVDragRef = useRef<{ patchId: number; target: 'group'|'point'; role?: 'main'|'u'|'v'; startPosWorld: THREE.Vector3; startGroupPos?: THREE.Vector3; startPointLocal?: THREE.Vector3 } | null>(null);
+  const uvUDragRef = useRef<{
+    patchId: number;
+    target: 'group'|'point'|'edge';
+    role?: 'main'|'u'|'v';
+    edgeRole?: 'u'|'v';
+    startPosWorld: THREE.Vector3;
+    startGroupPos?: THREE.Vector3;
+    startPointLocal?: THREE.Vector3;
+  } | null>(null);
+  const uvVDragRef = useRef<{
+    patchId: number;
+    target: 'group'|'point'|'edge';
+    role?: 'main'|'u'|'v';
+    edgeRole?: 'u'|'v';
+    startPosWorld: THREE.Vector3;
+    startGroupPos?: THREE.Vector3;
+    startPointLocal?: THREE.Vector3;
+  } | null>(null);
   const uvAnyDraggingRef = useRef<boolean>(false);
   const uvOverHandleRef = useRef<boolean>(false);
   const suppressPickUntilRef = useRef<number>(0);
@@ -982,11 +998,23 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         const sel = selectedPatchRef.current; if (!sel) return;
         const clicked: any = selectedClickedObjectRef.current;
         const handle = which === 'u' ? uvHandleURef.current : uvHandleVRef.current; if (!handle) return;
-        const rec = { patchId: sel.id, target: (clicked && clicked.userData?.type === 'point') ? 'point' : 'group', role: (clicked && clicked.userData?.type === 'point') ? (clicked.userData.role as any) : undefined, startPosWorld: handle.position.clone(), startGroupPos: (() => { const g = new THREE.Vector3(); sel.group.getWorldPosition(g); return g; })(), startPointLocal: (clicked && clicked.userData?.type === 'point') ? (clicked as THREE.Object3D).position.clone() : undefined };
+        // Build drag record; treat a clicked line as an 'edge' target
+        const isPoint = (clicked && clicked.userData?.type === 'point');
+        const isEdge = (clicked && clicked.userData?.type === 'line');
+        const rec = {
+          patchId: sel.id,
+          target: isPoint ? 'point' : (isEdge ? 'edge' : 'group'),
+          role: isPoint ? (clicked.userData.role as any) : undefined,
+          edgeRole: isEdge ? (clicked.userData.role as 'u'|'v') : undefined,
+          startPosWorld: handle.position.clone(),
+          startGroupPos: (() => { const g = new THREE.Vector3(); sel.group.getWorldPosition(g); return g; })(),
+          startPointLocal: isPoint ? (clicked as THREE.Object3D).position.clone() : undefined,
+        } as const;
         if (which === 'u') uvUDragRef.current = rec; else uvVDragRef.current = rec;
         uvAnyDraggingRef.current = true; orbit.enabled = false;
         // Lock anchor spec based on current target
         if (rec.target === 'point' && rec.role) uvAnchorRef.current = { target: 'point', role: rec.role };
+        else if (rec.target === 'edge' && rec.edgeRole) uvAnchorRef.current = { target: 'edge', role: rec.edgeRole };
         else uvAnchorRef.current = { target: 'group' };
       };
       const endUVDrag = () => {
@@ -1011,6 +1039,14 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         if (rec.target === 'point' && rec.role) {
           const a = sel.group.worldToLocal(rec.startPosWorld.clone()); const b = sel.group.worldToLocal(mappedPos.clone()); const dLocal = b.sub(a);
           const baseLocal = rec.startPointLocal!.clone(); sel.points[rec.role].position.copy(baseLocal.add(dLocal)); updatePatchGeometry(sel); emitChange();
+        } else if (rec.target === 'edge' && rec.edgeRole) {
+          // Move main + selected edge endpoint together; third point remains
+          const a = sel.group.worldToLocal(rec.startPosWorld.clone());
+          const b = sel.group.worldToLocal(mappedPos.clone());
+          const dLocal = b.sub(a);
+          sel.points.main.position.add(dLocal);
+          if (rec.edgeRole === 'u') sel.points.u.position.add(dLocal); else sel.points.v.position.add(dLocal);
+          updatePatchGeometry(sel); emitChange();
         } else {
           const parent = sel.group.parent as THREE.Object3D | null;
           if (parent) {
