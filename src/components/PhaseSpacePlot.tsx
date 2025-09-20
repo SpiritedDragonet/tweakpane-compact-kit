@@ -45,8 +45,8 @@ type Props = {
   // Controls how close auto-framing gets relative to the original 2.0× span
   // e.g., 10 => 10x closer than original (d = maxSpan * 2.0 / 10 = 0.2 * maxSpan)
   frameCloseness?: number;
-  // Selection change callback for UI highlight
-  onSelectionChange?: (sel: { patchId: number | null; role: 'main' | 'u' | 'v' | null }) => void;
+  // Selection change callback for UI highlight (supports points and edges)
+  onSelectionChange?: (sel: { patchId: number | null; role: 'main' | 'u' | 'v' | 'edge_u' | 'edge_v' | null }) => void;
 };
 
 export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, onPatchesChange, frameCloseness = 2, onSelectionChange }, ref) {
@@ -287,11 +287,14 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       // Update UV anchor
       if (clickedObject && (anyClicked?.userData?.type === 'point')) uvAnchorRef.current = { target: 'point', role: (anyClicked.userData.role as any) };
       else uvAnchorRef.current = { target: 'group' };
-      // Notify UI even when switching within the same group (only highlight point roles)
+      // Notify UI even when switching within same group (point or edge)
       if (clickedObject) {
-        let role: 'main'|'u'|'v'|null = null;
+        let role: 'main'|'u'|'v'|'edge_u'|'edge_v'|null = null;
         const anyClicked: any = clickedObject as any;
-        if (anyClicked && anyClicked.userData && anyClicked.userData.type === 'point') role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
+        if (anyClicked && anyClicked.userData) {
+          if (anyClicked.userData.type === 'point') role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
+          else if (anyClicked.userData.type === 'line') role = ((anyClicked.userData.role as 'u'|'v') === 'u') ? 'edge_u' : 'edge_v';
+        }
         onSelectionChange?.({ patchId: p.id, role });
       }
       return;
@@ -320,10 +323,14 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     else if (clickedObject && (anyClicked?.userData?.type === 'line')) uvAnchorRef.current = { target: 'edge', role: (anyClicked.userData.role as any) };
     else uvAnchorRef.current = { target: 'group' };
     ensureAttachTarget(p);
-    // Notify UI with selected role if a point was clicked
-    let role: 'main'|'u'|'v'|null = null;
-    if (anyClicked && anyClicked.userData && anyClicked.userData.type === 'point') {
-      role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
+    // Notify UI with selected role (point or edge)
+    let role: 'main'|'u'|'v'|'edge_u'|'edge_v'|null = null;
+    if (anyClicked && anyClicked.userData) {
+      if (anyClicked.userData.type === 'point') {
+        role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
+      } else if (anyClicked.userData.type === 'line') {
+        role = ((anyClicked.userData.role as 'u'|'v') === 'u') ? 'edge_u' : 'edge_v';
+      }
     }
     onSelectionChange?.({ patchId: p.id, role });
   }
@@ -872,7 +879,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
             }
           }
         } else {
-          if (modeRef.current === 'uv') { uvDragRef.current = null; }
+        if (modeRef.current === 'uv') { uvDragRef.current = null; suppressPickUntilRef.current = performance.now() + 180; }
           // Keep pivot at last location to preserve axes position
           dragSnapshotRef.current = null;
           lastMainDuringDragRef.current = null;
@@ -1005,7 +1012,21 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
           const a = sel.group.worldToLocal(rec.startPosWorld.clone()); const b = sel.group.worldToLocal(mappedPos.clone()); const dLocal = b.sub(a);
           const baseLocal = rec.startPointLocal!.clone(); sel.points[rec.role].position.copy(baseLocal.add(dLocal)); updatePatchGeometry(sel); emitChange();
         } else {
-          const parent = sel.group.parent as THREE.Object3D | null; if (parent) { const newWorld = new THREE.Vector3(); sel.group.getWorldPosition(newWorld); newWorld.add(mappedDeltaW); const newLocal = parent.worldToLocal(newWorld.clone()); sel.group.position.copy(newLocal); emitChange(); }
+          const parent = sel.group.parent as THREE.Object3D | null;
+          if (parent) {
+            const newWorld = new THREE.Vector3();
+            sel.group.getWorldPosition(newWorld);
+            newWorld.add(mappedDeltaW);
+            const newLocal = parent.worldToLocal(newWorld.clone());
+            sel.group.position.copy(newLocal);
+            emitChange();
+            // Keep fat edge overlay in sync when dragging an edge anchor in UV mode
+            const clickedAny: any = selectedClickedObjectRef.current;
+            if (clickedAny && clickedAny.userData?.type === 'line' && fatEdgeRef.current?.line) {
+              const role = (clickedAny.userData.role as 'u'|'v');
+              createOrUpdateFatEdge(sel, role);
+            }
+          }
         }
         // incremental baseline
         if (which === 'u') uvUDragRef.current!.startPosWorld.copy(mappedPos); else uvVDragRef.current!.startPosWorld.copy(mappedPos);
@@ -1041,10 +1062,34 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         if (hits.length) {
           chosen = hits[0].object as THREE.Object3D;
         } else {
-          const otherObjs = objs.filter(o => (o as any).userData && (o as any).userData.type !== 'point');
-          raycaster.params.Line = { threshold: 0.01 } as any;
-          hits = raycaster.intersectObjects(otherObjs as any, false);
-          if (hits.length) chosen = hits[0].object as THREE.Object3D;
+          // Prefer hitting lines first, then fall back to quads/others
+          const lineObjs = objs.filter(o => (o as any).userData && (o as any).userData.type === 'line');
+          const quadObjs = objs.filter(o => (o as any).userData && (o as any).userData.type === 'quad');
+          // Compute a pixel-based world threshold for more reliable line picking
+          const cam = cameraRef.current!;
+          const rect = renderer.domElement.getBoundingClientRect();
+          const b = boundsRef.current;
+          const cx = b ? (b.minX + b.maxX) * 0.5 : 0;
+          const cy = b ? (b.minY + b.maxY) * 0.5 : 0;
+          const cz = b ? (b.minZ + b.maxZ) * 0.5 : 0;
+          const center = new THREE.Vector3(cx, cy, cz);
+          const dist = cam.position.distanceTo(center);
+          const vFov = cam.fov * Math.PI / 180;
+          const worldPerPixel = (2 * Math.tan(vFov / 2) * dist) / Math.max(1, rect.height);
+          const thr = Math.max(0.002, Math.min(0.25, worldPerPixel * 8));
+          (raycaster.params as any).Line = { threshold: thr } as any;
+          hits = raycaster.intersectObjects(lineObjs as any, false);
+          if (hits.length) {
+            chosen = hits[0].object as THREE.Object3D;
+          } else {
+            // Fall back to quads and any other non-point visuals
+            hits = raycaster.intersectObjects(quadObjs as any, false);
+            if (!hits.length) {
+              const others = objs.filter(o => (o as any).userData && (o as any).userData.type !== 'point' && (o as any).userData.type !== 'line' && (o as any).userData.type !== 'quad');
+              hits = raycaster.intersectObjects(others as any, false);
+            }
+            if (hits.length) chosen = hits[0].object as THREE.Object3D;
+          }
         }
         if (chosen) {
           const p = patchesRef.current.get((chosen as any).userData.patchId);

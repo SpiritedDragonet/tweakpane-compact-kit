@@ -211,30 +211,30 @@ export const App: React.FC = () => {
                     plotRef.current?.updatePointWorld(p.id, 'v', { x: newV[0], y: newV[1], z: newV[2] });
                   }
                 } else if (role === 'edge_u') {
+                  // First align main, then map u with the same op
+                  const newM = transform(m, op);
+                  plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
                   if (isRel) {
                     const uRel: [number,number,number] = [u[0]-m[0], u[1]-m[1], u[2]-m[2]];
-                    const rU = transform(uRel, op); const newUAbs: [number,number,number] = [m[0]+rU[0], m[1]+rU[1], m[2]+rU[2]];
-                    const newM = transform(m, op);
+                    const rU = transform(uRel, op);
+                    const newUAbs: [number,number,number] = [newM[0]+rU[0], newM[1]+rU[1], newM[2]+rU[2]];
                     plotRef.current?.updatePointWorld(p.id, 'u', { x: newUAbs[0], y: newUAbs[1], z: newUAbs[2] });
-                    plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
                   } else {
                     const newU = transform(u, op);
-                    const newM = transform(m, op);
                     plotRef.current?.updatePointWorld(p.id, 'u', { x: newU[0], y: newU[1], z: newU[2] });
-                    plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
                   }
                 } else if (role === 'edge_v') {
+                  // First align main, then map v with the same op
+                  const newM = transform(m, op);
+                  plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
                   if (isRel) {
                     const vRel: [number,number,number] = [v[0]-m[0], v[1]-m[1], v[2]-m[2]];
-                    const rV = transform(vRel, op); const newVAbs: [number,number,number] = [m[0]+rV[0], m[1]+rV[1], m[2]+rV[2]];
-                    const newM = transform(m, op);
+                    const rV = transform(vRel, op);
+                    const newVAbs: [number,number,number] = [newM[0]+rV[0], newM[1]+rV[1], newM[2]+rV[2]];
                     plotRef.current?.updatePointWorld(p.id, 'v', { x: newVAbs[0], y: newVAbs[1], z: newVAbs[2] });
-                    plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
                   } else {
                     const newV = transform(v, op);
-                    const newM = transform(m, op);
                     plotRef.current?.updatePointWorld(p.id, 'v', { x: newV[0], y: newV[1], z: newV[2] });
-                    plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
                   }
                 }
               };
