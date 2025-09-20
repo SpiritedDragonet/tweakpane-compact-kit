@@ -66,6 +66,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const uvUDragRef = useRef<{ patchId: number; target: 'group'|'point'; role?: 'main'|'u'|'v'; startPosWorld: THREE.Vector3; startGroupPos?: THREE.Vector3; startPointLocal?: THREE.Vector3 } | null>(null);
   const uvVDragRef = useRef<{ patchId: number; target: 'group'|'point'; role?: 'main'|'u'|'v'; startPosWorld: THREE.Vector3; startGroupPos?: THREE.Vector3; startPointLocal?: THREE.Vector3 } | null>(null);
   const uvAnyDraggingRef = useRef<boolean>(false);
+  const uvOverHandleRef = useRef<boolean>(false);
   const uvAnchorRef = useRef<{ target: 'group'|'point'; role?: 'main'|'u'|'v' } | null>(null);
   const selectedClickedObjectRef = useRef<THREE.Object3D | null>(null);
   type DragSnapshot = { patchId: number; main0: THREE.Vector3; u0: THREE.Vector3; v0: THREE.Vector3; pivotLocal0: THREE.Vector3; scale0: number; pointerStart?: { x: number; y: number }; edgeRole?: 'u'|'v' };
