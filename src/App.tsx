@@ -24,7 +24,7 @@ export const App: React.FC = () => {
   const [pointSizePx, setPointSizePx] = useState<number>(15);
   const [frameCloseness, setFrameCloseness] = useState<number>(2); // 默认近景倍数（更贴近你的偏好）
   const [patches, setPatches] = useState<PatchDTO[]>([]);
-  const [toolMode, setToolMode] = useState<'translate'|'rotate'|'scale'>('translate');
+  const [toolMode, setToolMode] = useState<'translate'|'rotate'|'scale'|'uv'>('translate');
   const [toolSpace, setToolSpace] = useState<'local'|'world'>('local');
   // Per-group coordinate display mode: 'global' (absolute) or 'local' (relative to main for u/v)
   const [coordModeById, setCoordModeById] = useState<Record<number, 'global' | 'local'>>({});
@@ -115,6 +115,7 @@ export const App: React.FC = () => {
               <option value='translate'>移动 (W)</option>
               <option value='rotate'>旋转 (E)</option>
               <option value='scale'>缩放 (R)</option>
+              <option value='uv'>沿u/v平移</option>
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
