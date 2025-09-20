@@ -197,11 +197,35 @@ export const App: React.FC = () => {
             {(() => {
               const disabled = selection.patchId == null || selection.role == null;
               const getPatch = () => patches.find(pp => pp.id === selection.patchId) || null;
-              \n                plotRef.current?.commit?.('align-op');
+              const applyOp = (op: string) => {
+                const p = getPatch(); if (!p) return;
+                const mode = coordModeById[p.id] ?? 'global';
+                const isRel = mode === 'local';
+                const m = p.main as [number, number, number];
+                const u = p.u as [number, number, number];
+                const v = p.v as [number, number, number];
+                const transform = (vec: [number,number,number], op: string): [number,number,number] => {
+                  const [x, y, z] = vec;
+                  switch (op) {
+                    case 'AX_X': return [x, 0, 0];
+                    case 'AX_Y': return [0, y, 0];
+                    case 'AX_Z': return [0, 0, z];
+                    case 'PL_XY': return [x, y, 0];
+                    case 'PL_YZ': return [0, y, z];
+                    case 'PL_ZX': return [x, 0, z];
+                    case 'DG_XY': { const t = (x + y) / 2; return [t, t, 0]; }
+                    case 'DG_YZ': { const t = (y + z) / 2; return [0, t, t]; }
+                    case 'DG_ZX': { const t = (z + x) / 2; return [t, 0, t]; }
+                    case 'DP_XY': { const t = (x + y) / 2; return [t, t, z]; }
+                    case 'DP_YZ': { const t = (y + z) / 2; return [x, t, t]; }
+                    case 'DP_ZX': { const t = (z + x) / 2; return [t, y, t]; }
+                    case 'MAIN_D': { const t = (x + y + z) / 3; return [t, t, t]; }
+                    default: return vec;
+                  }
                 };
-                const role = selection.role as 'main'|'u'|'v';
+                const role = selection.role as 'main'|'u'|'v'|'edge_u'|'edge_v';
                 if (role === 'main') {
-                  const newM = transform(m, op); // p uses absolute in both modes
+                  const newM = transform(m, op);
                   const locked = !!lockMainById[p.id];
                   if (locked) {
                     const delta: [number,number,number] = [newM[0]-m[0], newM[1]-m[1], newM[2]-m[2]];
@@ -232,7 +256,6 @@ export const App: React.FC = () => {
                     plotRef.current?.updatePointWorld(p.id, 'v', { x: newV[0], y: newV[1], z: newV[2] });
                   }
                 } else if (role === 'edge_u') {
-                  // First align main, then map u with the same op
                   const newM = transform(m, op);
                   plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
                   if (isRel) {
@@ -245,7 +268,6 @@ export const App: React.FC = () => {
                     plotRef.current?.updatePointWorld(p.id, 'u', { x: newU[0], y: newU[1], z: newU[2] });
                   }
                 } else if (role === 'edge_v') {
-                  // First align main, then map v with the same op
                   const newM = transform(m, op);
                   plotRef.current?.updatePointWorld(p.id, 'main', { x: newM[0], y: newM[1], z: newM[2] });
                   if (isRel) {
@@ -258,6 +280,7 @@ export const App: React.FC = () => {
                     plotRef.current?.updatePointWorld(p.id, 'v', { x: newV[0], y: newV[1], z: newV[2] });
                   }
                 }
+                plotRef.current?.commit?.('align-op');
               };
               const Btn = (props: { label: string; title: string; op: string }) => (
                 <button
