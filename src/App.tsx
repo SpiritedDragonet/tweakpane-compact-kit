@@ -92,34 +92,11 @@ export const App: React.FC = () => {
             <input type="range" min={1} max={50} step={1} value={tau} onChange={(e) => setTau(parseInt(e.target.value, 10))} style={{ flex: 1 }} />
             <input type="number" min={1} max={50} step={1} value={tau} onChange={(e) => setTau(parseInt(e.target.value, 10) || 8)} style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }} />
           </div>
+          
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <label style={{ minWidth: 70, color: '#cfcfcf' }}>近景倍数</label>
-            <input
-              type="range"
-              min={2}
-              max={40}
-              step={1}
-              value={frameCloseness}
-              onChange={(e) => setFrameCloseness(parseInt(e.target.value, 10))}
-              style={{ flex: 1 }}
-            />
-            <input
-              type="number"
-              min={2}
-              max={100}
-              step={1}
-              value={frameCloseness}
-              onChange={(e) => {
-                const v = parseInt(e.target.value, 10);
-                setFrameCloseness(Number.isFinite(v) ? Math.max(2, Math.min(100, v)) : 2);
-              }}
-              style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <label style={{ minWidth: 70, color: '#cfcfcf' }}>Start</label>
+            <label style={{ minWidth: 70, color: '#cfcfcf' }}>开始</label>
             <input type="number" min={0} max={Math.max(0, signal.length - 2)} step={1} value={start} onChange={(e) => setStart(Math.max(0, parseInt(e.target.value, 10) || 0))} style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }} />
-            <label style={{ minWidth: 40, color: '#cfcfcf' }}>End</label>
+            <label style={{ minWidth: 40, color: '#cfcfcf' }}>结束</label>
             <input type="number" min={1} max={signal.length - 1} step={1} value={end} onChange={(e) => setEnd(Math.min(signal.length - 1, parseInt(e.target.value, 10) || (signal.length - 1)))} style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
@@ -152,18 +129,35 @@ export const App: React.FC = () => {
             <input type="range" min={6} max={60} step={1} value={pointSizePx} onChange={(e) => setPointSizePx(parseInt(e.target.value, 10) || 15)} style={{ flex: 1 }} />
             <input type="number" min={6} max={60} step={1} value={pointSizePx} onChange={(e) => setPointSizePx(Math.max(6, Math.min(60, parseInt(e.target.value, 10) || 15)))} style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }} />
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+            <label style={{ minWidth: 90, color: '#cfcfcf' }}>近景倍数</label>
+            <input
+              type="range"
+              min={2}
+              max={40}
+              step={1}
+              value={frameCloseness}
+              onChange={(e) => setFrameCloseness(parseInt(e.target.value, 10))}
+              style={{ flex: 1 }}
+            />
+            <input
+              type="number"
+              min={2}
+              max={100}
+              step={1}
+              value={frameCloseness}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                setFrameCloseness(Number.isFinite(v) ? Math.max(2, Math.min(100, v)) : 2);
+              }}
+              style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
+            />
+          </div>
         </div>
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
-          <b style={{ color: '#fff', fontSize: 13 as any }}>补丁编辑</b>
+          <b style={{ color: '#fff', fontSize: 13 as any }}>对齐操作</b>
           {/* 统一坐标操作区：作用于当前选中组 */}
           <div style={{ marginTop: 10 }}>
-            <div style={{ color: '#aaa', marginBottom: 6 }}>
-              目标组: {selection.patchId != null ? `ID ${selection.patchId}` : '未选择'}；坐标模式: {(() => {
-                if (selection.patchId == null) return '-';
-                const mode = coordModeById[selection.patchId] ?? 'global';
-                return mode === 'global' ? '绝对' : '相对';
-              })()}
-            </div>
             {(() => {
               const disabled = selection.patchId == null || selection.role == null;
               const getPatch = () => patches.find(pp => pp.id === selection.patchId) || null;
@@ -294,7 +288,7 @@ export const App: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
             <b style={{ color: '#fff', fontSize: 13 as any, whiteSpace: 'nowrap' }}>组列表</b>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-              <span style={{ color: '#aaa' }}>全部坐标:</span>
+              <span style={{ color: '#aaa' }}>统一坐标:</span>
               <button
                 onClick={() => {
                   const next: Record<number, 'global'|'local'> = {};
@@ -351,7 +345,8 @@ export const App: React.FC = () => {
                     plotRef.current?.renamePatch(id, name);
                   }
                 }}
-                style={{ background: '#333', color: '#eee', border: '1px solid #555', padding: '8px 12px', borderRadius: 5, cursor: 'pointer' }}
+                disabled={newGroupNameKind === 'custom' && !!validateName(customName)}
+                style={{ background: '#333', color: '#eee', border: '1px solid #555', padding: '8px 12px', borderRadius: 5, cursor: (newGroupNameKind === 'custom' && !!validateName(customName)) ? 'not-allowed' : 'pointer', opacity: (newGroupNameKind === 'custom' && !!validateName(customName)) ? 0.6 : 1 }}
               >增加一个组</button>
               <button
                 onClick={() => plotRef.current?.deleteSelectedPatch()}
