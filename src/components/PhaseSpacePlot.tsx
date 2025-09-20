@@ -59,6 +59,13 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const gizmoRef = useRef<TransformControls | null>(null);
   const pivotRef = useRef<THREE.Object3D | null>(null);
   const uvFrameRef = useRef<THREE.Object3D | null>(null);
+  const uvHandleURef = useRef<THREE.Object3D | null>(null);
+  const uvHandleVRef = useRef<THREE.Object3D | null>(null);
+  const uvCtrlURef = useRef<TransformControls | null>(null);
+  const uvCtrlVRef = useRef<TransformControls | null>(null);
+  const uvUDragRef = useRef<{ patchId: number; target: 'group'|'point'; role?: 'main'|'u'|'v'; startPosWorld: THREE.Vector3; startGroupPos?: THREE.Vector3; startPointLocal?: THREE.Vector3 } | null>(null);
+  const uvVDragRef = useRef<{ patchId: number; target: 'group'|'point'; role?: 'main'|'u'|'v'; startPosWorld: THREE.Vector3; startGroupPos?: THREE.Vector3; startPointLocal?: THREE.Vector3 } | null>(null);
+  const uvAnyDraggingRef = useRef<boolean>(false);
   const selectedClickedObjectRef = useRef<THREE.Object3D | null>(null);
   type DragSnapshot = { patchId: number; main0: THREE.Vector3; u0: THREE.Vector3; v0: THREE.Vector3; pivotLocal0: THREE.Vector3; scale0: number; pointerStart?: { x: number; y: number }; edgeRole?: 'u'|'v' };
   const dragSnapshotRef = useRef<DragSnapshot | null>(null);
@@ -193,7 +200,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     const isDraggingPoint = !!(gizmoRef.current?.dragging && (gizmoRef.current?.object as any)?.userData?.type === 'point');
     const isDraggingPivot = !!(gizmoRef.current?.dragging && pivotRef.current && gizmoRef.current?.object === pivotRef.current);
     const isDraggingUV = !!(gizmoRef.current?.dragging && modeRef.current === 'uv');
-    if (!isDraggingPoint && !isDraggingPivot && !isDraggingUV) {
+    if (!isDraggingPoint && !isDraggingPivot && !(isDraggingUV || uvAnyDraggingRef.current)) {
       const centerLocal = new THREE.Vector3().addVectors(u.position, v.position).multiplyScalar(0.5);
       if (centerLocal.lengthSq() > 1e-12) {
         main.position.sub(centerLocal);
@@ -248,6 +255,10 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       const giz = gizmoRef.current; const scene = sceneRef.current;
       if (uvFrameRef.current && scene && giz) { giz.detach(); scene.remove(uvFrameRef.current); uvFrameRef.current = null; }
       if (giz) { (giz as any).showX = true; (giz as any).showY = true; (giz as any).showZ = true; }
+      if (uvCtrlURef.current) { try { uvCtrlURef.current.detach(); } catch {} uvCtrlURef.current.visible = false; }
+      if (uvCtrlVRef.current) { try { uvCtrlVRef.current.detach(); } catch {} uvCtrlVRef.current.visible = false; }
+      if (uvHandleURef.current && scene) { scene.remove(uvHandleURef.current); uvHandleURef.current = null; }
+      if (uvHandleVRef.current && scene) { scene.remove(uvHandleVRef.current); uvHandleVRef.current = null; }
     }
     // Notify UI
     onSelectionChange?.({ patchId: null, role: null });
@@ -349,7 +360,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     const clicked: any = selectedClickedObjectRef.current;
     const scene = sceneRef.current; if (!scene) return;
     const needPivot = (mode === 'rotate' || mode === 'scale');
-    if (modeRef.current === 'uv') { updateUVGizmoForSelection(p); return; }
+    if (modeRef.current === 'uv') { updateUVDoubleAxisForSelection(p); return; }
     const locked = lockedMainSetRef.current.has(p.id);
     if (!needPivot) {
       if (pivotRef.current) { scene.remove(pivotRef.current); pivotRef.current = null; }
@@ -414,6 +425,39 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     (gizmo as any).setSpace?.('local');
     (gizmo as any).showX = true; (gizmo as any).showY = true; (gizmo as any).showZ = false;
     gizmo.attach(uv);
+  }
+
+  function updateUVDoubleAxisForSelection(p: Patch) {
+    const scene = sceneRef.current; if (!scene) return;
+    const clicked: any = selectedClickedObjectRef.current;
+    const mW = p.points.main.position.clone(); p.group.localToWorld(mW);
+    const uW = p.points.u.position.clone(); p.group.localToWorld(uW);
+    const vW = p.points.v.position.clone(); p.group.localToWorld(vW);
+    let uDir = uW.clone().sub(mW); if (uDir.lengthSq() < 1e-12) uDir.set(1,0,0); uDir.normalize();
+    let vDir = vW.clone().sub(mW); if (vDir.lengthSq() < 1e-12) vDir.set(0,0,1); vDir.normalize();
+    const anchor = new THREE.Vector3();
+    if (clicked && clicked.userData?.type === 'point') (clicked as THREE.Object3D).getWorldPosition(anchor); else p.group.getWorldPosition(anchor);
+    const qU = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1,0,0), uDir);
+    const qV = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1,0,0), vDir);
+    const makeHandle = (ref: React.MutableRefObject<THREE.Object3D | null>, q: THREE.Quaternion) => {
+      const obj = ref.current ?? new THREE.Object3D();
+      obj.position.copy(anchor);
+      obj.quaternion.copy(q);
+      if (!ref.current) { scene.add(obj); ref.current = obj; }
+    };
+    makeHandle(uvHandleURef, qU);
+    makeHandle(uvHandleVRef, qV);
+    const setupCtrl = (ref: React.MutableRefObject<TransformControls | null>, handle: THREE.Object3D | null) => {
+      if (!ref.current || !handle) return;
+      const ctrl = ref.current;
+      ctrl.setMode('translate');
+      (ctrl as any).setSpace?.('local');
+      (ctrl as any).showX = true; (ctrl as any).showY = false; (ctrl as any).showZ = false;
+      ctrl.attach(handle);
+      ctrl.visible = true;
+    };
+    setupCtrl(uvCtrlURef, uvHandleURef.current);
+    setupCtrl(uvCtrlVRef, uvHandleVRef.current);
   }
 
   function measurePatchSpan(p: Patch) {
@@ -665,11 +709,17 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       modeRef.current = mode as any;
       const gizmo = gizmoRef.current; const scene = sceneRef.current; const sel = selectedPatchRef.current;
       if (mode === 'uv') {
-        gizmo?.setMode('translate');
-        if (sel) updateUVGizmoForSelection(sel);
+        // Hide main gizmo and show dual single-axis
+        if (gizmo) { gizmo.detach(); }
+        if (sel) updateUVDoubleAxisForSelection(sel);
       } else {
         // Cleanup UV helper when leaving uv mode
         if (uvFrameRef.current && scene && gizmo) { gizmo.detach(); scene.remove(uvFrameRef.current); uvFrameRef.current = null; }
+        // Hide and detach dual controls
+        if (uvCtrlURef.current) { try { uvCtrlURef.current.detach(); } catch {} uvCtrlURef.current.visible = false; }
+        if (uvCtrlVRef.current) { try { uvCtrlVRef.current.detach(); } catch {} uvCtrlVRef.current.visible = false; }
+        if (uvHandleURef.current && scene) { scene.remove(uvHandleURef.current); uvHandleURef.current = null; }
+        if (uvHandleVRef.current && scene) { scene.remove(uvHandleVRef.current); uvHandleVRef.current = null; }
         if (gizmo) { (gizmo as any).showX = true; (gizmo as any).showY = true; (gizmo as any).showZ = true; gizmo.setMode(mode as any); }
         if (sel) ensureAttachTarget(sel);
       }
@@ -784,7 +834,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
           dragSnapshotRef.current = null;
           lastMainDuringDragRef.current = null;
           lastPivotDuringDragRef.current = null;
-          if (sel) { updatePatchGeometry(sel); emitChange(); }
+          if (sel) { updatePatchGeometry(sel); emitChange(); if (modeRef.current === 'uv') updateUVGizmoForSelection(sel); }
         }
       });
       gizmo.addEventListener('objectChange', () => { 
@@ -794,31 +844,46 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         if (modeRef.current === 'uv') {
           const uv = uvFrameRef.current; const info = uvDragRef.current; if (!uv || !info) return;
           const cur = uv.position.clone();
-          const deltaW = cur.clone().sub(info.startPosWorld);
-          if (deltaW.lengthSq() === 0) return;
+          const rawDeltaW = cur.clone().sub(info.startPosWorld);
+          // Project raw gizmo movement onto its local X/Y to get scalar distances
+          const xAxis = new THREE.Vector3(1,0,0).applyQuaternion(uv.quaternion).normalize();
+          const yAxis = new THREE.Vector3(0,1,0).applyQuaternion(uv.quaternion).normalize();
+          const sx = rawDeltaW.dot(xAxis);
+          const sy = rawDeltaW.dot(yAxis);
+          // Build pu/pv direction (unit) in world space (not orthogonalized)
+          const mW = sel.points.main.position.clone(); sel.group.localToWorld(mW);
+          const uW = sel.points.u.position.clone(); sel.group.localToWorld(uW);
+          const vW = sel.points.v.position.clone(); sel.group.localToWorld(vW);
+          const uDir = uW.sub(mW); const vDir = vW.sub(mW);
+          if (uDir.lengthSq() < 1e-12 && vDir.lengthSq() < 1e-12) return;
+          if (uDir.lengthSq() < 1e-12) uDir.set(1,0,0);
+          if (vDir.lengthSq() < 1e-12) vDir.set(0,0,1);
+          uDir.normalize(); vDir.normalize();
+          const mappedDeltaW = uDir.multiplyScalar(sx).add(vDir.multiplyScalar(sy));
+          // Reposition uv frame to the mapped position to avoid drift
+          const mappedPos = info.startPosWorld.clone().add(mappedDeltaW);
+          uv.position.copy(mappedPos);
           if (info.target === 'point' && info.role) {
             const group = sel.group;
-            const startW = info.startPosWorld.clone();
-            const prevLocal = info.startPointLocal!.clone();
-            // Convert world delta to group-local delta
-            const a = group.worldToLocal(startW.clone());
-            const b = group.worldToLocal(startW.clone().add(deltaW));
+            const a = group.worldToLocal(info.startPosWorld.clone());
+            const b = group.worldToLocal(mappedPos.clone());
             const dLocal = b.sub(a);
-            sel.points[info.role].position.copy(prevLocal.clone().add(dLocal));
+            const baseLocal = info.startPointLocal!.clone();
+            sel.points[info.role].position.copy(baseLocal.add(dLocal));
             updatePatchGeometry(sel); emitChange();
           } else {
-            // Move whole group by world delta
+            // Move whole group by mapped world delta
             const parent = sel.group.parent as THREE.Object3D | null;
             if (parent) {
-              const newWorld = new THREE.Vector3();
-              sel.group.getWorldPosition(newWorld); newWorld.add(deltaW);
+              const newWorld = new THREE.Vector3(); sel.group.getWorldPosition(newWorld);
+              newWorld.add(mappedDeltaW);
               const newLocal = parent.worldToLocal(newWorld.clone());
               sel.group.position.copy(newLocal);
               emitChange();
             }
           }
           // Incremental baseline
-          info.startPosWorld.copy(cur);
+          info.startPosWorld.copy(mappedPos);
           if (info.target === 'point' && info.role) info.startPointLocal = sel.points[info.role].position.clone();
           return;
         }
@@ -855,6 +920,49 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
           updatePatchGeometry(sel); emitChange();
         }
       });
+      // Create dual single-axis UV controls (hidden by default)
+      const uvCtrlU = new TransformControls(camera, renderer.domElement);
+      uvCtrlU.setSize(0.7); (uvCtrlU as any).setSpace?.('local'); (uvCtrlU as any).showX = true; (uvCtrlU as any).showY = false; (uvCtrlU as any).showZ = false; uvCtrlU.visible = false; scene.add(uvCtrlU); uvCtrlURef.current = uvCtrlU;
+      const uvCtrlV = new TransformControls(camera, renderer.domElement);
+      uvCtrlV.setSize(0.7); (uvCtrlV as any).setSpace?.('local'); (uvCtrlV as any).showX = true; (uvCtrlV as any).showY = false; (uvCtrlV as any).showZ = false; uvCtrlV.visible = false; scene.add(uvCtrlV); uvCtrlVRef.current = uvCtrlV;
+      const beginUVDrag = (which: 'u'|'v') => {
+        const sel = selectedPatchRef.current; if (!sel) return;
+        const clicked: any = selectedClickedObjectRef.current;
+        const handle = which === 'u' ? uvHandleURef.current : uvHandleVRef.current; if (!handle) return;
+        const rec = { patchId: sel.id, target: (clicked && clicked.userData?.type === 'point') ? 'point' : 'group', role: (clicked && clicked.userData?.type === 'point') ? (clicked.userData.role as any) : undefined, startPosWorld: handle.position.clone(), startGroupPos: (() => { const g = new THREE.Vector3(); sel.group.getWorldPosition(g); return g; })(), startPointLocal: (clicked && clicked.userData?.type === 'point') ? (clicked as THREE.Object3D).position.clone() : undefined };
+        if (which === 'u') uvUDragRef.current = rec; else uvVDragRef.current = rec;
+        uvAnyDraggingRef.current = true; orbit.enabled = false;
+      };
+      const endUVDrag = () => {
+        uvUDragRef.current = null; uvVDragRef.current = null; uvAnyDraggingRef.current = false; orbit.enabled = true; const sel = selectedPatchRef.current; if (sel) { updatePatchGeometry(sel); emitChange(); if (modeRef.current === 'uv') updateUVDoubleAxisForSelection(sel); }
+      };
+      const onUVObjectChange = (which: 'u'|'v') => {
+        const sel = selectedPatchRef.current; if (!sel) return; const handle = which === 'u' ? uvHandleURef.current : uvHandleVRef.current; if (!handle) return; const rec = which === 'u' ? uvUDragRef.current : uvVDragRef.current; if (!rec) return;
+        // compute scalar along handle local X
+        const xAxis = new THREE.Vector3(1,0,0).applyQuaternion(handle.quaternion).normalize();
+        const deltaW = handle.position.clone().sub(rec.startPosWorld);
+        const s = deltaW.dot(xAxis);
+        // map to pu/pv unit direction
+        const mW = sel.points.main.position.clone(); sel.group.localToWorld(mW);
+        const dirW = (which === 'u' ? sel.points.u.position.clone() : sel.points.v.position.clone()); sel.group.localToWorld(dirW);
+        const vec = dirW.sub(mW); if (vec.lengthSq() < 1e-12) vec.set(which === 'u' ? 1 : 0, 0, which === 'v' ? 1 : 0); vec.normalize();
+        const mappedDeltaW = vec.multiplyScalar(s);
+        const mappedPos = rec.startPosWorld.clone().add(mappedDeltaW);
+        handle.position.copy(mappedPos);
+        if (rec.target === 'point' && rec.role) {
+          const a = sel.group.worldToLocal(rec.startPosWorld.clone()); const b = sel.group.worldToLocal(mappedPos.clone()); const dLocal = b.sub(a);
+          const baseLocal = rec.startPointLocal!.clone(); sel.points[rec.role].position.copy(baseLocal.add(dLocal)); updatePatchGeometry(sel); emitChange();
+        } else {
+          const parent = sel.group.parent as THREE.Object3D | null; if (parent) { const newWorld = new THREE.Vector3(); sel.group.getWorldPosition(newWorld); newWorld.add(mappedDeltaW); const newLocal = parent.worldToLocal(newWorld.clone()); sel.group.position.copy(newLocal); emitChange(); }
+        }
+        // incremental baseline
+        if (which === 'u') uvUDragRef.current!.startPosWorld.copy(mappedPos); else uvVDragRef.current!.startPosWorld.copy(mappedPos);
+        if (rec.target === 'point' && rec.role) { if (which === 'u') uvUDragRef.current!.startPointLocal = sel.points[rec.role].position.clone(); else uvVDragRef.current!.startPointLocal = sel.points[rec.role].position.clone(); }
+      };
+      uvCtrlU.addEventListener('dragging-changed', (e: any) => { if (e.value) beginUVDrag('u'); else endUVDrag(); });
+      uvCtrlV.addEventListener('dragging-changed', (e: any) => { if (e.value) beginUVDrag('v'); else endUVDrag(); });
+      uvCtrlU.addEventListener('objectChange', () => onUVObjectChange('u'));
+      uvCtrlV.addEventListener('objectChange', () => onUVObjectChange('v'));
       gizmo.setScaleSnap?.(0.05);
       scene.add(gizmo); gizmoRef.current = gizmo;
 
