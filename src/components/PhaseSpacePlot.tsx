@@ -192,7 +192,8 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     // Recenter group origin at parallelogram center (only shift points, not line/quad objects)
     const isDraggingPoint = !!(gizmoRef.current?.dragging && (gizmoRef.current?.object as any)?.userData?.type === 'point');
     const isDraggingPivot = !!(gizmoRef.current?.dragging && pivotRef.current && gizmoRef.current?.object === pivotRef.current);
-    if (!isDraggingPoint && !isDraggingPivot) {
+    const isDraggingUV = !!(gizmoRef.current?.dragging && modeRef.current === 'uv');
+    if (!isDraggingPoint && !isDraggingPivot && !isDraggingUV) {
       const centerLocal = new THREE.Vector3().addVectors(u.position, v.position).multiplyScalar(0.5);
       if (centerLocal.lengthSq() > 1e-12) {
         main.position.sub(centerLocal);
@@ -242,6 +243,12 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     (sel.quad.material as THREE.MeshBasicMaterial).color.copy(sel.color);
     gizmoRef.current?.detach();
     selectedPatchRef.current = null;
+    // Cleanup UV helper if active
+    if (modeRef.current === 'uv') {
+      const giz = gizmoRef.current; const scene = sceneRef.current;
+      if (uvFrameRef.current && scene && giz) { giz.detach(); scene.remove(uvFrameRef.current); uvFrameRef.current = null; }
+      if (giz) { (giz as any).showX = true; (giz as any).showY = true; (giz as any).showZ = true; }
+    }
     // Notify UI
     onSelectionChange?.({ patchId: null, role: null });
   }
@@ -262,14 +269,11 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         }
         fatEdgeRef.current = null;
       }
-      // Notify UI even when switching point within the same group
+      // Notify UI even when switching within the same group (only highlight point roles)
       if (clickedObject) {
-        let role: 'main'|'u'|'v'|'edge_u'|'edge_v'|null = null;
+        let role: 'main'|'u'|'v'|null = null;
         const anyClicked: any = clickedObject as any;
-        if (anyClicked && anyClicked.userData) {
-          if (anyClicked.userData.type === 'point') role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
-          else if (anyClicked.userData.type === 'line') role = ((anyClicked.userData.role as 'u'|'v') === 'u') ? 'edge_u' : 'edge_v';
-        }
+        if (anyClicked && anyClicked.userData && anyClicked.userData.type === 'point') role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
         onSelectionChange?.({ patchId: p.id, role });
       }
       return;
@@ -292,16 +296,11 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     (p.quad.material as THREE.MeshBasicMaterial).opacity = 0.44;
     selectedClickedObjectRef.current = clickedObject ?? null;
     ensureAttachTarget(p);
-    // Notify UI with selected role if a point or line was clicked
-    let role: 'main'|'u'|'v'|'edge_u'|'edge_v'|null = null;
+    // Notify UI with selected role if a point was clicked
+    let role: 'main'|'u'|'v'|null = null;
     const anyClicked: any = clickedObject as any;
-    if (anyClicked && anyClicked.userData) {
-      if (anyClicked.userData.type === 'point') {
-        role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
-      } else if (anyClicked.userData.type === 'line') {
-        const r = (anyClicked.userData.role as 'u'|'v');
-        role = r === 'u' ? 'edge_u' : 'edge_v';
-      }
+    if (anyClicked && anyClicked.userData && anyClicked.userData.type === 'point') {
+      role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
     }
     onSelectionChange?.({ patchId: p.id, role });
   }
@@ -350,6 +349,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     const clicked: any = selectedClickedObjectRef.current;
     const scene = sceneRef.current; if (!scene) return;
     const needPivot = (mode === 'rotate' || mode === 'scale');
+    if (modeRef.current === 'uv') { updateUVGizmoForSelection(p); return; }
     const locked = lockedMainSetRef.current.has(p.id);
     if (!needPivot) {
       if (pivotRef.current) { scene.remove(pivotRef.current); pivotRef.current = null; }
@@ -385,6 +385,35 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     pivot.quaternion.identity(); pivot.scale.set(1,1,1);
     if (!pivotRef.current) { scene.add(pivot); pivotRef.current = pivot; }
     gizmo.attach(pivot);
+  }
+
+  function updateUVGizmoForSelection(p: Patch) {
+    const gizmo = gizmoRef.current; const scene = sceneRef.current; if (!gizmo || !scene) return;
+    // Build UV basis from pu/pv world directions
+    const mW = p.points.main.position.clone(); p.group.localToWorld(mW);
+    const uW = p.points.u.position.clone(); p.group.localToWorld(uW);
+    const vW = p.points.v.position.clone(); p.group.localToWorld(vW);
+    let uDir = uW.clone().sub(mW); let vDir = vW.clone().sub(mW);
+    if (uDir.lengthSq() < 1e-12) uDir.set(1,0,0);
+    if (vDir.lengthSq() < 1e-12) vDir.set(0,0,1);
+    uDir.normalize();
+    vDir.sub(uDir.clone().multiplyScalar(vDir.dot(uDir))).normalize();
+    let zDir = new THREE.Vector3().crossVectors(uDir, vDir);
+    if (zDir.lengthSq() < 1e-12) zDir.set(0,1,0); else zDir.normalize();
+    const basis = new THREE.Matrix4().makeBasis(uDir, vDir, zDir);
+    const q = new THREE.Quaternion().setFromRotationMatrix(basis);
+    const uv = uvFrameRef.current ?? new THREE.Object3D();
+    const attachPos = new THREE.Vector3();
+    const clicked: any = selectedClickedObjectRef.current;
+    if (clicked && clicked.userData?.type === 'point') (clicked as THREE.Object3D).getWorldPosition(attachPos); else p.group.getWorldPosition(attachPos);
+    uv.position.copy(attachPos);
+    uv.quaternion.copy(q);
+    if (!uvFrameRef.current) { scene.add(uv); uvFrameRef.current = uv; }
+    // Attach gizmo to uv frame with X/Y only
+    (gizmo as any).setMode?.('translate');
+    (gizmo as any).setSpace?.('local');
+    (gizmo as any).showX = true; (gizmo as any).showY = true; (gizmo as any).showZ = false;
+    gizmo.attach(uv);
   }
 
   function measurePatchSpan(p: Patch) {
@@ -632,7 +661,19 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       p.points[role].position.copy(local);
       updatePatchGeometry(p); emitChange();
     },
-    setTransformMode: (mode) => { modeRef.current = mode as any; gizmoRef.current?.setMode(mode === 'uv' ? 'translate' : (mode as any)); const sel = selectedPatchRef.current; if (sel) ensureAttachTarget(sel); },
+    setTransformMode: (mode) => {
+      modeRef.current = mode as any;
+      const gizmo = gizmoRef.current; const scene = sceneRef.current; const sel = selectedPatchRef.current;
+      if (mode === 'uv') {
+        gizmo?.setMode('translate');
+        if (sel) updateUVGizmoForSelection(sel);
+      } else {
+        // Cleanup UV helper when leaving uv mode
+        if (uvFrameRef.current && scene && gizmo) { gizmo.detach(); scene.remove(uvFrameRef.current); uvFrameRef.current = null; }
+        if (gizmo) { (gizmo as any).showX = true; (gizmo as any).showY = true; (gizmo as any).showZ = true; gizmo.setMode(mode as any); }
+        if (sel) ensureAttachTarget(sel);
+      }
+    },
     setTransformSpace: (space) => { gizmoRef.current?.setSpace(space); const sel = selectedPatchRef.current; if (sel) ensureAttachTarget(sel); },
     focusOnTrajectory: () => {
       const cam = cameraRef.current, orbit = orbitRef.current; const b = boundsRef.current; if (!cam || !orbit || !b) return;
@@ -692,41 +733,15 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
           lastScale.set(1,1,1); lastQuat.identity();
           if (sel) {
             ensureAttachTarget(sel);
-            // Setup UV-translate helper frame on drag start
-            if (modeRef.current === 'uv') {
+            // Setup UV drag baseline on start
+            if (modeRef.current === 'uv' && uvFrameRef.current) {
               const clicked: any = selectedClickedObjectRef.current;
-              const group = sel.group;
-              // Compute world positions
-              const mW = sel.points.main.position.clone(); group.localToWorld(mW);
-              const uW = sel.points.u.position.clone(); group.localToWorld(uW);
-              const vW = sel.points.v.position.clone(); group.localToWorld(vW);
-              let uDir = uW.clone().sub(mW); let vDir = vW.clone().sub(mW);
-              if (uDir.lengthSq() < 1e-12) uDir.set(1,0,0);
-              if (vDir.lengthSq() < 1e-12) vDir.set(0,0,1);
-              uDir.normalize(); vDir.normalize();
-              const zDir = new THREE.Vector3().crossVectors(uDir, vDir);
-              if (zDir.lengthSq() < 1e-12) zDir.set(0,1,0); else zDir.normalize();
-              // Re-orthogonalize vDir to be perpendicular to uDir for stable handles
-              vDir.sub(uDir.clone().multiplyScalar(vDir.dot(uDir))).normalize();
-              const basis = new THREE.Matrix4().makeBasis(uDir, vDir, zDir);
-              const q = new THREE.Quaternion().setFromRotationMatrix(basis);
-              const uv = new THREE.Object3D();
-              const attachPos = new THREE.Vector3();
-              if (clicked && clicked.userData?.type === 'point') (clicked as THREE.Object3D).getWorldPosition(attachPos);
-              else group.getWorldPosition(attachPos);
-              uv.position.copy(attachPos);
-              uv.quaternion.copy(q);
-              scene.add(uv); uvFrameRef.current = uv;
-              // Attach gizmo to frame, restrict to two axes
-              gizmo.attach(uv);
-              (gizmo as any).setSpace?.('local');
-              (gizmo as any).showX = true; (gizmo as any).showY = true; (gizmo as any).showZ = false;
               uvDragRef.current = {
                 patchId: sel.id,
                 target: (clicked && clicked.userData?.type === 'point') ? 'point' : 'group',
                 role: (clicked && clicked.userData?.type === 'point') ? (clicked.userData.role as any) : undefined,
-                startPosWorld: attachPos.clone(),
-                startGroupPos: (() => { const gpos = new THREE.Vector3(); group.getWorldPosition(gpos); return gpos; })(),
+                startPosWorld: uvFrameRef.current.position.clone(),
+                startGroupPos: (() => { const gpos = new THREE.Vector3(); sel.group.getWorldPosition(gpos); return gpos; })(),
                 startPointLocal: (clicked && clicked.userData?.type === 'point') ? (clicked as THREE.Object3D).position.clone() : undefined,
               };
             }
@@ -764,12 +779,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
             }
           }
         } else {
-          // Cleanup UV frame on drag end
-          if (modeRef.current === 'uv') {
-            const uv = uvFrameRef.current; if (uv && scene) { gizmo.detach(); scene.remove(uv); }
-            uvFrameRef.current = null; uvDragRef.current = null;
-            (gizmo as any).showX = true; (gizmo as any).showY = true; (gizmo as any).showZ = true;
-          }
+          if (modeRef.current === 'uv') { uvDragRef.current = null; }
           // Keep pivot at last location to preserve axes position
           dragSnapshotRef.current = null;
           lastMainDuringDragRef.current = null;
