@@ -1133,15 +1133,29 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
           const p = patchesRef.current.get((chosen as any).userData.patchId);
           if (p) { setSelection(p, chosen); return; }
         }
-        // 2) No scene hit — if clicking on any gizmo axis (main or UV), keep current selection
+        // 2) No scene hit — even点击空白也不清除，保持当前选择
+        // 单击或拖动空白处不取消选择（仅双击空白才清除，见 dblclick 处理）
+        return;
+      };
+      renderer.domElement.addEventListener('pointerdown', onPointerDown);
+      const onDblClick = (event: MouseEvent) => {
+        // 仅在双击空白处时清除选择
+        if (performance.now() < suppressPickUntilRef.current) return;
+        if (gizmoRef.current?.dragging || uvCtrlURef.current?.dragging || uvCtrlVRef.current?.dragging) return;
+        const r = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((event.clientX - r.left) / r.width) * 2 - 1;
+        pointer.y = -((event.clientY - r.top) / r.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const objs = Array.from(patchesRef.current.values()).flatMap(p => p.objects);
+        const hits = raycaster.intersectObjects(objs as any, false);
         const mainAxis = (gizmoRef.current as any)?.axis;
         const uvAxisActive = ((uvCtrlURef.current as any)?.axis || (uvCtrlVRef.current as any)?.axis);
         const isOnUVHandle = (modeRef.current === 'uv') && uvOverHandleRef.current && uvAxisActive;
-        if (isOnUVHandle || mainAxis) { return; }
-        // 3) Otherwise, clear selection
-        clearSelection();
+        if (!hits.length && !mainAxis && !isOnUVHandle) {
+          clearSelection();
+        }
       };
-      renderer.domElement.addEventListener('pointerdown', onPointerDown);
+      renderer.domElement.addEventListener('dblclick', onDblClick);
       const onPointerMove = (event: PointerEvent) => {
         const gizmo = gizmoRef.current; const camera = cameraRef.current;
         if (!gizmo || !camera) return;
@@ -1222,6 +1236,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       renderer.domElement.addEventListener('pointermove', onPointerMove);
       detachDebugHandlers = () => {
         renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+        renderer.domElement.removeEventListener('dblclick', onDblClick);
         renderer.domElement.removeEventListener('pointermove', onPointerMove);
       };
     }

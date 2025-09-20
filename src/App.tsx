@@ -121,12 +121,7 @@ export const App: React.FC = () => {
         </div>
       </div>
       <aside style={{ width: 340, borderLeft: '1px solid #2a2a2a', background: 'rgba(0,0,0,0.35)', padding: 12, boxSizing: 'border-box', overflowY: 'auto' }}>
-        <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5 }}>
-          <b style={{ color: '#fff', fontSize: 13 as any }}>操作指南</b><br />
-          • 鼠标拖拽旋转，滚轮缩放视角<br />
-          • 点击点/线/面选中组；拖动控制柄移动点<br />
-          • W/E/R：移动/旋转/缩放；Esc：取消选择
-        </div>
+        {/* 操作指南面板已移除以简化 UI */}
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
           <b style={{ color: '#fff', fontSize: 13 as any }}>相空间参数</b>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
