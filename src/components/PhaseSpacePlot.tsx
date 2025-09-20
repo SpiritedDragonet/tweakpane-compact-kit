@@ -67,7 +67,8 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const uvVDragRef = useRef<{ patchId: number; target: 'group'|'point'; role?: 'main'|'u'|'v'; startPosWorld: THREE.Vector3; startGroupPos?: THREE.Vector3; startPointLocal?: THREE.Vector3 } | null>(null);
   const uvAnyDraggingRef = useRef<boolean>(false);
   const uvOverHandleRef = useRef<boolean>(false);
-  const uvAnchorRef = useRef<{ target: 'group'|'point'; role?: 'main'|'u'|'v' } | null>(null);
+  const suppressPickUntilRef = useRef<number>(0);
+  const uvAnchorRef = useRef<{ target: 'group'|'point'|'edge'; role?: 'main'|'u'|'v' } | null>(null);
   const selectedClickedObjectRef = useRef<THREE.Object3D | null>(null);
   type DragSnapshot = { patchId: number; main0: THREE.Vector3; u0: THREE.Vector3; v0: THREE.Vector3; pivotLocal0: THREE.Vector3; scale0: number; pointerStart?: { x: number; y: number }; edgeRole?: 'u'|'v' };
   const dragSnapshotRef = useRef<DragSnapshot | null>(null);
@@ -276,6 +277,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       if (anyClicked && anyClicked.userData && anyClicked.userData.type === 'line') {
         const role = (anyClicked.userData.role as 'u'|'v');
         createOrUpdateFatEdge(p, role);
+        uvAnchorRef.current = { target: 'edge', role };
       } else {
         if (fatEdgeRef.current?.line && sceneRef.current) {
           sceneRef.current.remove(fatEdgeRef.current.line);
@@ -304,6 +306,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     if (clickedObject && (clickedObject as any).userData?.type === 'line') {
       const role = (clickedObject as any).userData?.role as 'u'|'v';
       createOrUpdateFatEdge(p, role);
+      uvAnchorRef.current = { target: 'edge', role };
     } else {
       // clear overlay
       if (fatEdgeRef.current?.line && sceneRef.current) sceneRef.current.remove(fatEdgeRef.current.line);
@@ -314,6 +317,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     // Set UV anchor for new selection
     const anyClicked: any = clickedObject as any;
     if (clickedObject && (anyClicked?.userData?.type === 'point')) uvAnchorRef.current = { target: 'point', role: (anyClicked.userData.role as any) };
+    else if (clickedObject && (anyClicked?.userData?.type === 'line')) uvAnchorRef.current = { target: 'edge', role: (anyClicked.userData.role as any) };
     else uvAnchorRef.current = { target: 'group' };
     ensureAttachTarget(p);
     // Notify UI with selected role if a point was clicked
@@ -447,8 +451,21 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     const anchorSpec = uvAnchorRef.current;
     if (anchorSpec && anchorSpec.target === 'point' && anchorSpec.role) {
       const obj = p.points[anchorSpec.role] as THREE.Object3D; obj.getWorldPosition(anchor);
+    } else if (anchorSpec && anchorSpec.target === 'edge' && anchorSpec.role) {
+      const aLocal = p.points.main.position.clone();
+      const bLocal = (anchorSpec.role === 'u' ? p.points.u.position : p.points.v.position).clone();
+      const midLocal = aLocal.clone().add(bLocal).multiplyScalar(0.5);
+      const midWorld = p.group.localToWorld(midLocal.clone());
+      anchor.copy(midWorld);
     } else if (clicked && clicked.userData?.type === 'point') {
       (clicked as THREE.Object3D).getWorldPosition(anchor);
+    } else if (clicked && clicked.userData?.type === 'line') {
+      const role = (clicked.userData.role as 'u'|'v');
+      const aLocal = p.points.main.position.clone();
+      const bLocal = (role === 'u' ? p.points.u.position : p.points.v.position).clone();
+      const midLocal = aLocal.clone().add(bLocal).multiplyScalar(0.5);
+      const midWorld = p.group.localToWorld(midLocal.clone());
+      anchor.copy(midWorld);
     } else {
       p.group.getWorldPosition(anchor);
     }
@@ -860,7 +877,10 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
           dragSnapshotRef.current = null;
           lastMainDuringDragRef.current = null;
           lastPivotDuringDragRef.current = null;
-          if (sel) { updatePatchGeometry(sel); emitChange(); if (modeRef.current === 'uv') updateUVGizmoForSelection(sel); }
+          // Suppress scene picking for a short moment to avoid up->click
+          suppressPickUntilRef.current = performance.now() + 180;
+          uvOverHandleRef.current = false;
+          if (sel) { updatePatchGeometry(sel); emitChange(); if (modeRef.current === 'uv') updateUVDoubleAxisForSelection(sel); }
         }
       });
       gizmo.addEventListener('objectChange', () => { 
@@ -991,8 +1011,8 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         if (which === 'u') uvUDragRef.current!.startPosWorld.copy(mappedPos); else uvVDragRef.current!.startPosWorld.copy(mappedPos);
         if (rec.target === 'point' && rec.role) { if (which === 'u') uvUDragRef.current!.startPointLocal = sel.points[rec.role].position.clone(); else uvVDragRef.current!.startPointLocal = sel.points[rec.role].position.clone(); }
       };
-      uvCtrlU.addEventListener('dragging-changed', (e: any) => { if (e.value) beginUVDrag('u'); else endUVDrag(); });
-      uvCtrlV.addEventListener('dragging-changed', (e: any) => { if (e.value) beginUVDrag('v'); else endUVDrag(); });
+      uvCtrlU.addEventListener('dragging-changed', (e: any) => { if (e.value) beginUVDrag('u'); else { suppressPickUntilRef.current = performance.now() + 180; uvOverHandleRef.current = false; endUVDrag(); } });
+      uvCtrlV.addEventListener('dragging-changed', (e: any) => { if (e.value) beginUVDrag('v'); else { suppressPickUntilRef.current = performance.now() + 180; uvOverHandleRef.current = false; endUVDrag(); } });
       uvCtrlU.addEventListener('hoveron', () => { uvOverHandleRef.current = true; });
       uvCtrlU.addEventListener('hoveroff', () => { uvOverHandleRef.current = false; });
       uvCtrlV.addEventListener('hoveron', () => { uvOverHandleRef.current = true; });
@@ -1005,16 +1025,11 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       const raycaster = new THREE.Raycaster();
       const pointer = new THREE.Vector2();
       const onPointerDown = (event: PointerEvent) => {
-        if (gizmoRef.current?.dragging) return;
+        // Suppress pick if within debounce window after a drag end
+        if (performance.now() < suppressPickUntilRef.current) return;
+        if (gizmoRef.current?.dragging || uvCtrlURef.current?.dragging || uvCtrlVRef.current?.dragging) return;
         lastPointerRef.current = { x: event.clientX, y: event.clientY };
-        // If clicking on any gizmo axis (main or UV single-axis), do not change selection
-        const mainAxis = (gizmoRef.current as any)?.axis;
-        const uAxis = (uvCtrlURef.current as any)?.axis;
-        const vAxis = (uvCtrlVRef.current as any)?.axis;
-        if (uvOverHandleRef.current || mainAxis || uAxis || vAxis) {
-          // Clicked on gizmo handle; keep current selection
-          return;
-        }
+        // 1) Try to pick scene objects first (points > others)
         const r = renderer.domElement.getBoundingClientRect();
         pointer.x = ((event.clientX - r.left) / r.width) * 2 - 1;
         pointer.y = -((event.clientY - r.top) / r.height) * 2 + 1;
@@ -1027,17 +1042,21 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
           chosen = hits[0].object as THREE.Object3D;
         } else {
           const otherObjs = objs.filter(o => (o as any).userData && (o as any).userData.type !== 'point');
-          // slightly reduce line pick threshold to make lines less dominant than points
           raycaster.params.Line = { threshold: 0.01 } as any;
           hits = raycaster.intersectObjects(otherObjs as any, false);
           if (hits.length) chosen = hits[0].object as THREE.Object3D;
         }
         if (chosen) {
           const p = patchesRef.current.get((chosen as any).userData.patchId);
-          if (p) setSelection(p, chosen);
-        } else {
-          clearSelection();
+          if (p) { setSelection(p, chosen); return; }
         }
+        // 2) No scene hit — if clicking on any gizmo axis (main or UV), keep current selection
+        const mainAxis = (gizmoRef.current as any)?.axis;
+        const uvAxisActive = ((uvCtrlURef.current as any)?.axis || (uvCtrlVRef.current as any)?.axis);
+        const isOnUVHandle = (modeRef.current === 'uv') && uvOverHandleRef.current && uvAxisActive;
+        if (isOnUVHandle || mainAxis) { return; }
+        // 3) Otherwise, clear selection
+        clearSelection();
       };
       renderer.domElement.addEventListener('pointerdown', onPointerDown);
       const onPointerMove = (event: PointerEvent) => {
