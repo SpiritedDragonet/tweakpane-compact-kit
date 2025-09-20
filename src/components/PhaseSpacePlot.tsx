@@ -311,12 +311,12 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     (p.quad.material as THREE.MeshBasicMaterial).opacity = 0.44;
     selectedClickedObjectRef.current = clickedObject ?? null;
     // Set UV anchor for new selection
+    const anyClicked: any = clickedObject as any;
     if (clickedObject && (anyClicked?.userData?.type === 'point')) uvAnchorRef.current = { target: 'point', role: (anyClicked.userData.role as any) };
     else uvAnchorRef.current = { target: 'group' };
     ensureAttachTarget(p);
     // Notify UI with selected role if a point was clicked
     let role: 'main'|'u'|'v'|null = null;
-    const anyClicked: any = clickedObject as any;
     if (anyClicked && anyClicked.userData && anyClicked.userData.type === 'point') {
       role = (anyClicked.userData.role as 'main'|'u'|'v') ?? null;
     }
