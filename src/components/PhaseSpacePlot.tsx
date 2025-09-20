@@ -451,8 +451,9 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     } else {
       p.group.getWorldPosition(anchor);
     }
-    const qU = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1,0,0), uDir);
-    const qV = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1,0,0), vDir);
+    // Align U handle local Y(0,1,0) to pu; V handle local Z(0,0,1) to pv
+    const qU = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), uDir);
+    const qV = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1), vDir);
     const makeHandle = (ref: React.MutableRefObject<THREE.Object3D | null>, q: THREE.Quaternion) => {
       const obj = ref.current ?? new THREE.Object3D();
       obj.position.copy(anchor);
@@ -461,41 +462,27 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     };
     makeHandle(uvHandleURef, qU);
     makeHandle(uvHandleVRef, qV);
-    const hideNonX = (ctrl: TransformControls) => {
-      (ctrl as any).traverse?.((obj: any) => {
+    const showOnlyAxis = (ctrl: TransformControls, axisChar: 'X'|'Y'|'Z') => {
+      ctrl.traverse((obj: any) => {
         const name: string = obj?.name ?? '';
         if (!name) return;
-        // Keep only X-related parts
-        if (!(name === 'X' || name.startsWith('X'))) {
-          if (typeof obj.visible === 'boolean') obj.visible = false;
-        } else {
-          if (typeof obj.visible === 'boolean') obj.visible = true;
-        }
+        const ok = (name === axisChar || name.startsWith(axisChar));
+        if (typeof obj.visible === 'boolean') obj.visible = ok;
       });
     };
-    const tintCtrlVisible = (ctrl: TransformControls | null, color: THREE.Color) => {
-      if (!ctrl) return;
-      ctrl.traverse((obj: any) => {
-        const mat = obj?.material;
-        if (mat && obj?.visible) {
-          try { mat.color?.set?.(color.getHex()); } catch {}
-          try { mat.setValues?.({ color: color }); } catch {}
-        }
-      });
-    };
-    const setupCtrl = (ref: React.MutableRefObject<TransformControls | null>, handle: THREE.Object3D | null, color: THREE.Color) => {
+    const setupCtrl = (ref: React.MutableRefObject<TransformControls | null>, handle: THREE.Object3D | null, axisChar: 'Y'|'Z') => {
       if (!ref.current || !handle) return;
       const ctrl = ref.current;
       ctrl.setMode('translate');
       (ctrl as any).setSpace?.('local');
-      (ctrl as any).showX = true; (ctrl as any).showY = false; (ctrl as any).showZ = false;
+      (ctrl as any).showX = false; (ctrl as any).showY = (axisChar === 'Y'); (ctrl as any).showZ = (axisChar === 'Z');
       ctrl.attach(handle);
       ctrl.visible = true;
-      hideNonX(ctrl);
-      tintCtrlVisible(ctrl, color);
+      showOnlyAxis(ctrl, axisChar);
     };
-    setupCtrl(uvCtrlURef, uvHandleURef.current, baseColors.u);
-    setupCtrl(uvCtrlVRef, uvHandleVRef.current, baseColors.v);
+    // U: only Y axis (green), V: only Z axis (blue)
+    setupCtrl(uvCtrlURef, uvHandleURef.current, 'Y');
+    setupCtrl(uvCtrlVRef, uvHandleVRef.current, 'Z');
   }
 
   function measurePatchSpan(p: Patch) {
@@ -979,10 +966,11 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       };
       const onUVObjectChange = (which: 'u'|'v') => {
         const sel = selectedPatchRef.current; if (!sel) return; const handle = which === 'u' ? uvHandleURef.current : uvHandleVRef.current; if (!handle) return; const rec = which === 'u' ? uvUDragRef.current : uvVDragRef.current; if (!rec) return;
-        // compute scalar along handle local X
-        const xAxis = new THREE.Vector3(1,0,0).applyQuaternion(handle.quaternion).normalize();
+        // compute scalar along handle axis (U: local Y, V: local Z)
+        const axis = (which === 'u') ? new THREE.Vector3(0,1,0).applyQuaternion(handle.quaternion).normalize()
+                                     : new THREE.Vector3(0,0,1).applyQuaternion(handle.quaternion).normalize();
         const deltaW = handle.position.clone().sub(rec.startPosWorld);
-        const s = deltaW.dot(xAxis);
+        const s = deltaW.dot(axis);
         // map to pu/pv unit direction
         const mW = sel.points.main.position.clone(); sel.group.localToWorld(mW);
         const dirW = (which === 'u' ? sel.points.u.position.clone() : sel.points.v.position.clone()); sel.group.localToWorld(dirW);
@@ -1004,6 +992,10 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       };
       uvCtrlU.addEventListener('dragging-changed', (e: any) => { if (e.value) beginUVDrag('u'); else endUVDrag(); });
       uvCtrlV.addEventListener('dragging-changed', (e: any) => { if (e.value) beginUVDrag('v'); else endUVDrag(); });
+      uvCtrlU.addEventListener('hoveron', () => { uvOverHandleRef.current = true; });
+      uvCtrlU.addEventListener('hoveroff', () => { uvOverHandleRef.current = false; });
+      uvCtrlV.addEventListener('hoveron', () => { uvOverHandleRef.current = true; });
+      uvCtrlV.addEventListener('hoveroff', () => { uvOverHandleRef.current = false; });
       uvCtrlU.addEventListener('objectChange', () => onUVObjectChange('u'));
       uvCtrlV.addEventListener('objectChange', () => onUVObjectChange('v'));
       gizmo.setScaleSnap?.(0.05);
@@ -1018,7 +1010,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         const mainAxis = (gizmoRef.current as any)?.axis;
         const uAxis = (uvCtrlURef.current as any)?.axis;
         const vAxis = (uvCtrlVRef.current as any)?.axis;
-        if (mainAxis || uAxis || vAxis) {
+        if (uvOverHandleRef.current || mainAxis || uAxis || vAxis) {
           // Clicked on gizmo handle; keep current selection
           return;
         }
