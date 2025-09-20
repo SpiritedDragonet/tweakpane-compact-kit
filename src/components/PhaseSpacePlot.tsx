@@ -461,7 +461,29 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     };
     makeHandle(uvHandleURef, qU);
     makeHandle(uvHandleVRef, qV);
-    const setupCtrl = (ref: React.MutableRefObject<TransformControls | null>, handle: THREE.Object3D | null) => {
+    const hideNonX = (ctrl: TransformControls) => {
+      (ctrl as any).traverse?.((obj: any) => {
+        const name: string = obj?.name ?? '';
+        if (!name) return;
+        // Keep only X-related parts
+        if (!(name === 'X' || name.startsWith('X'))) {
+          if (typeof obj.visible === 'boolean') obj.visible = false;
+        } else {
+          if (typeof obj.visible === 'boolean') obj.visible = true;
+        }
+      });
+    };
+    const tintCtrlVisible = (ctrl: TransformControls | null, color: THREE.Color) => {
+      if (!ctrl) return;
+      ctrl.traverse((obj: any) => {
+        const mat = obj?.material;
+        if (mat && obj?.visible) {
+          try { mat.color?.set?.(color.getHex()); } catch {}
+          try { mat.setValues?.({ color: color }); } catch {}
+        }
+      });
+    };
+    const setupCtrl = (ref: React.MutableRefObject<TransformControls | null>, handle: THREE.Object3D | null, color: THREE.Color) => {
       if (!ref.current || !handle) return;
       const ctrl = ref.current;
       ctrl.setMode('translate');
@@ -469,24 +491,11 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       (ctrl as any).showX = true; (ctrl as any).showY = false; (ctrl as any).showZ = false;
       ctrl.attach(handle);
       ctrl.visible = true;
+      hideNonX(ctrl);
+      tintCtrlVisible(ctrl, color);
     };
-    setupCtrl(uvCtrlURef, uvHandleURef.current);
-    setupCtrl(uvCtrlVRef, uvHandleVRef.current);
-    // Tint X axes colors for clarity
-    tintCtrlVisible(uvCtrlURef.current, baseColors.u);
-    tintCtrlVisible(uvCtrlVRef.current, baseColors.v);
-  }
-
-  function tintCtrlVisible(ctrl: TransformControls | null, color: THREE.Color) {
-    if (!ctrl) return;
-    ctrl.traverse(obj => {
-      const anyObj: any = obj as any;
-      if (anyObj.material && anyObj.visible) {
-        try { anyObj.material.color?.set?.(color.getHex()); } catch {}
-        // some gizmo pieces are line materials with .color
-        try { anyObj.material.setValues?.({ color: color }); } catch {}
-      }
-    });
+    setupCtrl(uvCtrlURef, uvHandleURef.current, baseColors.u);
+    setupCtrl(uvCtrlVRef, uvHandleVRef.current, baseColors.v);
   }
 
   function measurePatchSpan(p: Patch) {
@@ -1005,7 +1014,11 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       const onPointerDown = (event: PointerEvent) => {
         if (gizmoRef.current?.dragging) return;
         lastPointerRef.current = { x: event.clientX, y: event.clientY };
-        if ((gizmoRef.current as any)?.axis) {
+        // If clicking on any gizmo axis (main or UV single-axis), do not change selection
+        const mainAxis = (gizmoRef.current as any)?.axis;
+        const uAxis = (uvCtrlURef.current as any)?.axis;
+        const vAxis = (uvCtrlVRef.current as any)?.axis;
+        if (mainAxis || uAxis || vAxis) {
           // Clicked on gizmo handle; keep current selection
           return;
         }
