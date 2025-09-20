@@ -66,6 +66,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const uvUDragRef = useRef<{ patchId: number; target: 'group'|'point'; role?: 'main'|'u'|'v'; startPosWorld: THREE.Vector3; startGroupPos?: THREE.Vector3; startPointLocal?: THREE.Vector3 } | null>(null);
   const uvVDragRef = useRef<{ patchId: number; target: 'group'|'point'; role?: 'main'|'u'|'v'; startPosWorld: THREE.Vector3; startGroupPos?: THREE.Vector3; startPointLocal?: THREE.Vector3 } | null>(null);
   const uvAnyDraggingRef = useRef<boolean>(false);
+  const uvAnchorRef = useRef<{ target: 'group'|'point'; role?: 'main'|'u'|'v' } | null>(null);
   const selectedClickedObjectRef = useRef<THREE.Object3D | null>(null);
   type DragSnapshot = { patchId: number; main0: THREE.Vector3; u0: THREE.Vector3; v0: THREE.Vector3; pivotLocal0: THREE.Vector3; scale0: number; pointerStart?: { x: number; y: number }; edgeRole?: 'u'|'v' };
   const dragSnapshotRef = useRef<DragSnapshot | null>(null);
@@ -280,6 +281,9 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         }
         fatEdgeRef.current = null;
       }
+      // Update UV anchor
+      if (clickedObject && (anyClicked?.userData?.type === 'point')) uvAnchorRef.current = { target: 'point', role: (anyClicked.userData.role as any) };
+      else uvAnchorRef.current = { target: 'group' };
       // Notify UI even when switching within the same group (only highlight point roles)
       if (clickedObject) {
         let role: 'main'|'u'|'v'|null = null;
@@ -306,6 +310,9 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     }
     (p.quad.material as THREE.MeshBasicMaterial).opacity = 0.44;
     selectedClickedObjectRef.current = clickedObject ?? null;
+    // Set UV anchor for new selection
+    if (clickedObject && (anyClicked?.userData?.type === 'point')) uvAnchorRef.current = { target: 'point', role: (anyClicked.userData.role as any) };
+    else uvAnchorRef.current = { target: 'group' };
     ensureAttachTarget(p);
     // Notify UI with selected role if a point was clicked
     let role: 'main'|'u'|'v'|null = null;
@@ -436,7 +443,14 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     let uDir = uW.clone().sub(mW); if (uDir.lengthSq() < 1e-12) uDir.set(1,0,0); uDir.normalize();
     let vDir = vW.clone().sub(mW); if (vDir.lengthSq() < 1e-12) vDir.set(0,0,1); vDir.normalize();
     const anchor = new THREE.Vector3();
-    if (clicked && clicked.userData?.type === 'point') (clicked as THREE.Object3D).getWorldPosition(anchor); else p.group.getWorldPosition(anchor);
+    const anchorSpec = uvAnchorRef.current;
+    if (anchorSpec && anchorSpec.target === 'point' && anchorSpec.role) {
+      const obj = p.points[anchorSpec.role] as THREE.Object3D; obj.getWorldPosition(anchor);
+    } else if (clicked && clicked.userData?.type === 'point') {
+      (clicked as THREE.Object3D).getWorldPosition(anchor);
+    } else {
+      p.group.getWorldPosition(anchor);
+    }
     const qU = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1,0,0), uDir);
     const qV = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1,0,0), vDir);
     const makeHandle = (ref: React.MutableRefObject<THREE.Object3D | null>, q: THREE.Quaternion) => {
@@ -458,6 +472,21 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     };
     setupCtrl(uvCtrlURef, uvHandleURef.current);
     setupCtrl(uvCtrlVRef, uvHandleVRef.current);
+    // Tint X axes colors for clarity
+    tintCtrlVisible(uvCtrlURef.current, baseColors.u);
+    tintCtrlVisible(uvCtrlVRef.current, baseColors.v);
+  }
+
+  function tintCtrlVisible(ctrl: TransformControls | null, color: THREE.Color) {
+    if (!ctrl) return;
+    ctrl.traverse(obj => {
+      const anyObj: any = obj as any;
+      if (anyObj.material && anyObj.visible) {
+        try { anyObj.material.color?.set?.(color.getHex()); } catch {}
+        // some gizmo pieces are line materials with .color
+        try { anyObj.material.setValues?.({ color: color }); } catch {}
+      }
+    });
   }
 
   function measurePatchSpan(p: Patch) {
@@ -932,6 +961,9 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         const rec = { patchId: sel.id, target: (clicked && clicked.userData?.type === 'point') ? 'point' : 'group', role: (clicked && clicked.userData?.type === 'point') ? (clicked.userData.role as any) : undefined, startPosWorld: handle.position.clone(), startGroupPos: (() => { const g = new THREE.Vector3(); sel.group.getWorldPosition(g); return g; })(), startPointLocal: (clicked && clicked.userData?.type === 'point') ? (clicked as THREE.Object3D).position.clone() : undefined };
         if (which === 'u') uvUDragRef.current = rec; else uvVDragRef.current = rec;
         uvAnyDraggingRef.current = true; orbit.enabled = false;
+        // Lock anchor spec based on current target
+        if (rec.target === 'point' && rec.role) uvAnchorRef.current = { target: 'point', role: rec.role };
+        else uvAnchorRef.current = { target: 'group' };
       };
       const endUVDrag = () => {
         uvUDragRef.current = null; uvVDragRef.current = null; uvAnyDraggingRef.current = false; orbit.enabled = true; const sel = selectedPatchRef.current; if (sel) { updatePatchGeometry(sel); emitChange(); if (modeRef.current === 'uv') updateUVDoubleAxisForSelection(sel); }
@@ -949,6 +981,8 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         const mappedDeltaW = vec.multiplyScalar(s);
         const mappedPos = rec.startPosWorld.clone().add(mappedDeltaW);
         handle.position.copy(mappedPos);
+        // The other axis follows completely
+        const otherHandle = which === 'u' ? uvHandleVRef.current : uvHandleURef.current; if (otherHandle) otherHandle.position.copy(mappedPos);
         if (rec.target === 'point' && rec.role) {
           const a = sel.group.worldToLocal(rec.startPosWorld.clone()); const b = sel.group.worldToLocal(mappedPos.clone()); const dLocal = b.sub(a);
           const baseLocal = rec.startPointLocal!.clone(); sel.points[rec.role].position.copy(baseLocal.add(dLocal)); updatePatchGeometry(sel); emitChange();
