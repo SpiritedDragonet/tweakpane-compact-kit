@@ -25,7 +25,6 @@ export const App: React.FC = () => {
   const [frameCloseness, setFrameCloseness] = useState<number>(2); // 默认近景倍数（更贴近你的偏好）
   const [patches, setPatches] = useState<PatchDTO[]>([]);
   const [toolMode, setToolMode] = useState<'translate'|'rotate'|'scale'|'uv'>('translate');
-  const [toolSpace, setToolSpace] = useState<'local'|'world'>('local');
   // Per-group coordinate display mode: 'global' (absolute) or 'local' (relative to main for u/v)
   const [coordModeById, setCoordModeById] = useState<Record<number, 'global' | 'local'>>({});
   const [lockMainById, setLockMainById] = useState<Record<number, boolean>>({});
@@ -83,7 +82,7 @@ export const App: React.FC = () => {
           <b style={{ color: '#fff', fontSize: 13 as any }}>操作指南</b><br />
           • 鼠标拖拽旋转，滚轮缩放视角<br />
           • 点击点/线/面选中组；拖动控制柄移动点<br />
-          • W/E/R：移动/旋转/缩放；Q：切换坐标系；Esc：取消选择
+          • W/E/R：移动/旋转/缩放；Esc：取消选择
         </div>
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
           <b style={{ color: '#fff', fontSize: 13 as any }}>相空间参数</b>
@@ -114,13 +113,7 @@ export const App: React.FC = () => {
               <option value='uv'>沿u/v平移</option>
             </select>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <label style={{ minWidth: 70, color: '#cfcfcf' }}>坐标系</label>
-            <select value={toolSpace} onChange={(e) => { const s = e.target.value as any; setToolSpace(s); plotRef.current?.setTransformSpace(s); }} style={{ flex: 1, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}>
-              <option value='local'>局部 (Q)</option>
-              <option value='world'>世界</option>
-            </select>
-          </div>
+          
         </div>
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
           <b style={{ color: '#fff', fontSize: 13 as any }}>显示设置</b>
