@@ -111,6 +111,10 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const modeRef = useRef<'translate'|'rotate'|'scale'|'uv'>('translate');
   const boundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const markerGroupRef = useRef<THREE.Group | null>(null);
+  const markerSpritesRef = useRef<THREE.Sprite[]>([]);
+  const trajectoryIndexMapRef = useRef<Map<number, THREE.Vector3>>(new Map());
+  const [trajectoryVersion, setTrajectoryVersion] = useState(0);
   const lockedMainSetRef = useRef<Set<number>>(new Set());
   const lastMainDuringDragRef = useRef<THREE.Vector3 | null>(null);
 
@@ -146,9 +150,6 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   // Track last bounds we auto-framed for, and whether user interacted with camera
   const lastFramedBoundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null>(null);
   const userInteractedRef = useRef(false);
-  const markerGroupRef = useRef<THREE.Group | null>(null);
-  const trajectoryIndexMapRef = useRef<Map<number, THREE.Vector3>>(new Map());
-  const [trajectoryVersion, setTrajectoryVersion] = useState(0);
   // Adjustable default framing closeness (10x by default)
   const frameClosenessRef = useRef<number>(frameCloseness);
   useEffect(() => { frameClosenessRef.current = Math.max(1e-6, frameCloseness || 2); }, [frameCloseness]);
@@ -204,6 +205,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     patchesRef.current.forEach(p => {
       Object.values(p.points).forEach(pt => { (pt as any).userData.pixelHeight = pointSizePxRef.current; });
     });
+    markerSpritesRef.current.forEach(sp => { (sp as any).userData.pixelHeight = pointSizePxRef.current; });
   }, [pointPixelSize]);
 
   function createWhiteCircleTexture() {
@@ -1324,6 +1326,16 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
           }
         });
       });
+      markerSpritesRef.current.forEach(sprite => {
+        const ud: any = sprite.userData;
+        if (ud && ud.isMarkerSprite) {
+          sprite.getWorldPosition(tmp);
+          const dist = camera.position.distanceTo(tmp);
+          const desiredPx = ud.pixelHeight || pointSizePxRef.current;
+          const worldHeight = 2 * Math.tan(vFov / 2) * dist * (desiredPx / rH);
+          sprite.scale.set(worldHeight, worldHeight, 1);
+        }
+      });
       renderer.render(scene, camera);
       animationFrameRef.current = requestAnimationFrame(animate);
     };
@@ -1338,6 +1350,16 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       orbit.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
+      if (markerGroupRef.current) {
+        markerGroupRef.current.children.forEach(child => {
+          const sprite = child as THREE.Sprite;
+          const mat = sprite.material as THREE.Material | THREE.Material[];
+          if (Array.isArray(mat)) mat.forEach(m => m.dispose()); else mat.dispose();
+        });
+        scene.remove(markerGroupRef.current);
+        markerGroupRef.current = null;
+      }
+      markerSpritesRef.current = [];
     };
   }, []);
 
@@ -1430,52 +1452,55 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
 
     if (markerGroupRef.current) {
       markerGroupRef.current.children.forEach(child => {
-        const mesh = child as THREE.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const mat = mesh.material as THREE.Material | THREE.Material[];
+        const sprite = child as THREE.Sprite;
+        const mat = sprite.material as THREE.Material | THREE.Material[];
         if (Array.isArray(mat)) mat.forEach(m => m.dispose()); else mat.dispose();
       });
       scene.remove(markerGroupRef.current);
       markerGroupRef.current = null;
     }
+    markerSpritesRef.current = [];
 
     if (!markers || markers.length === 0) return;
 
     const indexMap = trajectoryIndexMapRef.current;
     const group = new THREE.Group();
+    const spriteList: THREE.Sprite[] = [];
     markers.forEach(marker => {
       const pos = indexMap.get(marker.index);
       if (!pos) return;
-      const geom = new THREE.SphereGeometry(0.18, 20, 20);
-      const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(marker.color), depthTest: false, depthWrite: false });
-      const mesh = new THREE.Mesh(geom, mat);
-      mesh.position.copy(pos);
-      mesh.userData = { type: 'marker', markerId: marker.id };
-      mesh.renderOrder = 995;
-      group.add(mesh);
+      if (!whiteCircleTextureRef.current) whiteCircleTextureRef.current = createWhiteCircleTexture();
+      const mat = new THREE.SpriteMaterial({ map: whiteCircleTextureRef.current, color: new THREE.Color(marker.color), depthTest: false, depthWrite: false });
+      const sprite = new THREE.Sprite(mat);
+      const SPRITE_SIZE = 0.3;
+      sprite.position.set(pos.x, pos.y, pos.z);
+      sprite.scale.set(SPRITE_SIZE, SPRITE_SIZE, 1);
+      sprite.userData = { type: 'marker', markerId: marker.id, isMarkerSprite: true, pixelHeight: pointSizePxRef.current };
+      sprite.renderOrder = 995;
+      group.add(sprite);
+      spriteList.push(sprite);
     });
     if (group.children.length === 0) {
-      group.children.forEach(child => {
-        const mesh = child as THREE.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const mat = mesh.material as THREE.Material | THREE.Material[];
+      spriteList.forEach(sprite => {
+        const mat = sprite.material as THREE.Material | THREE.Material[];
         if (Array.isArray(mat)) mat.forEach(m => m.dispose()); else mat.dispose();
       });
       return;
     }
     scene.add(group);
     markerGroupRef.current = group;
+    markerSpritesRef.current = spriteList;
 
     return () => {
       if (!markerGroupRef.current) return;
       markerGroupRef.current.children.forEach(child => {
-        const mesh = child as THREE.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const mat = mesh.material as THREE.Material | THREE.Material[];
+        const sprite = child as THREE.Sprite;
+        const mat = sprite.material as THREE.Material | THREE.Material[];
         if (Array.isArray(mat)) mat.forEach(m => m.dispose()); else mat.dispose();
       });
       scene.remove(markerGroupRef.current);
       markerGroupRef.current = null;
+      markerSpritesRef.current = [];
     };
   }, [markers, ready, trajectoryVersion]);
 

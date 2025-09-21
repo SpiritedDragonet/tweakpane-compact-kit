@@ -3,8 +3,6 @@ import { MarkerDTO, PhaseSpacePlot, PhaseSpacePlotHandle, PatchDTO } from './com
 
 type ECGMarkerEntry = { id: number; label: string; index: number };
 const ECG_STANDARD_LABELS = ['P', 'Q', 'R', 'S', 'J', 'T', 'U', 'V'] as const;
-type ECGLabelKey = typeof ECG_STANDARD_LABELS[number] | 'custom';
-const ECG_LABEL_KEYS: ECGLabelKey[] = [...ECG_STANDARD_LABELS, 'custom'];
 const DEFAULT_ECG_LABEL_COLORS: Record<string, string> = {
   P: '#ff6b6b',
   Q: '#ffd166',
@@ -17,6 +15,25 @@ const DEFAULT_ECG_LABEL_COLORS: Record<string, string> = {
   custom: '#cccccc',
 };
 const CUSTOM_LABEL_OPTION = '__custom__';
+const STANDARD_LABEL_SET = new Set<string>(ECG_STANDARD_LABELS);
+const normalizeHex = (value: string | undefined | null) => (value ? value.trim().toLowerCase() : '');
+const toColorKey = (label: string | undefined | null): string | null => {
+  if (!label) return null;
+  const trimmed = label.trim();
+  if (!trimmed) return null;
+  const upper = trimmed.toUpperCase();
+  return STANDARD_LABEL_SET.has(upper) ? upper : trimmed;
+};
+const isStandardKey = (key: string) => STANDARD_LABEL_SET.has(key);
+const getColorForLabelKey = (key: string | null, palette: Record<string, string>) => {
+  if (!key) return palette.custom ?? DEFAULT_ECG_LABEL_COLORS.custom;
+  const existing = palette[key];
+  if (existing) return existing;
+  if (isStandardKey(key)) return DEFAULT_ECG_LABEL_COLORS[key as keyof typeof DEFAULT_ECG_LABEL_COLORS];
+  return palette.custom ?? DEFAULT_ECG_LABEL_COLORS.custom;
+};
+const getColorForName = (label: string | undefined | null, palette: Record<string, string>) =>
+  getColorForLabelKey(toColorKey(label), palette);
 
 function generatePseudoECG(N = 3000, fs = 250) {
   const out = new Float32Array(N);
@@ -53,6 +70,7 @@ export const App: React.FC = () => {
   const [markerLabelOption, setMarkerLabelOption] = useState<string>('R');
   const [markerCustomLabel, setMarkerCustomLabel] = useState<string>('');
   const [markerCount, setMarkerCount] = useState<number>(1);
+  const [markerNameError, setMarkerNameError] = useState<string>('');
   const plotRef = useRef<PhaseSpacePlotHandle>(null);
   // Undo/redo history (max 100 steps)
   const MAX_HISTORY = 100;
@@ -164,6 +182,62 @@ export const App: React.FC = () => {
     }
   }, [patches, selection.patchId]);
 
+  useEffect(() => {
+    setEcgLabelColors(prev => {
+      const usedCustom = new Set<string>();
+      patches.forEach(p => {
+        const key = toColorKey(p.name);
+        if (key && !isStandardKey(key)) usedCustom.add(key);
+      });
+      markers.forEach(m => {
+        const key = toColorKey(m.label);
+        if (key && !isStandardKey(key)) usedCustom.add(key);
+      });
+      const next: Record<string, string> = {};
+      let changed = false;
+      ECG_STANDARD_LABELS.forEach(label => {
+        const current = prev[label] ?? DEFAULT_ECG_LABEL_COLORS[label];
+        next[label] = current;
+        if (prev[label] === undefined) changed = true;
+      });
+      usedCustom.forEach(label => {
+        const current = prev[label] ?? prev.custom ?? DEFAULT_ECG_LABEL_COLORS.custom;
+        next[label] = current;
+        if (prev[label] !== current) changed = true;
+      });
+      next.custom = prev.custom ?? DEFAULT_ECG_LABEL_COLORS.custom;
+      Object.keys(prev).forEach(key => {
+        if (!(key in next)) changed = true;
+      });
+      if (!changed && Object.keys(prev).length === Object.keys(next).length) {
+        let identical = true;
+        for (const key of Object.keys(next)) {
+          if (prev[key] !== next[key]) { identical = false; break; }
+        }
+        if (identical) return prev;
+      }
+      return next;
+    });
+  }, [patches, markers]);
+
+  useEffect(() => {
+    const handle = plotRef.current;
+    if (!handle) return;
+    let modified = false;
+    patches.forEach(p => {
+      const targetColor = getColorForName(p.name, ecgLabelColors);
+      const currentColor = p.color ?? '';
+      if (normalizeHex(currentColor) !== normalizeHex(targetColor)) {
+        if (!modified) ignoreChangesRef.current = true;
+        modified = true;
+        handle.updatePatchColor(p.id, targetColor);
+      }
+    });
+    if (modified) {
+      setTimeout(() => { ignoreChangesRef.current = false; }, 0);
+    }
+  }, [patches, ecgLabelColors]);
+
   const external = useMemo(() => ({
     signal,
     displayStartPosition: start + 1, // convert to 1-based for compatibility
@@ -175,48 +249,84 @@ export const App: React.FC = () => {
     id: marker.id,
     label: marker.label,
     index: marker.index,
-    color: ecgLabelColors[marker.label] ?? ecgLabelColors.custom ?? '#cccccc',
+    color: getColorForLabelKey(marker.label, ecgLabelColors),
   })), [markers, ecgLabelColors]);
 
   const minMarkerIndex = start;
   const maxMarkerIndex = end - 2 * tau - 1;
   const hasMarkerRange = maxMarkerIndex >= minMarkerIndex;
-  const addMarkersDisabled = !hasMarkerRange || (markerLabelOption === CUSTOM_LABEL_OPTION && markerCustomLabel.trim() === '');
 
-  const sortedLabelKeys = useMemo(() => {
-    const keys = Object.keys(ecgLabelColors);
-    return keys.sort((a, b) => {
-      const indexA = ECG_LABEL_KEYS.indexOf(a as ECGLabelKey);
-      const indexB = ECG_LABEL_KEYS.indexOf(b as ECGLabelKey);
-      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-      if (indexA !== -1) return -1;
-      if (indexB !== -1) return 1;
-      if (a === 'custom') return 1;
-      if (b === 'custom') return -1;
-      return a.localeCompare(b);
-    });
-  }, [ecgLabelColors]);
+  const customLabelKeysSorted = useMemo(
+    () => Object.keys(ecgLabelColors)
+      .filter(key => key !== 'custom' && !isStandardKey(key))
+      .sort((a, b) => a.localeCompare(b, 'zh-CN')),
+    [ecgLabelColors],
+  );
+  const markerNameOptions = useMemo(
+    () => [...ECG_STANDARD_LABELS, ...customLabelKeysSorted, CUSTOM_LABEL_OPTION],
+    [customLabelKeysSorted],
+  );
+  const colorOptions = useMemo(
+    () => [...ECG_STANDARD_LABELS, ...customLabelKeysSorted, 'custom'],
+    [customLabelKeysSorted],
+  );
+  const [colorEditLabel, setColorEditLabel] = useState<string>(ECG_STANDARD_LABELS[0]);
+  useEffect(() => {
+    if (!markerNameOptions.includes(markerLabelOption)) {
+      setMarkerLabelOption(markerNameOptions[0] ?? CUSTOM_LABEL_OPTION);
+    }
+  }, [markerNameOptions, markerLabelOption]);
+  useEffect(() => {
+    if (markerLabelOption !== CUSTOM_LABEL_OPTION && markerNameError) {
+      setMarkerNameError('');
+    }
+  }, [markerLabelOption, markerNameError]);
+  useEffect(() => {
+    if (colorOptions.length === 0) {
+      if (colorEditLabel !== 'custom') setColorEditLabel('custom');
+      return;
+    }
+    if (!colorOptions.includes(colorEditLabel)) {
+      setColorEditLabel(colorOptions[0]);
+    }
+  }, [colorOptions, colorEditLabel]);
+
+  const addMarkersDisabled = !hasMarkerRange || (markerLabelOption === CUSTOM_LABEL_OPTION && markerCustomLabel.trim() === '');
+  const currentEditColor = getColorForLabelKey(colorEditLabel, ecgLabelColors);
 
   const handleAddMarkers = () => {
     const useCustom = markerLabelOption === CUSTOM_LABEL_OPTION;
     const baseLabelRaw = useCustom ? markerCustomLabel.trim() : markerLabelOption;
-    if (!baseLabelRaw) return;
+    if (!useCustom) setMarkerNameError('');
+    const labelKey = toColorKey(baseLabelRaw);
+    if (!labelKey) { if (useCustom) setMarkerNameError('名称不能为空'); return; }
+    if (labelKey === 'custom') { setMarkerNameError('名称不可为 "custom"'); return; }
+    const isStandard = isStandardKey(labelKey);
+    if (useCustom) {
+      const validation = validateName(labelKey);
+      if (validation) { setMarkerNameError(validation); return; }
+      setMarkerNameError('');
+    }
     if (!hasMarkerRange) return;
     const count = Math.max(1, Math.floor(markerCount));
-    const baseLabel = baseLabelRaw;
     setEcgLabelColors(prev => {
-      if (prev[baseLabel] !== undefined) return prev;
-      return { ...prev, [baseLabel]: prev.custom ?? '#cccccc' };
+      if (isStandard) {
+        if (prev[labelKey] !== undefined) return prev;
+        return { ...prev, [labelKey]: DEFAULT_ECG_LABEL_COLORS[labelKey] };
+      }
+      if (prev[labelKey] !== undefined) return prev;
+      return { ...prev, [labelKey]: prev.custom ?? DEFAULT_ECG_LABEL_COLORS.custom };
     });
     const span = maxMarkerIndex - minMarkerIndex + 1;
     if (span <= 0) return;
     const newMarkers: ECGMarkerEntry[] = [];
     for (let i = 0; i < count; i++) {
       const idx = minMarkerIndex + Math.floor(Math.random() * span);
-      newMarkers.push({ id: markerIdRef.current++, label: baseLabel, index: idx });
+      newMarkers.push({ id: markerIdRef.current++, label: labelKey, index: idx });
     }
     setMarkers(prev => [...prev, ...newMarkers]);
     if (useCustom) setMarkerCustomLabel('');
+    if (isStandard || useCustom) setMarkerLabelOption(labelKey);
   };
 
   const removeMarker = (markerId: number) => {
@@ -329,23 +439,29 @@ export const App: React.FC = () => {
           </div>
           <div style={{ marginTop: 10 }}>
             <span style={{ color: '#cfcfcf' }}>ECG 标记颜色</span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
-              {sortedLabelKeys.map(key => {
-                const labelText = key === 'custom' ? '自定义默认' : key;
-                const value = ecgLabelColors[key] ?? ecgLabelColors.custom ?? '#cccccc';
-                return (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ color: '#aaa', minWidth: 80 }}>{labelText}</span>
-                    <input
-                      type='color'
-                      value={value}
-                      onChange={(e) => setEcgLabelColors(prev => ({ ...prev, [key]: e.target.value }))}
-                      style={{ width: 40, height: 24, border: 'none', background: 'transparent', cursor: 'pointer' }}
-                    />
-                    <span style={{ color: '#777', fontSize: 12 }}>{value.toUpperCase()}</span>
-                  </div>
-                );
-              })}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <label style={{ color: '#aaa' }}>名称</label>
+              <select
+                value={colorEditLabel}
+                onChange={(e) => setColorEditLabel(e.target.value)}
+                style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
+              >
+                {colorOptions.map(opt => (
+                  <option key={opt} value={opt}>{opt === 'custom' ? '自定义默认' : opt}</option>
+                ))}
+              </select>
+              <label style={{ color: '#aaa' }}>颜色</label>
+              <input
+                type='color'
+                value={currentEditColor}
+                onChange={(e) => setEcgLabelColors(prev => {
+                  const value = e.target.value;
+                  if (prev[colorEditLabel] === value) return prev;
+                  return { ...prev, [colorEditLabel]: value };
+                })}
+                style={{ width: 40, height: 24, border: 'none', background: 'transparent', cursor: 'pointer' }}
+              />
+              <span style={{ color: '#777', fontSize: 12 }}>{currentEditColor.toUpperCase()}</span>
             </div>
           </div>
         </div>
@@ -362,10 +478,9 @@ export const App: React.FC = () => {
                 onChange={(e) => setMarkerLabelOption(e.target.value)}
                 style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
               >
-                {ECG_STANDARD_LABELS.map(opt => (
-                  <option key={opt} value={opt}>{opt}</option>
+                {markerNameOptions.map(opt => (
+                  <option key={opt} value={opt}>{opt === CUSTOM_LABEL_OPTION ? '自定义' : opt}</option>
                 ))}
-                <option value={CUSTOM_LABEL_OPTION}>自定义</option>
               </select>
               {markerLabelOption === CUSTOM_LABEL_OPTION && (
                 <input
@@ -374,6 +489,9 @@ export const App: React.FC = () => {
                   placeholder='自定义名称'
                   style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px', minWidth: 120 }}
                 />
+              )}
+              {markerLabelOption === CUSTOM_LABEL_OPTION && markerNameError && (
+                <span style={{ color: '#f07167', fontSize: 12 }}>{markerNameError}</span>
               )}
               <label style={{ color: '#cfcfcf' }}>数量</label>
               <input
@@ -396,7 +514,7 @@ export const App: React.FC = () => {
                 <span style={{ color: '#777' }}>暂无标记点</span>
               ) : (
                 markers.map(marker => {
-                  const color = ecgLabelColors[marker.label] ?? ecgLabelColors.custom ?? '#cccccc';
+                  const color = getColorForLabelKey(marker.label, ecgLabelColors);
                   const valid = marker.index >= minMarkerIndex && marker.index <= maxMarkerIndex;
                   return (
                     <div key={marker.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'rgba(0,0,0,0.4)', borderRadius: 4 }}>
@@ -633,12 +751,9 @@ export const App: React.FC = () => {
                     onChange={(e) => plotRef.current?.renamePatch(p.id, e.target.value)}
                     style={{ flex: 1, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
                   />
-                  <input
-                    type='color'
-                    value={p.color ?? '#ffffff'}
-                    onChange={(e) => plotRef.current?.updatePatchColor(p.id, e.target.value)}
-                    title='主点/面的颜色'
-                    style={{ width: 36, height: 24, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                  <span
+                    title='组颜色由 ECG 标记颜色映射控制'
+                    style={{ display: 'inline-flex', width: 18, height: 18, borderRadius: 4, border: '1px solid #555', background: getColorForName(p.name, ecgLabelColors), flexShrink: 0 }}
                   />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
@@ -710,7 +825,7 @@ export const App: React.FC = () => {
                       const active = isPointSelected || isEdgeSelected;
                       const label = role === 'main' ? 'p' : role;
                       const mappingKey = role === 'main' ? 'P' : role.toUpperCase();
-                      const baseColor = ecgLabelColors[mappingKey] ?? ecgLabelColors.custom ?? '#aaa';
+                      const baseColor = getColorForLabelKey(mappingKey, ecgLabelColors);
                       return (
                         <span style={{ color: active ? '#ffdd59' : baseColor, width: 36, fontWeight: active ? 700 : 400 }}>{label}</span>
                       );
