@@ -15,6 +15,13 @@ export type PatchDTO = {
   v: [number, number, number];
 };
 
+export type MarkerDTO = {
+  id: number;
+  label: string;
+  index: number;
+  color: string;
+};
+
 export type PhaseSpacePlotHandle = {
   addPatch: (center?: { x?: number; y?: number; z?: number }) => number | null;
   deleteSelectedPatch: () => void;
@@ -27,6 +34,7 @@ export type PhaseSpacePlotHandle = {
   setTransformMode: (mode: 'translate'|'rotate'|'scale'|'uv') => void;
   setTransformSpace: (space: 'local'|'world') => void;
   focusOnTrajectory: () => void;
+  deletePatchById: (patchId: number) => void;
   setMainLocked: (patchId: number, locked: boolean) => void;
   commit: (reason?: string) => void;
 };
@@ -48,9 +56,10 @@ type Props = {
   frameCloseness?: number;
   // Selection change callback for UI highlight (supports points and edges)
   onSelectionChange?: (sel: { patchId: number | null; role: 'main' | 'u' | 'v' | 'edge_u' | 'edge_v' | null }) => void;
+  markers?: MarkerDTO[];
 };
 
-export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, onPatchesChange, frameCloseness = 2, onSelectionChange }, ref) {
+export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, onPatchesChange, frameCloseness = 2, onSelectionChange, markers = [] }, ref) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -137,6 +146,9 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   // Track last bounds we auto-framed for, and whether user interacted with camera
   const lastFramedBoundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null>(null);
   const userInteractedRef = useRef(false);
+  const markerGroupRef = useRef<THREE.Group | null>(null);
+  const trajectoryIndexMapRef = useRef<Map<number, THREE.Vector3>>(new Map());
+  const [trajectoryVersion, setTrajectoryVersion] = useState(0);
   // Adjustable default framing closeness (10x by default)
   const frameClosenessRef = useRef<number>(frameCloseness);
   useEffect(() => { frameClosenessRef.current = Math.max(1e-6, frameCloseness || 2); }, [frameCloseness]);
@@ -803,6 +815,10 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       orbit.target.set(cx, cy, cz); orbit.update();
       lastFramedBoundsRef.current = { minX, maxX, minY, maxY, minZ, maxZ };
     },
+    deletePatchById: (patchId: number) => {
+      deletePatch(patchId);
+      emitChange(true, 'delete-patch');
+    },
     setMainLocked: (patchId: number, locked: boolean) => {
       if (locked) lockedMainSetRef.current.add(patchId); else lockedMainSetRef.current.delete(patchId);
     },
@@ -1334,27 +1350,35 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       lineRef.current = null;
     }
 
-    const signal = external.signal; if (!signal || (signal as any).length === 0) return;
+    const resetMarkers = () => {
+      trajectoryIndexMapRef.current = new Map();
+      setTrajectoryVersion(v => v + 1);
+    };
+
+    const signal = external.signal; if (!signal || (signal as any).length === 0) { resetMarkers(); return; }
     const startIdx = Math.max(0, (external.displayStartPosition ?? 1) - 1);
     const endIdx = Math.min((signal as any).length - 1, (external.displayEndPosition ?? (signal as any).length) - 1);
     const tau = external.tau ?? 8;
-    if (startIdx >= endIdx) return;
+    if (startIdx >= endIdx) { resetMarkers(); return; }
 
     const seg = (signal as any).subarray ? (signal as any).subarray(startIdx, endIdx + 1) : (signal as any).slice(startIdx, endIdx + 1);
-    const N = seg.length - 2 * tau - 1; if (N <= 0) return;
+    const N = seg.length - 2 * tau - 1; if (N <= 0) { resetMarkers(); return; }
 
     const points: THREE.Vector3[] = [];
+    const indexMap = new Map<number, THREE.Vector3>();
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
     let minZ = Infinity, maxZ = -Infinity;
     for (let i = 0; i < N; i++) {
       const x = seg[i]; const y = seg[i + tau]; const z = seg[i + 2 * tau];
-      points.push(new THREE.Vector3(x, y, z));
+      const vec = new THREE.Vector3(x, y, z);
+      points.push(vec);
+      indexMap.set(startIdx + i, vec.clone());
       minX = Math.min(minX, x); maxX = Math.max(maxX, x);
       minY = Math.min(minY, y); maxY = Math.max(maxY, y);
       minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
     }
-    if (points.length === 0) return;
+    if (points.length === 0) { resetMarkers(); return; }
 
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     const colors = new Float32Array(points.length * 3);
@@ -1368,6 +1392,8 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
     scene.add(line); lineRef.current = line;
 
     boundsRef.current = { minX, maxX, minY, maxY, minZ, maxZ };
+    trajectoryIndexMapRef.current = indexMap;
+    setTrajectoryVersion(v => v + 1);
     createAxes(scene, minX, maxX, minY, maxY, minZ, maxZ);
 
     const cam = cameraRef.current, orbit = orbitRef.current; if (cam && orbit) {
@@ -1397,6 +1423,61 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       lastSignalObjRef.current = external.signal;
     }
   }, [ready, external.signal, external.displayStartPosition, external.displayEndPosition, external.tau]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const scene = sceneRef.current; if (!scene) return;
+
+    if (markerGroupRef.current) {
+      markerGroupRef.current.children.forEach(child => {
+        const mesh = child as THREE.Mesh;
+        if (mesh.geometry) mesh.geometry.dispose();
+        const mat = mesh.material as THREE.Material | THREE.Material[];
+        if (Array.isArray(mat)) mat.forEach(m => m.dispose()); else mat.dispose();
+      });
+      scene.remove(markerGroupRef.current);
+      markerGroupRef.current = null;
+    }
+
+    if (!markers || markers.length === 0) return;
+
+    const indexMap = trajectoryIndexMapRef.current;
+    const group = new THREE.Group();
+    markers.forEach(marker => {
+      const pos = indexMap.get(marker.index);
+      if (!pos) return;
+      const geom = new THREE.SphereGeometry(0.18, 20, 20);
+      const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(marker.color), depthTest: false, depthWrite: false });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.copy(pos);
+      mesh.userData = { type: 'marker', markerId: marker.id };
+      mesh.renderOrder = 995;
+      group.add(mesh);
+    });
+    if (group.children.length === 0) {
+      group.children.forEach(child => {
+        const mesh = child as THREE.Mesh;
+        if (mesh.geometry) mesh.geometry.dispose();
+        const mat = mesh.material as THREE.Material | THREE.Material[];
+        if (Array.isArray(mat)) mat.forEach(m => m.dispose()); else mat.dispose();
+      });
+      return;
+    }
+    scene.add(group);
+    markerGroupRef.current = group;
+
+    return () => {
+      if (!markerGroupRef.current) return;
+      markerGroupRef.current.children.forEach(child => {
+        const mesh = child as THREE.Mesh;
+        if (mesh.geometry) mesh.geometry.dispose();
+        const mat = mesh.material as THREE.Material | THREE.Material[];
+        if (Array.isArray(mat)) mat.forEach(m => m.dispose()); else mat.dispose();
+      });
+      scene.remove(markerGroupRef.current);
+      markerGroupRef.current = null;
+    };
+  }, [markers, ready, trajectoryVersion]);
 
   function createAxes(scene: THREE.Scene, minX: number, maxX: number, minY: number, maxY: number, minZ: number, maxZ: number) {
     const old = scene.children.filter(c => (c as any).userData && (c as any).userData.isMatlabAxis);

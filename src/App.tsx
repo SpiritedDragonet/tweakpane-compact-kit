@@ -1,5 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { PhaseSpacePlot, PhaseSpacePlotHandle, PatchDTO } from './components/PhaseSpacePlot';
+import { MarkerDTO, PhaseSpacePlot, PhaseSpacePlotHandle, PatchDTO } from './components/PhaseSpacePlot';
+
+type ECGMarkerEntry = { id: number; label: string; index: number };
+const ECG_STANDARD_LABELS = ['P', 'Q', 'R', 'S', 'J', 'T', 'U', 'V'] as const;
+type ECGLabelKey = typeof ECG_STANDARD_LABELS[number] | 'custom';
+const ECG_LABEL_KEYS: ECGLabelKey[] = [...ECG_STANDARD_LABELS, 'custom'];
+const DEFAULT_ECG_LABEL_COLORS: Record<string, string> = {
+  P: '#ff6b6b',
+  Q: '#ffd166',
+  R: '#06d6a0',
+  S: '#118ab2',
+  J: '#ffa502',
+  T: '#ef476f',
+  U: '#9b5de5',
+  V: '#4cc9f0',
+  custom: '#cccccc',
+};
+const CUSTOM_LABEL_OPTION = '__custom__';
 
 function generatePseudoECG(N = 3000, fs = 250) {
   const out = new Float32Array(N);
@@ -30,6 +47,12 @@ export const App: React.FC = () => {
   const [lockMainById, setLockMainById] = useState<Record<number, boolean>>({});
   // Selection from 3D view for UI highlight
   const [selection, setSelection] = useState<{ patchId: number | null; role: 'main'|'u'|'v'|'edge_u'|'edge_v'|null }>({ patchId: null, role: null });
+  const [markers, setMarkers] = useState<ECGMarkerEntry[]>([]);
+  const markerIdRef = useRef(0);
+  const [ecgLabelColors, setEcgLabelColors] = useState<Record<string, string>>(() => ({ ...DEFAULT_ECG_LABEL_COLORS }));
+  const [markerLabelOption, setMarkerLabelOption] = useState<string>('R');
+  const [markerCustomLabel, setMarkerCustomLabel] = useState<string>('');
+  const [markerCount, setMarkerCount] = useState<number>(1);
   const plotRef = useRef<PhaseSpacePlotHandle>(null);
   // Undo/redo history (max 100 steps)
   const MAX_HISTORY = 100;
@@ -94,12 +117,111 @@ export const App: React.FC = () => {
     setEnd(Math.min(signal.length - 1, 2000));
   }, [signal.length]);
 
+  useEffect(() => {
+    setCoordModeById(prev => {
+      const next: Record<number, 'global' | 'local'> = {};
+      let changed = false;
+      patches.forEach(p => {
+        const prevMode = prev[p.id];
+        if (prevMode === undefined) changed = true;
+        next[p.id] = prevMode ?? 'global';
+      });
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (!changed) {
+        if (prevKeys.length !== nextKeys.length) {
+          changed = true;
+        } else {
+          for (const key of prevKeys) {
+            if (!Object.prototype.hasOwnProperty.call(next, key)) { changed = true; break; }
+            if (next[key as any] !== prev[key as any]) { changed = true; break; }
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+    setLockMainById(prev => {
+      const next: Record<number, boolean> = {};
+      let changed = false;
+      patches.forEach(p => {
+        if (prev[p.id]) next[p.id] = true;
+      });
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (!changed) {
+        if (prevKeys.length !== nextKeys.length) {
+          changed = true;
+        } else {
+          for (const key of prevKeys) {
+            if (!Object.prototype.hasOwnProperty.call(next, key)) { changed = true; break; }
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+    if (selection.patchId != null && !patches.some(pp => pp.id === selection.patchId)) {
+      setSelection({ patchId: null, role: null });
+    }
+  }, [patches, selection.patchId]);
+
   const external = useMemo(() => ({
     signal,
     displayStartPosition: start + 1, // convert to 1-based for compatibility
     displayEndPosition: end + 1,
     tau,
   }), [signal, start, end, tau]);
+
+  const markersForPlot = useMemo<MarkerDTO[]>(() => markers.map(marker => ({
+    id: marker.id,
+    label: marker.label,
+    index: marker.index,
+    color: ecgLabelColors[marker.label] ?? ecgLabelColors.custom ?? '#cccccc',
+  })), [markers, ecgLabelColors]);
+
+  const minMarkerIndex = start;
+  const maxMarkerIndex = end - 2 * tau - 1;
+  const hasMarkerRange = maxMarkerIndex >= minMarkerIndex;
+  const addMarkersDisabled = !hasMarkerRange || (markerLabelOption === CUSTOM_LABEL_OPTION && markerCustomLabel.trim() === '');
+
+  const sortedLabelKeys = useMemo(() => {
+    const keys = Object.keys(ecgLabelColors);
+    return keys.sort((a, b) => {
+      const indexA = ECG_LABEL_KEYS.indexOf(a as ECGLabelKey);
+      const indexB = ECG_LABEL_KEYS.indexOf(b as ECGLabelKey);
+      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      if (a === 'custom') return 1;
+      if (b === 'custom') return -1;
+      return a.localeCompare(b);
+    });
+  }, [ecgLabelColors]);
+
+  const handleAddMarkers = () => {
+    const useCustom = markerLabelOption === CUSTOM_LABEL_OPTION;
+    const baseLabelRaw = useCustom ? markerCustomLabel.trim() : markerLabelOption;
+    if (!baseLabelRaw) return;
+    if (!hasMarkerRange) return;
+    const count = Math.max(1, Math.floor(markerCount));
+    const baseLabel = baseLabelRaw;
+    setEcgLabelColors(prev => {
+      if (prev[baseLabel] !== undefined) return prev;
+      return { ...prev, [baseLabel]: prev.custom ?? '#cccccc' };
+    });
+    const span = maxMarkerIndex - minMarkerIndex + 1;
+    if (span <= 0) return;
+    const newMarkers: ECGMarkerEntry[] = [];
+    for (let i = 0; i < count; i++) {
+      const idx = minMarkerIndex + Math.floor(Math.random() * span);
+      newMarkers.push({ id: markerIdRef.current++, label: baseLabel, index: idx });
+    }
+    setMarkers(prev => [...prev, ...newMarkers]);
+    if (useCustom) setMarkerCustomLabel('');
+  };
+
+  const removeMarker = (markerId: number) => {
+    setMarkers(prev => prev.filter(m => m.id !== markerId));
+  };
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
@@ -111,6 +233,7 @@ export const App: React.FC = () => {
             debug={true}
             pointPixelSize={pointSizePx}
             frameCloseness={frameCloseness}
+            markers={markersForPlot}
             onSelectionChange={setSelection}
             onPatchesChange={(arr, meta) => {
               setPatches(arr);
@@ -203,6 +326,92 @@ export const App: React.FC = () => {
               }}
               style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
             />
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <span style={{ color: '#cfcfcf' }}>ECG 标记颜色</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+              {sortedLabelKeys.map(key => {
+                const labelText = key === 'custom' ? '自定义默认' : key;
+                const value = ecgLabelColors[key] ?? ecgLabelColors.custom ?? '#cccccc';
+                return (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ color: '#aaa', minWidth: 80 }}>{labelText}</span>
+                    <input
+                      type='color'
+                      value={value}
+                      onChange={(e) => setEcgLabelColors(prev => ({ ...prev, [key]: e.target.value }))}
+                      style={{ width: 40, height: 24, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                    />
+                    <span style={{ color: '#777', fontSize: 12 }}>{value.toUpperCase()}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
+          <b style={{ color: '#fff', fontSize: 13 as any }}>点列表</b>
+          <div style={{ marginTop: 6, color: hasMarkerRange ? '#aaa' : '#f07167', fontSize: 12 }}>
+            {hasMarkerRange ? `有效序列范围: ${minMarkerIndex} ~ ${maxMarkerIndex}` : '当前 τ 或范围设置不足以生成点'}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <label style={{ color: '#cfcfcf' }}>名称</label>
+              <select
+                value={markerLabelOption}
+                onChange={(e) => setMarkerLabelOption(e.target.value)}
+                style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
+              >
+                {ECG_STANDARD_LABELS.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+                <option value={CUSTOM_LABEL_OPTION}>自定义</option>
+              </select>
+              {markerLabelOption === CUSTOM_LABEL_OPTION && (
+                <input
+                  value={markerCustomLabel}
+                  onChange={(e) => setMarkerCustomLabel(e.target.value)}
+                  placeholder='自定义名称'
+                  style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px', minWidth: 120 }}
+                />
+              )}
+              <label style={{ color: '#cfcfcf' }}>数量</label>
+              <input
+                type='number'
+                min={1}
+                max={200}
+                step={1}
+                value={markerCount}
+                onChange={(e) => setMarkerCount(Math.max(1, Math.min(200, parseInt(e.target.value, 10) || 1)))}
+                style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
+              />
+              <button
+                onClick={handleAddMarkers}
+                disabled={addMarkersDisabled}
+                style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 12px', borderRadius: 5, cursor: addMarkersDisabled ? 'not-allowed' : 'pointer', opacity: addMarkersDisabled ? 0.5 : 1 }}
+              >添加点</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {markers.length === 0 ? (
+                <span style={{ color: '#777' }}>暂无标记点</span>
+              ) : (
+                markers.map(marker => {
+                  const color = ecgLabelColors[marker.label] ?? ecgLabelColors.custom ?? '#cccccc';
+                  const valid = marker.index >= minMarkerIndex && marker.index <= maxMarkerIndex;
+                  return (
+                    <div key={marker.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'rgba(0,0,0,0.4)', borderRadius: 4 }}>
+                      <span style={{ display: 'inline-flex', width: 12, height: 12, borderRadius: 3, background: color, border: '1px solid #555' }} />
+                      <span style={{ color, minWidth: 40, fontWeight: 600 }}>{marker.label}</span>
+                      <span style={{ color: valid ? '#aaa' : '#f07167', flex: 1 }}>序列值: {marker.index}{valid ? '' : ' (超出范围)'}</span>
+                      <button
+                        onClick={() => removeMarker(marker.id)}
+                        style={{ background: '#402020', color: '#ffb4b4', border: '1px solid #aa4444', padding: '4px 8px', borderRadius: 4, cursor: 'pointer' }}
+                      >删除</button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
@@ -407,7 +616,15 @@ export const App: React.FC = () => {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
             {patches.map(p => (
-              <div key={p.id} style={{ border: '1px solid #444', borderRadius: 6, padding: 8, background: 'rgba(0,0,0,0.35)' }}>
+              <div
+                key={p.id}
+                style={{
+                  border: selection.patchId === p.id ? '1px solid #ffdd59' : '1px solid #444',
+                  borderRadius: 6,
+                  padding: 8,
+                  background: selection.patchId === p.id ? 'rgba(255, 221, 89, 0.08)' : 'rgba(0,0,0,0.35)'
+                }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ color: selection.patchId === p.id ? '#ffdd59' : '#bbb', minWidth: 40, fontWeight: selection.patchId === p.id ? 700 : 400 }}>ID {p.id}</span>
                   <input
@@ -434,11 +651,11 @@ export const App: React.FC = () => {
                           <button
                             onClick={() => setCoordModeById(prev => ({ ...prev, [p.id]: 'global' }))}
                             style={{ background: mode === 'global' ? '#4a4a4a' : '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                          >绝对</button>
+                          >全局</button>
                           <button
                             onClick={() => setCoordModeById(prev => ({ ...prev, [p.id]: 'local' }))}
                             style={{ background: mode === 'local' ? '#4a4a4a' : '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                          >相对</button>
+                          >局部</button>
                         </>
                       );
                     })()}
@@ -479,6 +696,10 @@ export const App: React.FC = () => {
                       }}
                       style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                     >轮换</button>
+                    <button
+                      onClick={() => plotRef.current?.deletePatchById(p.id)}
+                      style={{ background: '#402020', color: '#ffb4b4', border: '1px solid #aa4444', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >删除组</button>
                   </div>
                 </div>
                 {(['main','u','v'] as const).map(role => (
@@ -488,8 +709,10 @@ export const App: React.FC = () => {
                       const isEdgeSelected = selection.patchId === p.id && ((selection.role === 'edge_u' && (role === 'main' || role === 'u')) || (selection.role === 'edge_v' && (role === 'main' || role === 'v')));
                       const active = isPointSelected || isEdgeSelected;
                       const label = role === 'main' ? 'p' : role;
+                      const mappingKey = role === 'main' ? 'P' : role.toUpperCase();
+                      const baseColor = ecgLabelColors[mappingKey] ?? ecgLabelColors.custom ?? '#aaa';
                       return (
-                        <span style={{ color: active ? '#ffdd59' : '#aaa', width: 36, fontWeight: active ? 700 : 400 }}>{label}</span>
+                        <span style={{ color: active ? '#ffdd59' : baseColor, width: 36, fontWeight: active ? 700 : 400 }}>{label}</span>
                       );
                     })()}
                     {(['x','y','z'] as const).map((axis, idx) => (
