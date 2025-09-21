@@ -142,14 +142,34 @@ export const App: React.FC = () => {
         </div>
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
           <b style={{ color: '#fff', fontSize: 13 as any }}>交互模式</b>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <label style={{ minWidth: 70, color: '#cfcfcf' }}>操作</label>
-            <select value={toolMode} onChange={(e) => { const m = e.target.value as any; setToolMode(m); plotRef.current?.setTransformMode(m); }} style={{ flex: 1, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}>
-              <option value='translate'>移动 (W)</option>
-              <option value='rotate'>旋转 (E)</option>
-              <option value='scale'>缩放 (R)</option>
-              <option value='uv'>沿u/v平移</option>
-            </select>
+          <div style={{ marginTop: 6 }}>
+            <span style={{ color: '#cfcfcf' }}>操作</span>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+              {[
+                { value: 'translate' as const, label: '移动', hint: 'W' },
+                { value: 'rotate' as const, label: '旋转', hint: 'E' },
+                { value: 'scale' as const, label: '缩放', hint: 'R' },
+                { value: 'uv' as const, label: '沿u/v平移', hint: '' },
+              ].map(btn => {
+                const active = toolMode === btn.value;
+                return (
+                  <button
+                    key={btn.value}
+                    onClick={() => { setToolMode(btn.value); plotRef.current?.setTransformMode(btn.value); }}
+                    style={{
+                      background: active ? '#4a4a4a' : '#2f2f2f',
+                      color: '#eee',
+                      border: '1px solid #555',
+                      padding: '6px 10px',
+                      borderRadius: 5,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      fontWeight: active ? 600 : 400,
+                    }}
+                  >{btn.label}{btn.hint ? ` (${btn.hint})` : ''}</button>
+                );
+              })}
+            </div>
           </div>
           
         </div>
