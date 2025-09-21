@@ -361,87 +361,7 @@ export const App: React.FC = () => {
             }}
           />
         </div>
-        <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setMarkerPanelOpen(open => !open)}
-              style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}
-            >{markerPanelOpen ? '▼' : '▶'} 点列表</button>
-            <button
-              onClick={clearMarkers}
-              disabled={markers.length === 0}
-              style={{ background: '#402020', color: '#ffb4b4', border: '1px solid #aa4444', padding: '6px 12px', borderRadius: 5, cursor: markers.length === 0 ? 'not-allowed' : 'pointer', opacity: markers.length === 0 ? 0.6 : 1 }}
-            >删除全部点</button>
-          </div>
-          {markerPanelOpen && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-              <div style={{ color: hasMarkerRange ? '#aaa' : '#f07167', fontSize: 12 }}>
-                {hasMarkerRange ? `有效序列范围: ${minMarkerIndex} ~ ${maxMarkerIndex}` : '当前 τ 或范围设置不足以生成点'}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <label style={{ color: '#cfcfcf' }}>名称</label>
-                <select
-                  value={markerLabelOption}
-                  onChange={(e) => setMarkerLabelOption(e.target.value)}
-                  style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
-                >
-                  {markerNameOptions.map(opt => (
-                    <option key={opt} value={opt}>{opt === CUSTOM_LABEL_OPTION ? '自定义' : opt}</option>
-                  ))}
-                </select>
-                {markerLabelOption === CUSTOM_LABEL_OPTION && (
-                  <>
-                    <input
-                      value={markerCustomLabel}
-                      onChange={(e) => setMarkerCustomLabel(e.target.value)}
-                      placeholder='自定义名称'
-                      style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px', minWidth: 120 }}
-                    />
-                    {markerNameError && (
-                      <span style={{ color: '#f07167', fontSize: 12 }}>{markerNameError}</span>
-                    )}
-                  </>
-                )}
-                <label style={{ color: '#cfcfcf' }}>数量</label>
-                <input
-                  type='number'
-                  min={1}
-                  max={200}
-                  step={1}
-                  value={markerCount}
-                  onChange={(e) => setMarkerCount(Math.max(1, Math.min(200, parseInt(e.target.value, 10) || 1)))}
-                  style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
-                />
-                <button
-                  onClick={handleAddMarkers}
-                  disabled={addMarkersDisabled}
-                  style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 12px', borderRadius: 5, cursor: addMarkersDisabled ? 'not-allowed' : 'pointer', opacity: addMarkersDisabled ? 0.5 : 1 }}
-                >添加点</button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {markers.length === 0 ? (
-                  <span style={{ color: '#777' }}>暂无标记点</span>
-                ) : (
-                  markers.map(marker => {
-                    const color = getColorForLabelKey(marker.label, ecgLabelColors);
-                    const valid = marker.index >= minMarkerIndex && marker.index <= maxMarkerIndex;
-                    return (
-                      <div key={marker.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'rgba(0,0,0,0.4)', borderRadius: 4 }}>
-                        <span style={{ display: 'inline-flex', width: 12, height: 12, borderRadius: 3, background: color, border: '1px solid #555' }} />
-                        <span style={{ color, minWidth: 40, fontWeight: 600 }}>{marker.label}</span>
-                        <span style={{ color: valid ? '#aaa' : '#f07167', flex: 1 }}>序列值: {marker.index}{valid ? '' : ' (超出范围)'}</span>
-                        <button
-                          onClick={() => removeMarker(marker.id)}
-                          style={{ background: '#402020', color: '#ffb4b4', border: '1px solid #aa4444', padding: '4px 8px', borderRadius: 4, cursor: 'pointer' }}
-                        >删除</button>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        
       </div>
       <aside style={{ width: 340, borderLeft: '1px solid #2a2a2a', background: 'rgba(0,0,0,0.35)', padding: 12, boxSizing: 'border-box', overflowY: 'auto' }}>
         {/* 操作指南面板已移除以简化 UI */}
@@ -926,6 +846,87 @@ export const App: React.FC = () => {
             ))}
             </div>
             </>
+          )}
+        </div>
+        <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setMarkerPanelOpen(open => !open)}
+              style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}
+            >{markerPanelOpen ? '▼' : '▶'} 点列表</button>
+            <button
+              onClick={clearMarkers}
+              disabled={markers.length === 0}
+              style={{ background: '#402020', color: '#ffb4b4', border: '1px solid #aa4444', padding: '6px 12px', borderRadius: 5, cursor: markers.length === 0 ? 'not-allowed' : 'pointer', opacity: markers.length === 0 ? 0.6 : 1 }}
+            >删除全部点</button>
+          </div>
+          {markerPanelOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+              <div style={{ color: hasMarkerRange ? '#aaa' : '#f07167', fontSize: 12 }}>
+                {hasMarkerRange ? `有效序列范围: ${minMarkerIndex} ~ ${maxMarkerIndex}` : '当前 τ 或范围设置不足以生成点'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <label style={{ color: '#cfcfcf' }}>名称</label>
+                <select
+                  value={markerLabelOption}
+                  onChange={(e) => setMarkerLabelOption(e.target.value)}
+                  style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
+                >
+                  {markerNameOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt === CUSTOM_LABEL_OPTION ? '自定义' : opt}</option>
+                  ))}
+                </select>
+                {markerLabelOption === CUSTOM_LABEL_OPTION && (
+                  <>
+                    <input
+                      value={markerCustomLabel}
+                      onChange={(e) => setMarkerCustomLabel(e.target.value)}
+                      placeholder='自定义名称'
+                      style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px', minWidth: 120 }}
+                    />
+                    {markerNameError && (
+                      <span style={{ color: '#f07167', fontSize: 12 }}>{markerNameError}</span>
+                    )}
+                  </>
+                )}
+                <label style={{ color: '#cfcfcf' }}>数量</label>
+                <input
+                  type='number'
+                  min={1}
+                  max={200}
+                  step={1}
+                  value={markerCount}
+                  onChange={(e) => setMarkerCount(Math.max(1, Math.min(200, parseInt(e.target.value, 10) || 1)))}
+                  style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
+                />
+                <button
+                  onClick={handleAddMarkers}
+                  disabled={addMarkersDisabled}
+                  style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 12px', borderRadius: 5, cursor: addMarkersDisabled ? 'not-allowed' : 'pointer', opacity: addMarkersDisabled ? 0.5 : 1 }}
+                >添加点</button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {markers.length === 0 ? (
+                  <span style={{ color: '#777' }}>暂无标记点</span>
+                ) : (
+                  markers.map(marker => {
+                    const color = getColorForLabelKey(marker.label, ecgLabelColors);
+                    const valid = marker.index >= minMarkerIndex && marker.index <= maxMarkerIndex;
+                    return (
+                      <div key={marker.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'rgba(0,0,0,0.4)', borderRadius: 4 }}>
+                        <span style={{ display: 'inline-flex', width: 12, height: 12, borderRadius: 3, background: color, border: '1px solid #555' }} />
+                        <span style={{ color, minWidth: 40, fontWeight: 600 }}>{marker.label}</span>
+                        <span style={{ color: valid ? '#aaa' : '#f07167', flex: 1 }}>序列值: {marker.index}{valid ? '' : ' (超出范围)'}</span>
+                        <button
+                          onClick={() => removeMarker(marker.id)}
+                          style={{ background: '#402020', color: '#ffb4b4', border: '1px solid #aa4444', padding: '4px 8px', borderRadius: 4, cursor: 'pointer' }}
+                        >删除</button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           )}
         </div>
       </aside>
