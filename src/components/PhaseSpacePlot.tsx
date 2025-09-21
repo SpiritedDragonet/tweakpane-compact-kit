@@ -50,6 +50,7 @@ type Props = {
   external: ExternalControls;
   debug?: boolean;
   pointPixelSize?: number; // desired on-screen size for point sprites (in pixels)
+  markerPointPixelSize?: number; // desired on-screen size for marker sprites
   onPatchesChange?: (patches: PatchDTO[], meta?: { commit?: boolean; reason?: string }) => void;
   // Controls how close auto-framing gets relative to the original 2.0× span
   // e.g., 10 => 10x closer than original (d = maxSpan * 2.0 / 10 = 0.2 * maxSpan)
@@ -59,7 +60,7 @@ type Props = {
   markers?: MarkerDTO[];
 };
 
-export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, onPatchesChange, frameCloseness = 2, onSelectionChange, markers = [] }, ref) {
+export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(function PhaseSpacePlotImpl({ external, debug = true, pointPixelSize, markerPointPixelSize, onPatchesChange, frameCloseness = 2, onSelectionChange, markers = [] }, ref) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -200,13 +201,17 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   }
   const defaultPointPx = Math.max(4, Math.min(64, pointPixelSize ?? 15));
   const pointSizePxRef = useRef<number>(defaultPointPx);
+  const markerPointSizeRef = useRef<number>(Math.max(2, Math.min(64, markerPointPixelSize ?? 6)));
   useEffect(() => { pointSizePxRef.current = Math.max(4, Math.min(64, pointPixelSize ?? 15));
     // update existing points' desired pixel height
     patchesRef.current.forEach(p => {
       Object.values(p.points).forEach(pt => { (pt as any).userData.pixelHeight = pointSizePxRef.current; });
     });
-    markerSpritesRef.current.forEach(sp => { (sp as any).userData.pixelHeight = pointSizePxRef.current; });
   }, [pointPixelSize]);
+  useEffect(() => {
+    markerPointSizeRef.current = Math.max(2, Math.min(64, markerPointPixelSize ?? 6));
+    markerSpritesRef.current.forEach(sp => { (sp as any).userData.pixelHeight = markerPointSizeRef.current; });
+  }, [markerPointPixelSize]);
 
   function createWhiteCircleTexture() {
     const canvas = document.createElement('canvas');
@@ -1331,7 +1336,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
         if (ud && ud.isMarkerSprite) {
           sprite.getWorldPosition(tmp);
           const dist = camera.position.distanceTo(tmp);
-          const desiredPx = ud.pixelHeight || pointSizePxRef.current;
+          const desiredPx = ud.pixelHeight || markerPointSizeRef.current;
           const worldHeight = 2 * Math.tan(vFov / 2) * dist * (desiredPx / rH);
           sprite.scale.set(worldHeight, worldHeight, 1);
         }
@@ -1475,7 +1480,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
       const SPRITE_SIZE = 0.3;
       sprite.position.set(pos.x, pos.y, pos.z);
       sprite.scale.set(SPRITE_SIZE, SPRITE_SIZE, 1);
-      sprite.userData = { type: 'marker', markerId: marker.id, isMarkerSprite: true, pixelHeight: pointSizePxRef.current };
+      sprite.userData = { type: 'marker', markerId: marker.id, isMarkerSprite: true, pixelHeight: markerPointSizeRef.current };
       sprite.renderOrder = 995;
       group.add(sprite);
       spriteList.push(sprite);

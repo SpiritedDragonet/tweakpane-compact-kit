@@ -55,7 +55,8 @@ export const App: React.FC = () => {
   const [tau, setTau] = useState<number>(8);
   const [start, setStart] = useState<number>(0);
   const [end, setEnd] = useState<number>(2000);
-  const [pointSizePx, setPointSizePx] = useState<number>(15);
+  const [pointSizePx, setPointSizePx] = useState<number>(10);
+  const [markerPointSizePx, setMarkerPointSizePx] = useState<number>(6);
   const [frameCloseness, setFrameCloseness] = useState<number>(2); // 默认近景倍数（更贴近你的偏好）
   const [patches, setPatches] = useState<PatchDTO[]>([]);
   const [toolMode, setToolMode] = useState<'translate'|'rotate'|'scale'|'uv'>('translate');
@@ -64,6 +65,8 @@ export const App: React.FC = () => {
   const [lockMainById, setLockMainById] = useState<Record<number, boolean>>({});
   // Selection from 3D view for UI highlight
   const [selection, setSelection] = useState<{ patchId: number | null; role: 'main'|'u'|'v'|'edge_u'|'edge_v'|null }>({ patchId: null, role: null });
+  const [groupPanelOpen, setGroupPanelOpen] = useState<boolean>(true);
+  const [markerPanelOpen, setMarkerPanelOpen] = useState<boolean>(true);
   const [markers, setMarkers] = useState<ECGMarkerEntry[]>([]);
   const markerIdRef = useRef(0);
   const [ecgLabelColors, setEcgLabelColors] = useState<Record<string, string>>(() => ({ ...DEFAULT_ECG_LABEL_COLORS }));
@@ -333,6 +336,11 @@ export const App: React.FC = () => {
     setMarkers(prev => prev.filter(m => m.id !== markerId));
   };
 
+  const clearMarkers = () => {
+    if (markers.length === 0) return;
+    setMarkers([]);
+  };
+
   return (
     <div style={{ display: 'flex', height: '100%' }}>
       <div style={{ flex: '1 1 auto', padding: 12, boxSizing: 'border-box' }}>
@@ -342,6 +350,7 @@ export const App: React.FC = () => {
             external={external}
             debug={true}
             pointPixelSize={pointSizePx}
+            markerPointPixelSize={markerPointSizePx}
             frameCloseness={frameCloseness}
             markers={markersForPlot}
             onSelectionChange={setSelection}
@@ -351,6 +360,87 @@ export const App: React.FC = () => {
               if (meta?.commit) pushHistory(arr);
             }}
           />
+        </div>
+        <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setMarkerPanelOpen(open => !open)}
+              style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}
+            >{markerPanelOpen ? '▼' : '▶'} 点列表</button>
+            <button
+              onClick={clearMarkers}
+              disabled={markers.length === 0}
+              style={{ background: '#402020', color: '#ffb4b4', border: '1px solid #aa4444', padding: '6px 12px', borderRadius: 5, cursor: markers.length === 0 ? 'not-allowed' : 'pointer', opacity: markers.length === 0 ? 0.6 : 1 }}
+            >删除全部点</button>
+          </div>
+          {markerPanelOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+              <div style={{ color: hasMarkerRange ? '#aaa' : '#f07167', fontSize: 12 }}>
+                {hasMarkerRange ? `有效序列范围: ${minMarkerIndex} ~ ${maxMarkerIndex}` : '当前 τ 或范围设置不足以生成点'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <label style={{ color: '#cfcfcf' }}>名称</label>
+                <select
+                  value={markerLabelOption}
+                  onChange={(e) => setMarkerLabelOption(e.target.value)}
+                  style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
+                >
+                  {markerNameOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt === CUSTOM_LABEL_OPTION ? '自定义' : opt}</option>
+                  ))}
+                </select>
+                {markerLabelOption === CUSTOM_LABEL_OPTION && (
+                  <>
+                    <input
+                      value={markerCustomLabel}
+                      onChange={(e) => setMarkerCustomLabel(e.target.value)}
+                      placeholder='自定义名称'
+                      style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px', minWidth: 120 }}
+                    />
+                    {markerNameError && (
+                      <span style={{ color: '#f07167', fontSize: 12 }}>{markerNameError}</span>
+                    )}
+                  </>
+                )}
+                <label style={{ color: '#cfcfcf' }}>数量</label>
+                <input
+                  type='number'
+                  min={1}
+                  max={200}
+                  step={1}
+                  value={markerCount}
+                  onChange={(e) => setMarkerCount(Math.max(1, Math.min(200, parseInt(e.target.value, 10) || 1)))}
+                  style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
+                />
+                <button
+                  onClick={handleAddMarkers}
+                  disabled={addMarkersDisabled}
+                  style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 12px', borderRadius: 5, cursor: addMarkersDisabled ? 'not-allowed' : 'pointer', opacity: addMarkersDisabled ? 0.5 : 1 }}
+                >添加点</button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {markers.length === 0 ? (
+                  <span style={{ color: '#777' }}>暂无标记点</span>
+                ) : (
+                  markers.map(marker => {
+                    const color = getColorForLabelKey(marker.label, ecgLabelColors);
+                    const valid = marker.index >= minMarkerIndex && marker.index <= maxMarkerIndex;
+                    return (
+                      <div key={marker.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'rgba(0,0,0,0.4)', borderRadius: 4 }}>
+                        <span style={{ display: 'inline-flex', width: 12, height: 12, borderRadius: 3, background: color, border: '1px solid #555' }} />
+                        <span style={{ color, minWidth: 40, fontWeight: 600 }}>{marker.label}</span>
+                        <span style={{ color: valid ? '#aaa' : '#f07167', flex: 1 }}>序列值: {marker.index}{valid ? '' : ' (超出范围)'}</span>
+                        <button
+                          onClick={() => removeMarker(marker.id)}
+                          style={{ background: '#402020', color: '#ffb4b4', border: '1px solid #aa4444', padding: '4px 8px', borderRadius: 4, cursor: 'pointer' }}
+                        >删除</button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <aside style={{ width: 340, borderLeft: '1px solid #2a2a2a', background: 'rgba(0,0,0,0.35)', padding: 12, boxSizing: 'border-box', overflowY: 'auto' }}>
@@ -409,9 +499,14 @@ export const App: React.FC = () => {
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
           <b style={{ color: '#fff', fontSize: 13 as any }}>显示设置</b>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <label style={{ minWidth: 90, color: '#cfcfcf' }}>点大小(px)</label>
-            <input type="range" min={6} max={60} step={1} value={pointSizePx} onChange={(e) => setPointSizePx(parseInt(e.target.value, 10) || 15)} style={{ flex: 1 }} />
-            <input type="number" min={6} max={60} step={1} value={pointSizePx} onChange={(e) => setPointSizePx(Math.max(6, Math.min(60, parseInt(e.target.value, 10) || 15)))} style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }} />
+            <label style={{ minWidth: 110, color: '#cfcfcf' }}>组点大小(px)</label>
+            <input type="range" min={4} max={64} step={1} value={pointSizePx} onChange={(e) => setPointSizePx(Math.max(4, Math.min(64, parseInt(e.target.value, 10) || 10)))} style={{ flex: 1 }} />
+            <input type="number" min={4} max={64} step={1} value={pointSizePx} onChange={(e) => setPointSizePx(Math.max(4, Math.min(64, parseInt(e.target.value, 10) || 10)))} style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+            <label style={{ minWidth: 110, color: '#cfcfcf' }}>标记点大小(px)</label>
+            <input type="range" min={2} max={40} step={1} value={markerPointSizePx} onChange={(e) => setMarkerPointSizePx(Math.max(2, Math.min(40, parseInt(e.target.value, 10) || 6)))} style={{ flex: 1 }} />
+            <input type="number" min={2} max={40} step={1} value={markerPointSizePx} onChange={(e) => setMarkerPointSizePx(Math.max(2, Math.min(40, parseInt(e.target.value, 10) || 6)))} style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
             <label style={{ minWidth: 90, color: '#cfcfcf' }}>近景倍数</label>
@@ -462,73 +557,6 @@ export const App: React.FC = () => {
                 style={{ width: 40, height: 24, border: 'none', background: 'transparent', cursor: 'pointer' }}
               />
               <span style={{ color: '#777', fontSize: 12 }}>{currentEditColor.toUpperCase()}</span>
-            </div>
-          </div>
-        </div>
-        <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
-          <b style={{ color: '#fff', fontSize: 13 as any }}>点列表</b>
-          <div style={{ marginTop: 6, color: hasMarkerRange ? '#aaa' : '#f07167', fontSize: 12 }}>
-            {hasMarkerRange ? `有效序列范围: ${minMarkerIndex} ~ ${maxMarkerIndex}` : '当前 τ 或范围设置不足以生成点'}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <label style={{ color: '#cfcfcf' }}>名称</label>
-              <select
-                value={markerLabelOption}
-                onChange={(e) => setMarkerLabelOption(e.target.value)}
-                style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
-              >
-                {markerNameOptions.map(opt => (
-                  <option key={opt} value={opt}>{opt === CUSTOM_LABEL_OPTION ? '自定义' : opt}</option>
-                ))}
-              </select>
-              {markerLabelOption === CUSTOM_LABEL_OPTION && (
-                <input
-                  value={markerCustomLabel}
-                  onChange={(e) => setMarkerCustomLabel(e.target.value)}
-                  placeholder='自定义名称'
-                  style={{ background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px', minWidth: 120 }}
-                />
-              )}
-              {markerLabelOption === CUSTOM_LABEL_OPTION && markerNameError && (
-                <span style={{ color: '#f07167', fontSize: 12 }}>{markerNameError}</span>
-              )}
-              <label style={{ color: '#cfcfcf' }}>数量</label>
-              <input
-                type='number'
-                min={1}
-                max={200}
-                step={1}
-                value={markerCount}
-                onChange={(e) => setMarkerCount(Math.max(1, Math.min(200, parseInt(e.target.value, 10) || 1)))}
-                style={{ width: 80, fontSize: 12, background: '#111', color: '#ddd', border: '1px solid #444', borderRadius: 4, padding: '4px 6px' }}
-              />
-              <button
-                onClick={handleAddMarkers}
-                disabled={addMarkersDisabled}
-                style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '6px 12px', borderRadius: 5, cursor: addMarkersDisabled ? 'not-allowed' : 'pointer', opacity: addMarkersDisabled ? 0.5 : 1 }}
-              >添加点</button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {markers.length === 0 ? (
-                <span style={{ color: '#777' }}>暂无标记点</span>
-              ) : (
-                markers.map(marker => {
-                  const color = getColorForLabelKey(marker.label, ecgLabelColors);
-                  const valid = marker.index >= minMarkerIndex && marker.index <= maxMarkerIndex;
-                  return (
-                    <div key={marker.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'rgba(0,0,0,0.4)', borderRadius: 4 }}>
-                      <span style={{ display: 'inline-flex', width: 12, height: 12, borderRadius: 3, background: color, border: '1px solid #555' }} />
-                      <span style={{ color, minWidth: 40, fontWeight: 600 }}>{marker.label}</span>
-                      <span style={{ color: valid ? '#aaa' : '#f07167', flex: 1 }}>序列值: {marker.index}{valid ? '' : ' (超出范围)'}</span>
-                      <button
-                        onClick={() => removeMarker(marker.id)}
-                        style={{ background: '#402020', color: '#ffb4b4', border: '1px solid #aa4444', padding: '4px 8px', borderRadius: 4, cursor: 'pointer' }}
-                      >删除</button>
-                    </div>
-                  );
-                })
-              )}
             </div>
           </div>
         </div>
@@ -663,7 +691,10 @@ export const App: React.FC = () => {
         </div>
         <div style={{ background: 'rgba(0,0,0,0.55)', padding: '10px 14px', borderRadius: 8, border: '1px solid #333', fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <b style={{ color: '#fff', fontSize: 13 as any, whiteSpace: 'nowrap' }}>组列表</b>
+            <button
+              onClick={() => setGroupPanelOpen(open => !open)}
+              style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}
+            >{groupPanelOpen ? '▼' : '▶'} 组列表</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
               <span style={{ color: '#aaa' }}>统一坐标:</span>
               <button
@@ -673,7 +704,7 @@ export const App: React.FC = () => {
                   setCoordModeById(next);
                 }}
                 style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-              >绝对</button>
+              >全局</button>
               <button
                 onClick={() => {
                   const next: Record<number, 'global'|'local'> = {};
@@ -681,11 +712,12 @@ export const App: React.FC = () => {
                   setCoordModeById(next);
                 }}
                 style={{ background: '#2f2f2f', color: '#eee', border: '1px solid #555', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-              >相对</button>
+              >局部</button>
             </div>
           </div>
-          {/* 新增/删除移动到组列表，并在其上方放置命名选择器 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+          {groupPanelOpen && (
+            <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <label style={{ color: '#cfcfcf' }}>新组名称</label>
               <select
@@ -732,7 +764,7 @@ export const App: React.FC = () => {
               >删除选中组</button>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
             {patches.map(p => (
               <div
                 key={p.id}
@@ -892,7 +924,9 @@ export const App: React.FC = () => {
                 ))}
               </div>
             ))}
-          </div>
+            </div>
+            </>
+          )}
         </div>
       </aside>
     </div>
