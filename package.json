@@ -9,9 +9,11 @@
     "preview": "vite preview --port 5173"
   },
   "dependencies": {
+    "@tweakpane/plugin-essentials": "0.2.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "three": "0.165.0"
+    "three": "0.165.0",
+    "tweakpane": "4.0.5"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "4.3.1",
