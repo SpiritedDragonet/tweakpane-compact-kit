@@ -779,6 +779,26 @@ export const ConditionEditorPanel: React.FC<Props> = ({
     }
     if (nameParamsRef.current.kind !== newGroupNameKind) nameParamsRef.current.kind = newGroupNameKind;
   }, [newGroupNameKind]);
+
+  // Sync group name options when usedCustomNames changes in App
+  useEffect(() => {
+    const list = nameKindListRef.current as any;
+    if (!list) return;
+    try {
+      const opts = (groupNameOptions && groupNameOptions.length > 0 ? groupNameOptions : DEFAULT_GROUP_OPTIONS)
+        .map(v => ({ text: v === 'custom' ? '自定义' : v, value: v }));
+      // Update options and ensure current selection is valid
+      list.options = opts;
+      const current = nameParamsRef.current.kind;
+      const has = opts.some(o => o.value === current);
+      if (!has) {
+        const fallback = (opts[0]?.value) ?? 'P';
+        nameParamsRef.current.kind = fallback;
+        try { list.value = fallback; } catch {}
+        if (fallback !== newGroupNameKind) onSetNewGroupNameKind(fallback);
+      }
+    } catch {}
+  }, [groupNameOptions]);
   useEffect(() => {
     const b = customNameBindingRef.current;
     if (b) {

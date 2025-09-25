@@ -60,6 +60,8 @@ export const App: React.FC = () => {
   const [markerPointSizePx, setMarkerPointSizePx] = useState<number>(6);
   const [frameCloseness, setFrameCloseness] = useState<number>(2); // 默认近景倍数（更贴近你的偏好）
   const [patches, setPatches] = useState<PatchDTO[]>([]);
+  // Keep an immediate, mutable snapshot to avoid stale state reads during rapid UI edits
+  const patchesRef = useRef<PatchDTO[]>([]);
   const [toolMode, setToolMode] = useState<'translate'|'rotate'|'scale'|'uv'>('translate');
   // Per-group coordinate display mode: 'global' (absolute) or 'local' (relative to main for u/v)
   const [coordModeById, setCoordModeById] = useState<Record<number, 'global' | 'local'>>({});
@@ -91,7 +93,9 @@ export const App: React.FC = () => {
   const applySnapshot = (snap: PatchDTO[]) => {
     ignoreChangesRef.current = true;
     plotRef.current?.setPatches(clonePatches(snap));
-    setPatches(clonePatches(snap));
+    const cloned = clonePatches(snap);
+    patchesRef.current = cloned;
+    setPatches(cloned);
     ignoreChangesRef.current = false;
   };
   const undo = () => {
@@ -237,7 +241,12 @@ export const App: React.FC = () => {
     plotRef.current?.deleteSelectedPatch();
   };
   const onEditCoord = (patchId: number, role: 'main'|'u'|'v', axis: 'x'|'y'|'z', value: number) => {
-    const p = patches.find(pp => pp.id === patchId); if (!p) return;
+    console.log('[App] 接收到坐标编辑', { patchId, role, axis, value });
+    const p = (patchesRef.current || []).find(pp => pp.id === patchId);
+    if (!p) {
+      console.warn('[App] 未找到指定补丁，忽略编辑', { patchId });
+      return;
+    }
     const mode = coordModeById[patchId] ?? 'global';
     const idx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
     const curWorld = (p as any)[role] as [number,number,number];
@@ -254,6 +263,7 @@ export const App: React.FC = () => {
         const vNext: any = { x: vW[0], y: vW[1], z: vW[2] };
         uNext[axis] = (uW as any)[axis] + delta;
         vNext[axis] = (vW as any)[axis] + delta;
+        console.log('[App] 权威写入 main(锁定)', { patchId, next, uNext, vNext });
         plotRef.current?.updatePointWorld(patchId, 'main', next);
         plotRef.current?.updatePointWorld(patchId, 'u', uNext);
         plotRef.current?.updatePointWorld(patchId, 'v', vNext);
@@ -262,16 +272,19 @@ export const App: React.FC = () => {
     } else if (mode === 'local') {
       const worldVal = (Number.isFinite(value) ? value : (curWorld[idx] - mainArr[idx])) + mainArr[idx];
       next[axis] = worldVal;
+      console.log('[App] 权威写入 local', { patchId, role, axis, worldVal });
       plotRef.current?.updatePointWorld(patchId, role, next);
       return;
     } else {
       next[axis] = Number.isFinite(value) ? value : curWorld[idx];
+      console.log('[App] 权威写入 global', { patchId, role, axis, val: next[axis] });
       plotRef.current?.updatePointWorld(patchId, role, next);
       return;
     }
     plotRef.current?.updatePointWorld(patchId, role, next);
+    console.log('[App] 权威写入默认分支', { patchId, role, next });
   };
-  const onCommitCoords = () => { plotRef.current?.commit?.('coords-edit'); };
+  const onCommitCoords = () => { console.log('[App] 提交坐标编辑'); plotRef.current?.commit?.('coords-edit'); };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement | null;
@@ -585,6 +598,8 @@ export const App: React.FC = () => {
             markers={markersForPlot}
             onSelectionChange={setSelection}
             onPatchesChange={(arr, meta) => {
+              console.log('[App] 接收 PhaseSpacePlot patches', { count: arr.length, meta });
+              patchesRef.current = arr;
               setPatches(arr);
               if (ignoreChangesRef.current) return;
               if (meta?.commit) pushHistory(arr);
