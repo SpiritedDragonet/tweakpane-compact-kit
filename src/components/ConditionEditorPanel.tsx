@@ -1170,7 +1170,6 @@ export const ConditionEditorPanel: React.FC<Props> = ({
         const knobEls = Array.from(rowEl.querySelectorAll('.tp-txtv_k')) as HTMLElement[];
         if (knobEls.length !== 3) return;
         const axes: ('x'|'y'|'z')[] = ['x','y','z'];
-        const STEP = 0.01;
         const LIVE_SCALE = 0.001; // px -> value
         knobEls.forEach((knobEl, idx) => {
           const axis = axes[idx] || 'x';
@@ -1202,9 +1201,9 @@ export const ConditionEditorPanel: React.FC<Props> = ({
               document.removeEventListener('mouseup', onUp, true);
               // final commit using current params
               const params = (roleTag === 'p' ? coordParamsAll.p : roleTag === 'u' ? coordParamsAll.u : coordParamsAll.v) as any;
-              // snap to 0.01 on commit to keep dataset invariant
-              const cur = Number(params[axis]) || origin;
-              const finalVal = roundTo(Math.round(cur / STEP) * STEP, 4);
+              // no step snapping on commit; use current value as-is
+              const cur = Number(params[axis]);
+              const finalVal = Number.isFinite(cur) ? cur : origin;
               onEditCoord(id, roleTag === 'p' ? 'main' : roleTag, axis, finalVal);
               onCommitCoords();
             };
