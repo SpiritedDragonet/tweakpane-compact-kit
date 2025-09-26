@@ -1024,18 +1024,26 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       const bindings: { p?: InputBindingApi<any>; u?: InputBindingApi<any>; v?: InputBindingApi<any> } = {};
       const pBind = pf.addBinding(coordParamsAll, 'p', {
         label: makeRoleLabel('p'),
-        // Use step snapping for XYZ when dragging/typing
-        x: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
-        y: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
-        z: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        // Pointer has fine scale; snapping handled in onChange when dragging
+        x: { pointerScale: 0.0001, keyScale: 0.0001, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        y: { pointerScale: 0.0001, keyScale: 0.0001, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        z: { pointerScale: 0.0001, keyScale: 0.0001, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
       });
       pBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.p;
+        const wantX = roundTo(Number(v.x), 4);
+        const wantY = roundTo(Number(v.y), 4);
+        const wantZ = roundTo(Number(v.z), 4);
+        const dragging = !!(dxTestRef.current && dxTestRef.current.active);
+        // Snap to 0.01 only while dragging with pointer; accept exact typed values
+        // Reflect current values and refresh; commit only on end
         const rx = roundTo(Number(v.x), 4);
         const ry = roundTo(Number(v.y), 4);
         const rz = roundTo(Number(v.z), 4);
-        // update local params to reflect rounding immediately (smoothed in-flight)\n        if (!ev.last) {\n          coordParamsAll.p.x = clampStep(coordParamsAll.p.x, rx, 0.01);\n          coordParamsAll.p.y = clampStep(coordParamsAll.p.y, ry, 0.01);\n          coordParamsAll.p.z = clampStep(coordParamsAll.p.z, rz, 0.01);\n        } else {\n          coordParamsAll.p.x = rx; coordParamsAll.p.y = ry; coordParamsAll.p.z = rz;\n        }\n        try { (pBind as any).refresh?.(); } catch {}\n        if (!ev.last) return;
+        coordParamsAll.p.x = rx; coordParamsAll.p.y = ry; coordParamsAll.p.z = rz;
+        try { (pBind as any).refresh?.(); } catch {}
+        if (!ev.last) return;
         onEditCoord(id, 'main', 'x', rx);
         onEditCoord(id, 'main', 'y', ry);
         onEditCoord(id, 'main', 'z', rz);
@@ -1044,16 +1052,20 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       bindings.p = pBind as any;
       const uBind = pf.addBinding(coordParamsAll, 'u', {
         label: makeRoleLabel('u'),
-        x: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
-        y: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
-        z: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        x: { pointerScale: 0.0001, keyScale: 0.0001, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        y: { pointerScale: 0.0001, keyScale: 0.0001, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        z: { pointerScale: 0.0001, keyScale: 0.0001, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
       });
       uBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.u;
-        const rx = roundTo(Number(v.x), 4);
-        const ry = roundTo(Number(v.y), 4);
-        const rz = roundTo(Number(v.z), 4);
+        const wantX = roundTo(Number(v.x), 4);
+        const wantY = roundTo(Number(v.y), 4);
+        const wantZ = roundTo(Number(v.z), 4);
+        const dragging = !!(dxTestRef.current && dxTestRef.current.active);
+        const rx = dragging ? roundTo(Math.round(wantX * 10000) / 10000, 4) : wantX;
+        const ry = dragging ? roundTo(Math.round(wantY * 10000) / 10000, 4) : wantY;
+        const rz = dragging ? roundTo(Math.round(wantZ * 10000) / 10000, 4) : wantZ;
         coordParamsAll.u.x = rx; coordParamsAll.u.y = ry; coordParamsAll.u.z = rz;
         try { (uBind as any).refresh?.(); } catch {}
         if (!ev.last) return;
@@ -1065,16 +1077,20 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       bindings.u = uBind as any;
       const vBind = pf.addBinding(coordParamsAll, 'v', {
         label: makeRoleLabel('v'),
-        x: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
-        y: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
-        z: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        x: { pointerScale: 0.0001, keyScale: 0.0001, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        y: { pointerScale: 0.0001, keyScale: 0.0001, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        z: { pointerScale: 0.0001, keyScale: 0.0001, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
       });
       vBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.v;
-        const rx = roundTo(Number(v.x), 4);
-        const ry = roundTo(Number(v.y), 4);
-        const rz = roundTo(Number(v.z), 4);
+        const wantX = roundTo(Number(v.x), 4);
+        const wantY = roundTo(Number(v.y), 4);
+        const wantZ = roundTo(Number(v.z), 4);
+        const dragging = !!(dxTestRef.current && dxTestRef.current.active);
+        const rx = dragging ? roundTo(Math.round(wantX * 10000) / 10000, 4) : wantX;
+        const ry = dragging ? roundTo(Math.round(wantY * 10000) / 10000, 4) : wantY;
+        const rz = dragging ? roundTo(Math.round(wantZ * 10000) / 10000, 4) : wantZ;
         coordParamsAll.v.x = rx; coordParamsAll.v.y = ry; coordParamsAll.v.z = rz;
         try { (vBind as any).refresh?.(); } catch {}
         if (!ev.last) return;
@@ -1266,7 +1282,3 @@ export const ConditionEditorPanel: React.FC<Props> = ({
 };
 
 export default ConditionEditorPanel;
-
-
-
-
