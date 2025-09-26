@@ -223,6 +223,8 @@ export const ConditionEditorPanel: React.FC<Props> = ({
   const markerRowApisRef = useRef<any[]>([]); // hold created row apis to dispose on rebuild
   // No-op placeholder for legacy diagnostics (kept to avoid ref errors)
   const dxTestRef = useRef<any>(null);
+  // Live drag sensitivity (value per pixel for custom knob drag)
+  const liveScaleRef = useRef<number>(0.001);
 
   // Keep tweakpane params separate from React state to avoid feedback loops
   const paramsRef = useRef({
@@ -252,7 +254,7 @@ export const ConditionEditorPanel: React.FC<Props> = ({
     const folder = pane.addFolder({ title: '相空间参数', expanded: true });
 
     // Initialize params snapshot
-    paramsRef.current = { tau, start, end, pointSizePx, markerPointSizePx, frameCloseness, editColor: currentEditColor };
+    paramsRef.current = { tau, start, end, pointSizePx, markerPointSizePx, frameCloseness, editColor: currentEditColor, knobSensitivity: liveScaleRef.current } as any;
 
     const tauInput = folder.addBinding(paramsRef.current, 'tau', {
       label: 'τ (Tau)',
@@ -380,6 +382,20 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       const value = clamp(raw, 2, 100);
       if (value !== paramsRef.current.frameCloseness) paramsRef.current.frameCloseness = value;
       if (value !== frameCloseness) setFrameCloseness(value);
+    });
+
+    // Drag sensitivity for numeric knob (value per pixel)
+    const ksInput = folderDisplay.addBinding(paramsRef.current as any, 'knobSensitivity', {
+      label: '拖拽灵敏度',
+      min: 0.0001,
+      max: 0.01,
+      step: 0.0001,
+    });
+    ksInput.on('change', (ev: TpChangeEvent<number>) => {
+      const v = Number(ev.value);
+      const clamped = Math.max(0.0001, Math.min(0.01, isFinite(v) ? v : liveScaleRef.current));
+      if (clamped !== liveScaleRef.current) liveScaleRef.current = clamped;
+      (paramsRef.current as any).knobSensitivity = liveScaleRef.current;
     });
 
     // ECG color editing
@@ -712,6 +728,28 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       c.refresh();
     }
   }, [frameCloseness]);
+
+  // No external prop for knobSensitivity; keep binding display in sync with ref
+  useEffect(() => {
+    const pane = paneRef.current; if (!pane) return;
+    try {
+      // Find the display folder and refresh knobSensitivity binding if present
+      const folders: any[] = (pane as any).children || [];
+      // naive scan through children bindings: safe and cheap for this demo size
+      folders.forEach((fld: any) => {
+        const kids: any[] = (fld && fld.children) ? fld.children : [];
+        kids.forEach((child: any) => {
+          if (child && child.label === '拖拽灵敏度') {
+            const tgt = (child as any).binding?.target || (child as any).o?.object;
+            if (tgt && Math.abs((tgt as any).knobSensitivity - liveScaleRef.current) > 1e-9) {
+              (tgt as any).knobSensitivity = liveScaleRef.current;
+              child.refresh?.();
+            }
+          }
+        });
+      });
+    } catch {}
+  }, [liveScaleRef.current]);
 
   // Sync color list options and selection
   useEffect(() => {
@@ -1147,7 +1185,8 @@ export const ConditionEditorPanel: React.FC<Props> = ({
             const startX = ev.clientX;
             const onMove = (mv: MouseEvent) => {
               const dx = mv.clientX - startX;
-              let next = origin + dx * LIVE_SCALE;
+              const scale = Math.max(0.0001, Math.min(0.01, Number(liveScaleRef.current) || 0.001));
+              let next = origin + dx * scale;
               // snap to 0.01 and 4 decimals
               next = roundTo(Math.round(next / STEP) * STEP, 4);
               // update UI binding target without triggering onChange
