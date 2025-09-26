@@ -148,6 +148,7 @@ export const ConditionEditorPanel: React.FC<Props> = ({
   onDeleteSelectedGroup,
   onEditCoord,
   onCommitCoords,
+  onLiveEditCoord,
   groupNameOptions,
   newGroupNameKind,
   onSetNewGroupNameKind,
@@ -220,15 +221,8 @@ export const ConditionEditorPanel: React.FC<Props> = ({
   const markersListFolderRef = useRef<any | null>(null);
   const markersDynamicStartIndexRef = useRef<number>(0);
   const markerRowApisRef = useRef<any[]>([]); // hold created row apis to dispose on rebuild
-  // Track per-row drag frames for diagnostics (first 3 moves + per-axis commit counts)
-  const dxTestRef = useRef<{
-    id: number;
-    role: 'p'|'u'|'v';
-    moves: Record<'x'|'y'|'z', number[]>; // px offset vs center per axis (capture first 3)
-    commitCount: Record<'x'|'y'|'z', number>; // per-axis change frame index
-    active: boolean;
-    consumed?: boolean;
-  } | null>(null);
+  // No-op placeholder for legacy diagnostics (kept to avoid ref errors)
+  const dxTestRef = useRef<any>(null);
 
   // Keep tweakpane params separate from React state to avoid feedback loops
   const paramsRef = useRef({
@@ -1128,53 +1122,63 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       const rowEls = { p: safeGetEl(pBind), u: safeGetEl(uBind), v: safeGetEl(vBind) };
       groupUiMapRef.current.set(id, { folder: pf, nameBinding, params: coordParamsAll, bindings, folderEl, rowEls });
 
-      // Attach diagnostics logger for first 3 move frames (temporary; can be removed when verified)
-      const attachDxLoggerToRow = (rowEl: HTMLElement | null, roleTag: 'p'|'u'|'v') => {
+      // Attach custom drag harness on knob elements to fully bypass Tweakpane native pointer handling
+      const attachCustomDragToRow = (
+        rowEl: HTMLElement | null,
+        roleTag: 'p'|'u'|'v',
+        bindApi: InputBindingApi<any> | undefined | null,
+      ) => {
         if (!rowEl) return;
-        const onMouseDown = (ev: MouseEvent) => {
-          const target = ev.target as HTMLElement | null;
-          if (!target) return;
-          // Collect all three number-text containers within this row
-          const boxes = Array.from(rowEl.querySelectorAll("div[class*='txt']")) as HTMLElement[];
-          if (!boxes || boxes.length < 3) return;
-          const rects = boxes.map(b => b.getBoundingClientRect());
-          const cxs = rects.map(r => r.left + r.width / 2);
-          const dx0s = cxs.map(cx => ev.clientX - cx);
-          console.log(`[DxTest] down id=${id} role=${roleTag} dx0={x:${dx0s[0]?.toFixed(1)},y:${dx0s[1]?.toFixed(1)},z:${dx0s[2]?.toFixed(1)}} width={x:${rects[0]?.width.toFixed(1)},y:${rects[1]?.width.toFixed(1)},z:${rects[2]?.width.toFixed(1)}}`);
-          dxTestRef.current = { id, role: roleTag, moves: { x: [], y: [], z: [] }, commitCount: { x: 0, y: 0, z: 0 }, active: true, consumed: false };
-          let moveCaptured = 0;
-          const onMove = (mv: MouseEvent) => {
-            if (!dxTestRef.current || !dxTestRef.current.active) return;
-            const rects2 = boxes.map(b => b.getBoundingClientRect());
-            const cx2s = rects2.map(r => r.left + r.width / 2);
-            const dxs = cx2s.map(cx => mv.clientX - cx);
-            // record first 3 moves
-            if (moveCaptured < 3) {
-              dxTestRef.current.moves.x.push(dxs[0]);
-              dxTestRef.current.moves.y.push(dxs[1]);
-              dxTestRef.current.moves.z.push(dxs[2]);
-              moveCaptured += 1;
-              console.log(`[DxTest] move#${moveCaptured} id=${id} role=${roleTag} dx={x:${dxs[0]?.toFixed(1)},y:${dxs[1]?.toFixed(1)},z:${dxs[2]?.toFixed(1)}}`);
-              if (moveCaptured >= 3) {
-                // stop listening after 3
-                document.removeEventListener('mousemove', onMove);
-              }
-            }
+        const knobEls = Array.from(rowEl.querySelectorAll('.tp-txtv_k')) as HTMLElement[];
+        if (knobEls.length !== 3) return;
+        const axes: ('x'|'y'|'z')[] = ['x','y','z'];
+        const STEP = 0.01;
+        const LIVE_SCALE = 0.001; // px -> value
+        knobEls.forEach((knobEl, idx) => {
+          const axis = axes[idx] || 'x';
+          const onMouseDownCapture = (ev: MouseEvent) => {
+            // capture phase: stop native Tweakpane pointer handling
+            ev.preventDefault(); ev.stopPropagation();
+            try { (ev as any).stopImmediatePropagation?.(); } catch {}
+            const origin = (() => {
+              const params = (roleTag === 'p' ? coordParamsAll.p : roleTag === 'u' ? coordParamsAll.u : coordParamsAll.v);
+              return Number((params as any)[axis]) || 0;
+            })();
+            const startX = ev.clientX;
+            const onMove = (mv: MouseEvent) => {
+              const dx = mv.clientX - startX;
+              let next = origin + dx * LIVE_SCALE;
+              // snap to 0.01 and 4 decimals
+              next = roundTo(Math.round(next / STEP) * STEP, 4);
+              // update UI binding target without triggering onChange
+              const params = (roleTag === 'p' ? coordParamsAll.p : roleTag === 'u' ? coordParamsAll.u : coordParamsAll.v);
+              const prevVal = Number((params as any)[axis]) || 0;
+              if (Math.abs(prevVal - next) < 1e-9) return;
+              (params as any)[axis] = next;
+              try { uiSyncingRef.current = true; (bindApi as any)?.refresh?.(); } finally { uiSyncingRef.current = false; }
+              // drive Three live
+              onLiveEditCoord(id, roleTag === 'p' ? 'main' : roleTag, axis, next);
+            };
+            const onUp = () => {
+              document.removeEventListener('mousemove', onMove, true);
+              document.removeEventListener('mouseup', onUp, true);
+              // final commit using current params
+              const params = (roleTag === 'p' ? coordParamsAll.p : roleTag === 'u' ? coordParamsAll.u : coordParamsAll.v) as any;
+              const finalVal = roundTo(Number(params[axis]) || origin, 4);
+              onEditCoord(id, roleTag === 'p' ? 'main' : roleTag, axis, finalVal);
+              onCommitCoords();
+            };
+            document.addEventListener('mousemove', onMove, { capture: true } as any);
+            document.addEventListener('mouseup', onUp, { capture: true } as any);
           };
-          const onUp = () => {
-            if (dxTestRef.current) dxTestRef.current.active = false;
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-          };
-          document.addEventListener('mousemove', onMove, { passive: true } as any);
-          document.addEventListener('mouseup', onUp, { passive: true } as any);
-        };
-        try { rowEl.addEventListener('mousedown', onMouseDown, { passive: true } as any); } catch {}
+          // Use capture to preempt Tweakpane internal listener
+          try { knobEl.addEventListener('mousedown', onMouseDownCapture, { capture: true } as any); } catch {}
+        });
       };
 
-      attachDxLoggerToRow(rowEls.p as HTMLElement | null, 'p');
-      attachDxLoggerToRow(rowEls.u as HTMLElement | null, 'u');
-      attachDxLoggerToRow(rowEls.v as HTMLElement | null, 'v');
+      attachCustomDragToRow(rowEls.p as HTMLElement | null, 'p', bindings.p as any);
+      attachCustomDragToRow(rowEls.u as HTMLElement | null, 'u', bindings.u as any);
+      attachCustomDragToRow(rowEls.v as HTMLElement | null, 'v', bindings.v as any);
     });
   };  // Rebuild when patches array changed (add/remove/rename) or selection changed (for titles), or coord mode changed
   useEffect(() => { rebuildGroups(); }, [patches, selection.patchId, selection.role, coordModeById]);
