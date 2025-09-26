@@ -285,6 +285,48 @@ export const App: React.FC = () => {
     console.log(`[App] 写入(default) id=${patchId} role=${role} m=(${next.x},${next.y},${next.z})`);
   };
   const onCommitCoords = () => { plotRef.current?.commit?.('coords-edit'); };;
+  // Live coordinate edits during drag: update Three without committing
+  const onLiveEditCoord = (
+    patchId: number,
+    role: 'main'|'u'|'v',
+    axis: 'x'|'y'|'z',
+    value: number,
+  ) => {
+    const p = (patchesRef.current || []).find(pp => pp.id === patchId);
+    if (!p) return;
+    const mode = coordModeById[patchId] ?? 'global';
+    const idx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+    const mainArr = p.main as [number, number, number];
+    if (role === 'main') {
+      const cur = (p.main as [number,number,number])[idx];
+      const newVal = Number.isFinite(value) ? value : cur;
+      const delta = newVal - cur;
+      const next: any = { x: mainArr[0], y: mainArr[1], z: mainArr[2] };
+      next[axis] = newVal;
+      plotRef.current?.updatePointWorld(patchId, 'main', next);
+      if (lockMainById[patchId] && Math.abs(delta) > 0) {
+        const uW = p.u as [number,number,number];
+        const vW = p.v as [number,number,number];
+        const uNext: any = { x: uW[0], y: uW[1], z: uW[2] };
+        const vNext: any = { x: vW[0], y: vW[1], z: vW[2] };
+        uNext[axis] = (uW as any)[axis] + delta;
+        vNext[axis] = (vW as any)[axis] + delta;
+        plotRef.current?.updatePointWorld(patchId, 'u', uNext);
+        plotRef.current?.updatePointWorld(patchId, 'v', vNext);
+      }
+      return;
+    }
+    // u/v role
+    const curWorld = (p as any)[role] as [number,number,number];
+    const next: any = { x: curWorld[0], y: curWorld[1], z: curWorld[2] };
+    if (mode === 'local') {
+      const worldVal = (Number.isFinite(value) ? value : (curWorld[idx] - mainArr[idx])) + mainArr[idx];
+      next[axis] = worldVal;
+    } else {
+      next[axis] = Number.isFinite(value) ? value : curWorld[idx];
+    }
+    plotRef.current?.updatePointWorld(patchId, role, next);
+  };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement | null;
@@ -652,6 +694,7 @@ export const App: React.FC = () => {
           onDeleteSelectedGroup={onDeleteSelectedGroup}
           onEditCoord={onEditCoord}
           onCommitCoords={onCommitCoords}
+          onLiveEditCoord={onLiveEditCoord}
           groupNameOptions={groupNameOptions}
           newGroupNameKind={newGroupNameKind}
           onSetNewGroupNameKind={(k) => { setNewGroupNameKind(k); if (k !== 'custom') setCustomNameError(''); }}

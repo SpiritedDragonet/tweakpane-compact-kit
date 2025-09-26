@@ -58,6 +58,13 @@ type Props = {
     value: number,
   ) => void;
   onCommitCoords: () => void;
+  // Live edit (during drag) – update Three without committing history
+  onLiveEditCoord: (
+    patchId: number,
+    role: 'main'|'u'|'v',
+    axis: 'x'|'y'|'z',
+    value: number,
+  ) => void;
   // New group naming for add (shared name store)
   groupNameOptions: string[];
   newGroupNameKind: string;
@@ -1032,12 +1039,19 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       pBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.p;
-        // Reflect current values and refresh; commit only on end
+        // Reflect current values and refresh
+        const prev = { x: coordParamsAll.p.x, y: coordParamsAll.p.y, z: coordParamsAll.p.z };
         const rx = roundTo(Number(v.x), 4);
         const ry = roundTo(Number(v.y), 4);
         const rz = roundTo(Number(v.z), 4);
         coordParamsAll.p.x = rx; coordParamsAll.p.y = ry; coordParamsAll.p.z = rz;
-        if (!ev.last) return;
+        if (!ev.last) {
+          // Live-edit Three.js without committing history
+          if (rx !== prev.x) onLiveEditCoord(id, 'main', 'x', rx);
+          if (ry !== prev.y) onLiveEditCoord(id, 'main', 'y', ry);
+          if (rz !== prev.z) onLiveEditCoord(id, 'main', 'z', rz);
+          return;
+        }
         uiSyncingRef.current = true;
         try { (pBind as any).refresh?.(); } catch {}
         uiSyncingRef.current = false;
@@ -1056,11 +1070,17 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       uBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.u;
+        const prev = { x: coordParamsAll.u.x, y: coordParamsAll.u.y, z: coordParamsAll.u.z };
         const rx = roundTo(Number(v.x), 4);
         const ry = roundTo(Number(v.y), 4);
         const rz = roundTo(Number(v.z), 4);
         coordParamsAll.u.x = rx; coordParamsAll.u.y = ry; coordParamsAll.u.z = rz;
-        if (!ev.last) return;
+        if (!ev.last) {
+          if (rx !== prev.x) onLiveEditCoord(id, 'u', 'x', rx);
+          if (ry !== prev.y) onLiveEditCoord(id, 'u', 'y', ry);
+          if (rz !== prev.z) onLiveEditCoord(id, 'u', 'z', rz);
+          return;
+        }
         uiSyncingRef.current = true;
         try { (uBind as any).refresh?.(); } catch {}
         uiSyncingRef.current = false;
@@ -1079,11 +1099,17 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       vBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.v;
+        const prev = { x: coordParamsAll.v.x, y: coordParamsAll.v.y, z: coordParamsAll.v.z };
         const rx = roundTo(Number(v.x), 4);
         const ry = roundTo(Number(v.y), 4);
         const rz = roundTo(Number(v.z), 4);
         coordParamsAll.v.x = rx; coordParamsAll.v.y = ry; coordParamsAll.v.z = rz;
-        if (!ev.last) return;
+        if (!ev.last) {
+          if (rx !== prev.x) onLiveEditCoord(id, 'v', 'x', rx);
+          if (ry !== prev.y) onLiveEditCoord(id, 'v', 'y', ry);
+          if (rz !== prev.z) onLiveEditCoord(id, 'v', 'z', rz);
+          return;
+        }
         uiSyncingRef.current = true;
         try { (vBind as any).refresh?.(); } catch {}
         uiSyncingRef.current = false;
