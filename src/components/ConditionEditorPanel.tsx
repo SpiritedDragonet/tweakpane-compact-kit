@@ -1186,9 +1186,8 @@ export const ConditionEditorPanel: React.FC<Props> = ({
             const onMove = (mv: MouseEvent) => {
               const dx = mv.clientX - startX;
               const scale = Math.max(0.0001, Math.min(0.01, Number(liveScaleRef.current) || 0.001));
-              let next = origin + dx * scale;
-              // snap to 0.01 and 4 decimals
-              next = roundTo(Math.round(next / STEP) * STEP, 4);
+              // live update uses sensitivity only (rounded to 4 decimals), no 0.01 snapping
+              let next = roundTo(origin + dx * scale, 4);
               // update UI binding target without triggering onChange
               const params = (roleTag === 'p' ? coordParamsAll.p : roleTag === 'u' ? coordParamsAll.u : coordParamsAll.v);
               const prevVal = Number((params as any)[axis]) || 0;
@@ -1203,7 +1202,9 @@ export const ConditionEditorPanel: React.FC<Props> = ({
               document.removeEventListener('mouseup', onUp, true);
               // final commit using current params
               const params = (roleTag === 'p' ? coordParamsAll.p : roleTag === 'u' ? coordParamsAll.u : coordParamsAll.v) as any;
-              const finalVal = roundTo(Number(params[axis]) || origin, 4);
+              // snap to 0.01 on commit to keep dataset invariant
+              const cur = Number(params[axis]) || origin;
+              const finalVal = roundTo(Math.round(cur / STEP) * STEP, 4);
               onEditCoord(id, roleTag === 'p' ? 'main' : roleTag, axis, finalVal);
               onCommitCoords();
             };
