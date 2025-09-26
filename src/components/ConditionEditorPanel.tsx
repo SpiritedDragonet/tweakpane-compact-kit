@@ -1053,9 +1053,9 @@ export const ConditionEditorPanel: React.FC<Props> = ({
         const uRel = modeNow === 'local' ? [ux-px, uy-py, uz-pz] : [ux,uy,uz];
         const vRel = modeNow === 'local' ? [vx-px, vy-py, vz-pz] : [vx,vy,vz];
         return {
-          p: { x: roundTo(px, 4), y: roundTo(py, 4), z: roundTo(pz, 4) },
-          u: { x: roundTo(uRel[0], 4), y: roundTo(uRel[1], 4), z: roundTo(uRel[2], 4) },
-          v: { x: roundTo(vRel[0], 4), y: roundTo(vRel[1], 4), z: roundTo(vRel[2], 4) },
+          p: { x: px, y: py, z: pz },
+          u: { x: uRel[0], y: uRel[1], z: uRel[2] },
+          v: { x: vRel[0], y: vRel[1], z: vRel[2] },
         };
       };
       const coordParamsAll = toParams(p);
@@ -1299,9 +1299,9 @@ export const ConditionEditorPanel: React.FC<Props> = ({
           const uRel = modeNow === 'local' ? [ux-px, uy-py, uz-pz] : [ux,uy,uz];
           const vRel = modeNow === 'local' ? [vx-px, vy-py, vz-pz] : [vx,vy,vz];
           const next = {
-            p: { x: roundTo(px, 4), y: roundTo(py, 4), z: roundTo(pz, 4) },
-            u: { x: roundTo(uRel[0], 4), y: roundTo(uRel[1], 4), z: roundTo(uRel[2], 4) },
-            v: { x: roundTo(vRel[0], 4), y: roundTo(vRel[1], 4), z: roundTo(vRel[2], 4) },
+            p: { x: px, y: py, z: pz },
+            u: { x: uRel[0], y: uRel[1], z: uRel[2] },
+            v: { x: vRel[0], y: vRel[1], z: vRel[2] },
           };
           // mutate in place to keep binding target stable
           (['p','u','v'] as const).forEach((rk) => {
