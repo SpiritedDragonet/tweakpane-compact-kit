@@ -90,6 +90,12 @@ type Props = {
 
 // Clamp helper
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+// Round to N decimals (default 4)
+const roundTo = (n: number, d: number = 4) => {
+  if (!Number.isFinite(n)) return 0;
+  const f = Math.pow(10, Math.max(0, Math.floor(d)));
+  return Math.round(n * f) / f;
+};
 
 export const ConditionEditorPanel: React.FC<Props> = ({
   tau,
@@ -201,6 +207,15 @@ export const ConditionEditorPanel: React.FC<Props> = ({
   const markersListFolderRef = useRef<any | null>(null);
   const markersDynamicStartIndexRef = useRef<number>(0);
   const markerRowApisRef = useRef<any[]>([]); // hold created row apis to dispose on rebuild
+  // Track per-row drag frames for diagnostics (first 3 moves + per-axis commit counts)
+  const dxTestRef = useRef<{
+    id: number;
+    role: 'p'|'u'|'v';
+    moves: Record<'x'|'y'|'z', number[]>; // px offset vs center per axis (capture first 3)
+    commitCount: Record<'x'|'y'|'z', number>; // per-axis change frame index
+    active: boolean;
+    consumed?: boolean;
+  } | null>(null);
 
   // Keep tweakpane params separate from React state to avoid feedback loops
   const paramsRef = useRef({
@@ -993,41 +1008,77 @@ export const ConditionEditorPanel: React.FC<Props> = ({
         const uRel = modeNow === 'local' ? [ux-px, uy-py, uz-pz] : [ux,uy,uz];
         const vRel = modeNow === 'local' ? [vx-px, vy-py, vz-pz] : [vx,vy,vz];
         return {
-          p: { x: px, y: py, z: pz },
-          u: { x: uRel[0], y: uRel[1], z: uRel[2] },
-          v: { x: vRel[0], y: vRel[1], z: vRel[2] },
+          p: { x: roundTo(px, 4), y: roundTo(py, 4), z: roundTo(pz, 4) },
+          u: { x: roundTo(uRel[0], 4), y: roundTo(uRel[1], 4), z: roundTo(uRel[2], 4) },
+          v: { x: roundTo(vRel[0], 4), y: roundTo(vRel[1], 4), z: roundTo(vRel[2], 4) },
         };
       };
       const coordParamsAll = toParams(p);
       const makeRoleLabel = (role: 'p'|'u'|'v') => (role === 'p' ? 'p' : role);
       const bindings: { p?: InputBindingApi<any>; u?: InputBindingApi<any>; v?: InputBindingApi<any> } = {};
-      const pBind = pf.addBinding(coordParamsAll, 'p', { label: makeRoleLabel('p') });
+      const pBind = pf.addBinding(coordParamsAll, 'p', {
+        label: makeRoleLabel('p'),
+        // Use step snapping for XYZ when dragging/typing
+        x: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        y: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        z: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+      });
       pBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.p;
-        onEditCoord(id, 'main', 'x', Number(v.x));
-        onEditCoord(id, 'main', 'y', Number(v.y));
-        onEditCoord(id, 'main', 'z', Number(v.z));
+        const rx = roundTo(Number(v.x), 4);
+        const ry = roundTo(Number(v.y), 4);
+        const rz = roundTo(Number(v.z), 4);
+        // update local params to reflect rounding immediately
+        coordParamsAll.p.x = rx; coordParamsAll.p.y = ry; coordParamsAll.p.z = rz;
+        try { (pBind as any).refresh?.(); } catch {}
+        // Only commit on gesture end to avoid mid-drag baseline jumps
+        if (!ev.last) return;
+        onEditCoord(id, 'main', 'x', rx);
+        onEditCoord(id, 'main', 'y', ry);
+        onEditCoord(id, 'main', 'z', rz);
         onCommitCoords();
       });
       bindings.p = pBind as any;
-      const uBind = pf.addBinding(coordParamsAll, 'u', { label: makeRoleLabel('u') });
+      const uBind = pf.addBinding(coordParamsAll, 'u', {
+        label: makeRoleLabel('u'),
+        x: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        y: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        z: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+      });
       uBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.u;
-        onEditCoord(id, 'u', 'x', Number(v.x));
-        onEditCoord(id, 'u', 'y', Number(v.y));
-        onEditCoord(id, 'u', 'z', Number(v.z));
+        const rx = roundTo(Number(v.x), 4);
+        const ry = roundTo(Number(v.y), 4);
+        const rz = roundTo(Number(v.z), 4);
+        coordParamsAll.u.x = rx; coordParamsAll.u.y = ry; coordParamsAll.u.z = rz;
+        try { (uBind as any).refresh?.(); } catch {}
+        if (!ev.last) return;
+        onEditCoord(id, 'u', 'x', rx);
+        onEditCoord(id, 'u', 'y', ry);
+        onEditCoord(id, 'u', 'z', rz);
         onCommitCoords();
       });
       bindings.u = uBind as any;
-      const vBind = pf.addBinding(coordParamsAll, 'v', { label: makeRoleLabel('v') });
+      const vBind = pf.addBinding(coordParamsAll, 'v', {
+        label: makeRoleLabel('v'),
+        x: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        y: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+        z: { step: 0.01, format: (v: number) => (Number.isFinite(v) ? Number(v).toFixed(4) : '0.0000') },
+      });
       vBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.v;
-        onEditCoord(id, 'v', 'x', Number(v.x));
-        onEditCoord(id, 'v', 'y', Number(v.y));
-        onEditCoord(id, 'v', 'z', Number(v.z));
+        const rx = roundTo(Number(v.x), 4);
+        const ry = roundTo(Number(v.y), 4);
+        const rz = roundTo(Number(v.z), 4);
+        coordParamsAll.v.x = rx; coordParamsAll.v.y = ry; coordParamsAll.v.z = rz;
+        try { (vBind as any).refresh?.(); } catch {}
+        if (!ev.last) return;
+        onEditCoord(id, 'v', 'x', rx);
+        onEditCoord(id, 'v', 'y', ry);
+        onEditCoord(id, 'v', 'z', rz);
         onCommitCoords();
       });
       bindings.v = vBind as any;
@@ -1039,6 +1090,54 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       const folderEl = safeGetEl(pf);
       const rowEls = { p: safeGetEl(pBind), u: safeGetEl(uBind), v: safeGetEl(vBind) };
       groupUiMapRef.current.set(id, { folder: pf, nameBinding, params: coordParamsAll, bindings, folderEl, rowEls });
+
+      // Attach diagnostics logger for first 3 move frames (temporary; can be removed when verified)
+      const attachDxLoggerToRow = (rowEl: HTMLElement | null, roleTag: 'p'|'u'|'v') => {
+        if (!rowEl) return;
+        const onMouseDown = (ev: MouseEvent) => {
+          const target = ev.target as HTMLElement | null;
+          if (!target) return;
+          // Collect all three number-text containers within this row
+          const boxes = Array.from(rowEl.querySelectorAll("div[class*='txt']")) as HTMLElement[];
+          if (!boxes || boxes.length < 3) return;
+          const rects = boxes.map(b => b.getBoundingClientRect());
+          const cxs = rects.map(r => r.left + r.width / 2);
+          const dx0s = cxs.map(cx => ev.clientX - cx);
+          console.log(`[DxTest] down id=${id} role=${roleTag} dx0={x:${dx0s[0]?.toFixed(1)},y:${dx0s[1]?.toFixed(1)},z:${dx0s[2]?.toFixed(1)}} width={x:${rects[0]?.width.toFixed(1)},y:${rects[1]?.width.toFixed(1)},z:${rects[2]?.width.toFixed(1)}}`);
+          dxTestRef.current = { id, role: roleTag, moves: { x: [], y: [], z: [] }, commitCount: { x: 0, y: 0, z: 0 }, active: true, consumed: false };
+          let moveCaptured = 0;
+          const onMove = (mv: MouseEvent) => {
+            if (!dxTestRef.current || !dxTestRef.current.active) return;
+            const rects2 = boxes.map(b => b.getBoundingClientRect());
+            const cx2s = rects2.map(r => r.left + r.width / 2);
+            const dxs = cx2s.map(cx => mv.clientX - cx);
+            // record first 3 moves
+            if (moveCaptured < 3) {
+              dxTestRef.current.moves.x.push(dxs[0]);
+              dxTestRef.current.moves.y.push(dxs[1]);
+              dxTestRef.current.moves.z.push(dxs[2]);
+              moveCaptured += 1;
+              console.log(`[DxTest] move#${moveCaptured} id=${id} role=${roleTag} dx={x:${dxs[0]?.toFixed(1)},y:${dxs[1]?.toFixed(1)},z:${dxs[2]?.toFixed(1)}}`);
+              if (moveCaptured >= 3) {
+                // stop listening after 3
+                document.removeEventListener('mousemove', onMove);
+              }
+            }
+          };
+          const onUp = () => {
+            if (dxTestRef.current) dxTestRef.current.active = false;
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          };
+          document.addEventListener('mousemove', onMove, { passive: true } as any);
+          document.addEventListener('mouseup', onUp, { passive: true } as any);
+        };
+        try { rowEl.addEventListener('mousedown', onMouseDown, { passive: true } as any); } catch {}
+      };
+
+      attachDxLoggerToRow(rowEls.p as HTMLElement | null, 'p');
+      attachDxLoggerToRow(rowEls.u as HTMLElement | null, 'u');
+      attachDxLoggerToRow(rowEls.v as HTMLElement | null, 'v');
     });
   };  // Rebuild when patches array changed (add/remove/rename) or selection changed (for titles), or coord mode changed
   useEffect(() => { rebuildGroups(); }, [patches, selection.patchId, selection.role, coordModeById]);
@@ -1119,9 +1218,9 @@ export const ConditionEditorPanel: React.FC<Props> = ({
           const uRel = modeNow === 'local' ? [ux-px, uy-py, uz-pz] : [ux,uy,uz];
           const vRel = modeNow === 'local' ? [vx-px, vy-py, vz-pz] : [vx,vy,vz];
           const next = {
-            p: { x: px, y: py, z: pz },
-            u: { x: uRel[0], y: uRel[1], z: uRel[2] },
-            v: { x: vRel[0], y: vRel[1], z: vRel[2] },
+            p: { x: roundTo(px, 4), y: roundTo(py, 4), z: roundTo(pz, 4) },
+            u: { x: roundTo(uRel[0], 4), y: roundTo(uRel[1], 4), z: roundTo(uRel[2], 4) },
+            v: { x: roundTo(vRel[0], 4), y: roundTo(vRel[1], 4), z: roundTo(vRel[2], 4) },
           };
           // mutate in place to keep binding target stable
           (['p','u','v'] as const).forEach((rk) => {
@@ -1165,3 +1264,8 @@ export const ConditionEditorPanel: React.FC<Props> = ({
 };
 
 export default ConditionEditorPanel;
+
+
+
+
+

@@ -241,7 +241,7 @@ export const App: React.FC = () => {
     plotRef.current?.deleteSelectedPatch();
   };
   const onEditCoord = (patchId: number, role: 'main'|'u'|'v', axis: 'x'|'y'|'z', value: number) => {
-    console.log('[App] 接收到坐标编辑', { patchId, role, axis, value });
+    console.log(`[App] 坐标编辑 id=${patchId} role=${role} ${axis}=${value}`);
     const p = (patchesRef.current || []).find(pp => pp.id === patchId);
     if (!p) {
       console.warn('[App] 未找到指定补丁，忽略编辑', { patchId });
@@ -263,7 +263,7 @@ export const App: React.FC = () => {
         const vNext: any = { x: vW[0], y: vW[1], z: vW[2] };
         uNext[axis] = (uW as any)[axis] + delta;
         vNext[axis] = (vW as any)[axis] + delta;
-        console.log('[App] 权威写入 main(锁定)', { patchId, next, uNext, vNext });
+        console.log(`[App] 写入(main-锁定) id=${patchId} m=(${next.x},${next.y},${next.z})`);
         plotRef.current?.updatePointWorld(patchId, 'main', next);
         plotRef.current?.updatePointWorld(patchId, 'u', uNext);
         plotRef.current?.updatePointWorld(patchId, 'v', vNext);
@@ -272,19 +272,19 @@ export const App: React.FC = () => {
     } else if (mode === 'local') {
       const worldVal = (Number.isFinite(value) ? value : (curWorld[idx] - mainArr[idx])) + mainArr[idx];
       next[axis] = worldVal;
-      console.log('[App] 权威写入 local', { patchId, role, axis, worldVal });
+      console.log(`[App] 写入(local) id=${patchId} role=${role} ${axis}=${worldVal}`);
       plotRef.current?.updatePointWorld(patchId, role, next);
       return;
     } else {
       next[axis] = Number.isFinite(value) ? value : curWorld[idx];
-      console.log('[App] 权威写入 global', { patchId, role, axis, val: next[axis] });
+      console.log(`[App] 写入(global) id=${patchId} role=${role} ${axis}=${next[axis]}`);
       plotRef.current?.updatePointWorld(patchId, role, next);
       return;
     }
     plotRef.current?.updatePointWorld(patchId, role, next);
-    console.log('[App] 权威写入默认分支', { patchId, role, next });
+    console.log(`[App] 写入(default) id=${patchId} role=${role} m=(${next.x},${next.y},${next.z})`);
   };
-  const onCommitCoords = () => { console.log('[App] 提交坐标编辑'); plotRef.current?.commit?.('coords-edit'); };
+  const onCommitCoords = () => { plotRef.current?.commit?.('coords-edit'); };;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement | null;
@@ -598,7 +598,6 @@ export const App: React.FC = () => {
             markers={markersForPlot}
             onSelectionChange={setSelection}
             onPatchesChange={(arr, meta) => {
-              console.log('[App] 接收 PhaseSpacePlot patches', { count: arr.length, meta });
               patchesRef.current = arr;
               setPatches(arr);
               if (ignoreChangesRef.current) return;

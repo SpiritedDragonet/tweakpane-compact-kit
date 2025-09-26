@@ -139,6 +139,7 @@ export const PhaseSpacePlot = memo(forwardRef<PhaseSpacePlotHandle, Props>(funct
   const [ready, setReady] = useState(false);
   const lastPointerRef = useRef<{x:number;y:number}>({ x: 0, y: 0 });
   const rotateRadPerPixelRef = useRef<number>(0.01);
+  
   // Uniform scaling vertical sensitivity: exp(-dy * alpha) mapped to [0.1, 20]
   const uniformScaleAlphaRef = useRef<number>(Math.log(20) / 280); // ~280px to reach 20x
   // Track pivot world position during edge-translate drags
