@@ -1032,18 +1032,15 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       pBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.p;
-        const wantX = roundTo(Number(v.x), 4);
-        const wantY = roundTo(Number(v.y), 4);
-        const wantZ = roundTo(Number(v.z), 4);
-        const dragging = !!(dxTestRef.current && dxTestRef.current.active);
-        // Snap to 0.01 only while dragging with pointer; accept exact typed values
         // Reflect current values and refresh; commit only on end
         const rx = roundTo(Number(v.x), 4);
         const ry = roundTo(Number(v.y), 4);
         const rz = roundTo(Number(v.z), 4);
         coordParamsAll.p.x = rx; coordParamsAll.p.y = ry; coordParamsAll.p.z = rz;
-        try { (pBind as any).refresh?.(); } catch {}
         if (!ev.last) return;
+        uiSyncingRef.current = true;
+        try { (pBind as any).refresh?.(); } catch {}
+        uiSyncingRef.current = false;
         onEditCoord(id, 'main', 'x', rx);
         onEditCoord(id, 'main', 'y', ry);
         onEditCoord(id, 'main', 'z', rz);
@@ -1059,16 +1056,14 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       uBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.u;
-        const wantX = roundTo(Number(v.x), 4);
-        const wantY = roundTo(Number(v.y), 4);
-        const wantZ = roundTo(Number(v.z), 4);
-        const dragging = !!(dxTestRef.current && dxTestRef.current.active);
-        const rx = dragging ? roundTo(Math.round(wantX * 10000) / 10000, 4) : wantX;
-        const ry = dragging ? roundTo(Math.round(wantY * 10000) / 10000, 4) : wantY;
-        const rz = dragging ? roundTo(Math.round(wantZ * 10000) / 10000, 4) : wantZ;
+        const rx = roundTo(Number(v.x), 4);
+        const ry = roundTo(Number(v.y), 4);
+        const rz = roundTo(Number(v.z), 4);
         coordParamsAll.u.x = rx; coordParamsAll.u.y = ry; coordParamsAll.u.z = rz;
-        try { (uBind as any).refresh?.(); } catch {}
         if (!ev.last) return;
+        uiSyncingRef.current = true;
+        try { (uBind as any).refresh?.(); } catch {}
+        uiSyncingRef.current = false;
         onEditCoord(id, 'u', 'x', rx);
         onEditCoord(id, 'u', 'y', ry);
         onEditCoord(id, 'u', 'z', rz);
@@ -1084,16 +1079,14 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       vBind.on('change', (ev: TpChangeEvent<{x:number;y:number;z:number}>) => {
         if (uiSyncingRef.current) return;
         const v = ev.value || coordParamsAll.v;
-        const wantX = roundTo(Number(v.x), 4);
-        const wantY = roundTo(Number(v.y), 4);
-        const wantZ = roundTo(Number(v.z), 4);
-        const dragging = !!(dxTestRef.current && dxTestRef.current.active);
-        const rx = dragging ? roundTo(Math.round(wantX * 10000) / 10000, 4) : wantX;
-        const ry = dragging ? roundTo(Math.round(wantY * 10000) / 10000, 4) : wantY;
-        const rz = dragging ? roundTo(Math.round(wantZ * 10000) / 10000, 4) : wantZ;
+        const rx = roundTo(Number(v.x), 4);
+        const ry = roundTo(Number(v.y), 4);
+        const rz = roundTo(Number(v.z), 4);
         coordParamsAll.v.x = rx; coordParamsAll.v.y = ry; coordParamsAll.v.z = rz;
-        try { (vBind as any).refresh?.(); } catch {}
         if (!ev.last) return;
+        uiSyncingRef.current = true;
+        try { (vBind as any).refresh?.(); } catch {}
+        uiSyncingRef.current = false;
         onEditCoord(id, 'v', 'x', rx);
         onEditCoord(id, 'v', 'y', ry);
         onEditCoord(id, 'v', 'z', rz);
