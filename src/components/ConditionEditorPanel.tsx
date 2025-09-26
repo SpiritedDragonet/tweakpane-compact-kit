@@ -96,6 +96,12 @@ const roundTo = (n: number, d: number = 4) => {
   const f = Math.pow(10, Math.max(0, Math.floor(d)));
   return Math.round(n * f) / f;
 };
+// Limit a delta step to avoid large mid-drag jumps in UI-only display
+const clampStep = (prev: number, next: number, stepMax = 0.01) => {
+  const d = next - prev;
+  const bounded = Math.max(-Math.abs(stepMax), Math.min(Math.abs(stepMax), d));
+  return roundTo(prev + bounded, 4);
+};
 
 export const ConditionEditorPanel: React.FC<Props> = ({
   tau,
@@ -1029,11 +1035,7 @@ export const ConditionEditorPanel: React.FC<Props> = ({
         const rx = roundTo(Number(v.x), 4);
         const ry = roundTo(Number(v.y), 4);
         const rz = roundTo(Number(v.z), 4);
-        // update local params to reflect rounding immediately
-        coordParamsAll.p.x = rx; coordParamsAll.p.y = ry; coordParamsAll.p.z = rz;
-        try { (pBind as any).refresh?.(); } catch {}
-        // Only commit on gesture end to avoid mid-drag baseline jumps
-        if (!ev.last) return;
+        // update local params to reflect rounding immediately (smoothed in-flight)\n        if (!ev.last) {\n          coordParamsAll.p.x = clampStep(coordParamsAll.p.x, rx, 0.01);\n          coordParamsAll.p.y = clampStep(coordParamsAll.p.y, ry, 0.01);\n          coordParamsAll.p.z = clampStep(coordParamsAll.p.z, rz, 0.01);\n        } else {\n          coordParamsAll.p.x = rx; coordParamsAll.p.y = ry; coordParamsAll.p.z = rz;\n        }\n        try { (pBind as any).refresh?.(); } catch {}\n        if (!ev.last) return;
         onEditCoord(id, 'main', 'x', rx);
         onEditCoord(id, 'main', 'y', ry);
         onEditCoord(id, 'main', 'z', rz);
@@ -1264,7 +1266,6 @@ export const ConditionEditorPanel: React.FC<Props> = ({
 };
 
 export default ConditionEditorPanel;
-
 
 
 
