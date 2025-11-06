@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MarkerDTO, PhaseSpacePlot, PhaseSpacePlotHandle, PatchDTO } from './components/PhaseSpacePlot';
 import ConditionEditorPanel from './components/ConditionEditorPanel';
+import LayoutPlaygroundPanel from './components/LayoutPlaygroundPanel';
 
 type ECGMarkerEntry = { id: number; label: string; index: number };
 const ECG_STANDARD_LABELS = ['P', 'Q', 'R', 'S', 'J', 'T', 'U', 'V'] as const;
@@ -650,7 +651,7 @@ export const App: React.FC = () => {
         {/* 点列表旧 UI 已迁移到 Tweakpane */}
       </div>
       
-      <aside style={{ width: 320, borderLeft: '1px solid #2a2a2a', background: 'rgba(0,0,0,0.35)', padding: 0, boxSizing: 'border-box' }}>
+      <aside style={{ width: 320, borderLeft: '1px solid #2a2a2a', background: 'rgba(0,0,0,0.35)', padding: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <ConditionEditorPanel
           tau={tau}
           setTau={setTau}
@@ -721,6 +722,8 @@ export const App: React.FC = () => {
           onRemoveMarker={removeMarker}
           customOptionValue={CUSTOM_LABEL_OPTION}
         />
+        <div style={{ borderTop: '1px solid #2a2a2a' }} />
+        <LayoutPlaygroundPanel onRun={() => setSignal(generatePseudoECG())} />
       </aside>
     </div>
   );

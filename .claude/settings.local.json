@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(npm run dev:*)",
+      "Read(//g/BProj/ECGsplitter(matlab)/**)",
+      "Read(//g/BProj/**)",
+      "Bash(lsof:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

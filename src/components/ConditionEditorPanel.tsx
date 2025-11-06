@@ -1,9 +1,26 @@
 import React, { useEffect, useRef } from 'react';
 import { Pane, InputBindingApi, TpChangeEvent } from 'tweakpane';
+import type { BladeLayoutSpec } from '../plugins/BladeLayout';
+import { addSizedButton } from '../plugins/addSizedButton';
 // Essentials plugin for button grid
 import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
 import type { ButtonGridApi } from '@tweakpane/plugin-essentials';
 import type { PatchDTO } from './PhaseSpacePlot';
+
+// Import SVG icons as URLs
+import axisFocusXSvg from '../assets/icons/axis_focus_x.svg?url';
+import axisFocusYSvg from '../assets/icons/axis_focus_y.svg?url';
+import axisFocusZSvg from '../assets/icons/axis_focus_z.svg?url';
+import axisPlaneXYSvg from '../assets/icons/axis_plane_010_100.svg?url';
+import axisPlaneYZSvg from '../assets/icons/axis_plane_001_010.svg?url';
+import axisPlaneZXSvg from '../assets/icons/axis_plane_100_001.svg?url';
+import axisDimXYSvg from '../assets/icons/axis_dim_110.svg?url';
+import axisDimYZSvg from '../assets/icons/axis_dim_011.svg?url';
+import axisDimZXSvg from '../assets/icons/axis_dim_101.svg?url';
+import axisPlaneXYDiagSvg from '../assets/icons/axis_plane_110_001.svg?url';
+import axisPlaneYZDiagSvg from '../assets/icons/axis_plane_011_100.svg?url';
+import axisPlaneZXDiagSvg from '../assets/icons/axis_plane_101_010.svg?url';
+import axisDiag111Svg from '../assets/icons/axis_diag_111.svg?url';
 
 type TransformMode = 'translate'|'rotate'|'scale'|'uv';
 
@@ -247,9 +264,37 @@ export const ConditionEditorPanel: React.FC<Props> = ({
     const pane = new Pane({ container, title: '条件编辑' });
     // Register essentials plugin (button grid, etc.)
     pane.registerPlugin(EssentialsPlugin as any);
+    // Register a CSS-only helper bundle to scope container-fit rules (no visual override)
+    try {
+      pane.registerPlugin({
+        id: 'blade-helpers',
+        css: `
+          /* Let TP value views respect container width inside BladeLayout slots */
+          .tp-bl-slot .tp-lblv, .tp-bl-slot .tp-lblv_v { min-width: 0; max-width: 100%; box-sizing: border-box; }
+          /* Zero vertical gaps inside slots to eliminate extra spacing */
+          .tp-bl-slot .tp-lblv { margin-top: 0 !important; margin-bottom: 0 !important; }
+          .tp-bl-slot .tp-rotv, .tp-bl-slot .tp-rotv_c, .tp-bl-slot .tp-cntv { padding-top: 0 !important; padding-bottom: 0 !important; }
+          .tp-bl-slot .tp-rotv_c > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+          .tp-bl-slot .tp-fldv { margin-top: 0 !important; margin-bottom: 0 !important; }
+          .tp-bl-slot .tp-fldv_c { padding-top: 0 !important; padding-bottom: 0 !important; }
+          .tp-bl-slot .tp-v-fst, .tp-bl-slot .tp-v-vfst, .tp-bl-slot .tp-v-lst, .tp-bl-slot .tp-v-vlst {
+            padding-top: 0 !important; padding-bottom: 0 !important;
+            margin-top: 0 !important; margin-bottom: 0 !important;
+          }
+          /* Ensure nested row cells clip overflow and don't bleed across columns */
+          .tp-bl-row > .tp-bl-cell { overflow: hidden; box-sizing: border-box; }
+          /* Remove left label box for all non-checkbox controls within blade slots */
+          .tp-bl-slot .tp-lblv:not(:has(.tp-ckbv)) { padding-left: 0; }
+          .tp-bl-slot .tp-lblv:not(:has(.tp-ckbv)) .tp-lblv_l { display: none; width: 0; margin: 0; padding: 0; }
+          .tp-bl-slot .tp-lblv:not(:has(.tp-ckbv)) .tp-lblv_v { margin-left: 0; }
+        `,
+      } as any);
+    } catch {}
     pane.element.style.maxHeight = '100%';
     pane.element.style.overflowY = 'auto';
     paneRef.current = pane;
+    // Local child panes to dispose for demo split-layout
+    const demoPanesLocal: Pane[] = [];
 
     const folder = pane.addFolder({ title: '相空间参数', expanded: true });
 
@@ -456,10 +501,18 @@ export const ConditionEditorPanel: React.FC<Props> = ({
     const folderAlign = pane.addFolder({ title: '对齐操作', expanded: true });
     // 12-op grid (3x4)
     const alignOps = [
-      { key: 'AX_X', title: 'X' }, { key: 'AX_Y', title: 'Y' }, { key: 'AX_Z', title: 'Z' },
-      { key: 'PL_XY', title: 'XY' }, { key: 'PL_YZ', title: 'YZ' }, { key: 'PL_ZX', title: 'ZX' },
-      { key: 'DG_XY', title: 'XY斜' }, { key: 'DG_YZ', title: 'YZ斜' }, { key: 'DG_ZX', title: 'ZX斜' },
-      { key: 'DP_XY', title: 'XY斜面' }, { key: 'DP_YZ', title: 'YZ斜面' }, { key: 'DP_ZX', title: 'ZX斜面' },
+      { key: 'AX_X', title: 'X', tooltip: 'X轴对齐', icon: axisFocusXSvg },
+      { key: 'AX_Y', title: 'Y', tooltip: 'Y轴对齐', icon: axisFocusYSvg },
+      { key: 'AX_Z', title: 'Z', tooltip: 'Z轴对齐', icon: axisFocusZSvg },
+      { key: 'PL_XY', title: 'XY', tooltip: 'XY平面对齐', icon: axisPlaneXYSvg },
+      { key: 'PL_YZ', title: 'YZ', tooltip: 'YZ平面对齐', icon: axisPlaneYZSvg },
+      { key: 'PL_ZX', title: 'ZX', tooltip: 'ZX平面对齐', icon: axisPlaneZXSvg },
+      { key: 'DG_XY', title: 'XY斜', tooltip: 'XY斜线对齐', icon: axisDimXYSvg },
+      { key: 'DG_YZ', title: 'YZ斜', tooltip: 'YZ斜线对齐', icon: axisDimYZSvg },
+      { key: 'DG_ZX', title: 'ZX斜', tooltip: 'ZX斜线对齐', icon: axisDimZXSvg },
+      { key: 'DP_XY', title: 'XY斜面', tooltip: 'XY斜面对齐', icon: axisPlaneXYDiagSvg },
+      { key: 'DP_YZ', title: 'YZ斜面', tooltip: 'YZ斜面对齐', icon: axisPlaneYZDiagSvg },
+      { key: 'DP_ZX', title: 'ZX斜面', tooltip: 'ZX斜面对齐', icon: axisPlaneZXDiagSvg },
     ] as const;
     const gridAlign = folderAlign.addBlade({
       view: 'buttongrid',
@@ -467,7 +520,8 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       cells: (x: number, y: number) => {
         const idx = y * 3 + x;
         const item = alignOps[idx];
-        return { title: item ? item.title : '' };
+        // Initially empty title, will be replaced with SVG
+        return { title: '' };
       },
     }) as unknown as ButtonGridApi;
     gridAlign.on('click', (ev: any) => {
@@ -480,14 +534,94 @@ export const ConditionEditorPanel: React.FC<Props> = ({
     });
     alignGridRef.current = gridAlign;
 
+    // Setup SVG icons for align grid buttons
+    try {
+      const gridEl: HTMLElement | undefined = (gridAlign as any)?.controller?.valueController?.view?.element;
+      if (gridEl) {
+        // Set grid row height and button styles
+        gridEl.style.gridTemplateRows = 'repeat(4, 104px)';
+        const btns = Array.from(gridEl.querySelectorAll('button')) as HTMLElement[];
+        btns.forEach((btn, idx) => {
+          // Style button container
+          btn.style.height = '104px';
+          btn.style.padding = '2px';
+          btn.style.display = 'flex';
+          btn.style.alignItems = 'center';
+          btn.style.justifyContent = 'center';
+          const item = alignOps[idx];
+          if (item && item.icon) {
+            // Clear button text
+            btn.textContent = '';
+            // Fetch and insert SVG
+            fetch(item.icon)
+              .then(res => res.text())
+              .then(svgText => {
+                btn.innerHTML = svgText;
+                // Style the SVG - 4x original size
+                const svg = btn.querySelector('svg');
+                if (svg) {
+                  svg.style.width = '96px';
+                  svg.style.height = '96px';
+                  svg.style.fill = 'currentColor';
+                }
+                // Add tooltip
+                btn.title = item.tooltip;
+              })
+              .catch(err => {
+                console.error('Failed to load icon:', err);
+                btn.textContent = item.title; // Fallback to text
+              });
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Failed to setup align grid icons:', e);
+    }
+
     // Single main diagonal button as a 1x1 grid for consistent look
     const gridMain = folderAlign.addBlade({
       view: 'buttongrid',
       size: [1, 1],
-      cells: () => ({ title: '主对角线' }),
+      cells: () => ({ title: '' }),
     }) as unknown as ButtonGridApi;
     gridMain.on('click', () => { if (alignEnabledRef.current) onApplyAlignOpRef.current('MAIN_D'); });
     mainDiagGridRef.current = gridMain;
+
+    // Setup SVG icon for main diagonal button
+    try {
+      const gridEl: HTMLElement | undefined = (gridMain as any)?.controller?.valueController?.view?.element;
+      if (gridEl) {
+        // Set grid height and button style
+        gridEl.style.gridTemplateRows = '104px';
+        const btn = gridEl.querySelector('button') as HTMLElement;
+        if (btn) {
+          btn.style.height = '104px';
+          btn.style.padding = '2px';
+          btn.style.display = 'flex';
+          btn.style.alignItems = 'center';
+          btn.style.justifyContent = 'center';
+          btn.textContent = '';
+          fetch(axisDiag111Svg)
+            .then(res => res.text())
+            .then(svgText => {
+              btn.innerHTML = svgText;
+              const svg = btn.querySelector('svg');
+              if (svg) {
+                svg.style.width = '96px';
+                svg.style.height = '96px';
+                svg.style.fill = 'currentColor';
+              }
+              btn.title = '主对角线对齐';
+            })
+            .catch(err => {
+              console.error('Failed to load main diagonal icon:', err);
+              btn.textContent = '主对角线';
+            });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to setup main diagonal icon:', e);
+    }
 
     // Groups list folder (dynamic)
     const folderGroups = pane.addFolder({ title: '组列表', expanded: true });
@@ -588,6 +722,207 @@ export const ConditionEditorPanel: React.FC<Props> = ({
     } catch { markersDynamicStartIndexRef.current = 0; }
     // rows under markers folder will be rebuilt via markerRowApisRef; keep nothing implicitly
 
+    // Playground moved to a separate panel (LayoutPlaygroundPanel)
+    const ENABLE_PLAYGROUND_IN_THIS_PANEL = false as const;
+    if (ENABLE_PLAYGROUND_IN_THIS_PANEL) {
+      // (Disabled) Old inline playground was here
+    }
+
+    // Helper: create a full-size tweakpane button inside a Pane
+    const createFullButton = (paneInst: Pane, title: string, onClick?: () => void) => {
+      // Make pane container fill the grid cell
+      paneInst.element.style.height = '100%';
+      paneInst.element.style.display = 'flex';
+      paneInst.element.style.flexDirection = 'column';
+      // Hide inner header/indent to remove reserved heights
+      try {
+        const header = paneInst.element.querySelector('.tp-rotv_b') as HTMLElement | null;
+        const indent = paneInst.element.querySelector('.tp-rotv_i') as HTMLElement | null;
+        if (header) header.style.display = 'none';
+        if (indent) indent.style.display = 'none';
+        const content = paneInst.element.querySelector('.tp-rotv_c') as HTMLElement | null;
+        if (content) {
+          content.style.height = '100%';
+          content.style.display = 'flex';
+          content.style.flexDirection = 'column';
+        }
+      } catch {}
+      const btnApi: any = paneInst.addButton({ title });
+      if (onClick) btnApi.on('click', onClick);
+      try {
+        // Stretch labeled view and the inner button to fill
+        const rootEl: HTMLElement | undefined = btnApi?.controller?.labelController?.view?.element;
+        if (rootEl) {
+          rootEl.style.height = '100%';
+          const bEl = rootEl.querySelector('button') as HTMLElement | null;
+          if (bEl) {
+            bEl.style.height = '100%';
+            bEl.style.width = '100%';
+            bEl.style.display = 'flex';
+            bEl.style.alignItems = 'center';
+            bEl.style.justifyContent = 'center';
+          }
+        }
+      } catch {}
+      return btnApi;
+    };
+
+    // Helper: create a fixed-height (N blades) button inside a Pane
+    const createSizedButton = (paneInst: Pane, title: string, units: number, onClick?: () => void) => {
+      // Keep default auto height so content can drive natural size
+      try {
+        const header = paneInst.element.querySelector('.tp-rotv_b') as HTMLElement | null;
+        const indent = paneInst.element.querySelector('.tp-rotv_i') as HTMLElement | null;
+        if (header) header.style.display = 'none';
+        if (indent) indent.style.display = 'none';
+        const content = paneInst.element.querySelector('.tp-rotv_c') as HTMLElement | null;
+        if (content) {
+          content.style.height = 'auto';
+          content.style.display = 'block';
+        }
+      } catch {}
+      const btnApi: any = paneInst.addButton({ title });
+      if (onClick) btnApi.on('click', onClick);
+      try {
+        const rootEl: HTMLElement | undefined = btnApi?.controller?.labelController?.view?.element;
+        if (rootEl) {
+          rootEl.style.height = `calc(var(--cnt-usz) * ${Math.max(1, Math.floor(units || 1))})`;
+          rootEl.style.margin = '0';
+          const bEl = rootEl.querySelector('button') as HTMLElement | null;
+          if (bEl) {
+            bEl.style.height = '100%';
+            bEl.style.width = '100%';
+            bEl.style.display = 'flex';
+            bEl.style.alignItems = 'center';
+            bEl.style.justifyContent = 'center';
+          }
+        }
+      } catch {}
+      return btnApi;
+    };
+
+    // Random helpers
+    let layoutApi: any = null;
+    const childPanes: Pane[] = [];
+    let currentSpec: BladeLayoutSpec | null = null;
+
+    const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+    const sample = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+    const buildRandomSpec = (): BladeLayoutSpec => {
+      const mode = sample(['eq2', 'eq3', 'eq4', 'ratio']);
+      let split: any;
+      const rowsPerCol: number[] = [];
+      if (mode === 'ratio') {
+        const r = Math.random() * 0.4 + 0.3; // 0.3..0.7
+        split = { mode: 'ratio', ratio: Number(r.toFixed(2)) };
+        rowsPerCol.push(randomInt(1, 4), randomInt(1, 4));
+      } else {
+        const n = Number(mode.replace('eq', ''));
+        split = { mode: 'equal', count: n };
+        for (let i = 0; i < n; i++) rowsPerCol.push(randomInt(1, 4));
+      }
+      const totalUnits = Math.max(...rowsPerCol);
+      const baseUnits = 2; // initial displayed height (in blade units); rows may grow beyond
+      const children = rowsPerCol.map((rc) => ({
+        layout: {
+          units: rc,
+          rows: Array.from({ length: rc }, () => ({ units: 1, cols: { mode: 'equal', count: 1 }, children: ['leaf'] })),
+          // Make rows compact by default: no extra row gap
+          gutter: { row: { value: 0, unit: 'px' } },
+        },
+      }));
+      return {
+        units: baseUnits,
+        rows: [{ units: baseUnits, cols: split, children }],
+        // Compact columns by default; no gap between columns
+        gutter: { col: { value: 0, unit: 'px' } },
+        sizing: { container: 'grow', row: 'grow', snap: 'ceil' },
+      } as BladeLayoutSpec;
+    };
+
+    // (Playground controls removed from this panel)
+
+    const rebuild = () => {
+      // dispose old
+      childPanes.splice(0).forEach((cp) => { try { cp.dispose(); } catch {} });
+      if (layoutApi) { try { layoutApi.dispose(); } catch {} layoutApi = null; }
+      if (!currentSpec) { /* no-op when playground disabled */ }
+      const slots: HTMLElement[] = [];
+      const createDropdown = (paneInst: Pane) => {
+        const pool = ['A', 'B', 'C'];
+        const count = randomInt(2, 3);
+        const sel = pool.slice(0).sort(() => Math.random() - 0.5).slice(0, count);
+        const opts = sel.map((t) => ({ text: t, value: t.toLowerCase() }));
+        (paneInst as any).addBlade?.({ view: 'list', options: opts, value: opts[0]?.value ?? 'a' });
+      };
+      const fillSlot = (slot: HTMLElement) => {
+        const p = new Pane({ container: slot });
+        childPanes.push(p);
+        try {
+          const header = p.element.querySelector('.tp-rotv_b') as HTMLElement | null;
+          const indent = p.element.querySelector('.tp-rotv_i') as HTMLElement | null;
+          if (header) header.style.display = 'none';
+          if (indent) indent.style.display = 'none';
+        } catch {}
+        // t: 0:button, 1:slider, 2:dropdown, 3:checkbox, 4:folder, 5:text, 6:number, 7:color
+        const t = randomInt(0, 7);
+        if (t === 0) {
+          const units = randomInt(1, 4);
+          // Show how many blade rows this button consumes
+          try { addSizedButton(p, { title: `按钮（${units} 行）`, units }); }
+          catch { p.addButton({ title: `按钮 ${randomInt(1, 99)}` }); }
+        } else if (t === 1) {
+          const obj = { v: Math.random() } as { v: number };
+          p.addBinding(obj, 'v', { min: 0, max: 1, step: 0.01 });
+        } else if (t === 2) {
+          createDropdown(p);
+        } else if (t === 3) {
+          const obj = { b: Math.random() < 0.5 } as { b: boolean };
+          p.addBinding(obj, 'b');
+        } else if (t === 5) {
+          const o = { s: `文本${randomInt(1, 99)}` } as { s: string };
+          p.addBinding(o, 's');
+        } else if (t === 6) {
+          const o = { n: randomInt(-50, 50) } as { n: number };
+          p.addBinding(o, 'n', { min: -100, max: 100, step: 1 });
+        } else if (t === 7) {
+          const o = { c: '#'+Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0') } as { c: string };
+          try { p.addBinding(o, 'c'); } catch { /* fallback: ignore if color view unsupported */ }
+        } else {
+          const f = p.addFolder({ title: '分组', expanded: Math.random() < 0.5 });
+          const n = randomInt(2, 3);
+          for (let i = 0; i < n; i++) {
+            const subt = randomInt(0, 6); // diversify folder contents
+            if (subt === 0) {
+              const u = randomInt(1, 3);
+              try { (f as any).addButton?.({ title: `子按钮 ${i + 1}` }); } catch {}
+            } else if (subt === 1) {
+              const o = { v: Math.random() } as { v: number };
+              (f as any).addBinding?.(o, 'v', { min: 0, max: 1 });
+            } else if (subt === 2) {
+              const o = { b: Math.random() < 0.5 } as { b: boolean };
+              (f as any).addBinding?.(o, 'b');
+            } else if (subt === 3) {
+              createDropdown(f as any);
+            } else if (subt === 4) {
+              const o = { s: `子文本${i+1}` } as { s: string };
+              (f as any).addBinding?.(o, 's');
+            } else if (subt === 5) {
+              const o = { n: randomInt(0, 100) } as { n: number };
+              (f as any).addBinding?.(o, 'n', { min: 0, max: 100, step: 1 });
+            } else {
+              const o = { c: '#'+Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0') } as { c: string };
+              try { (f as any).addBinding?.(o, 'c'); } catch {}
+            }
+          }
+        }
+      };
+      // no-op when playground disabled
+    };
+
+    // initial (disabled)
+
     // Batch coord mode: 全部绝对/全部相对（2列）
     const modeGrid = folderGroups.addBlade({
       view: 'buttongrid',
@@ -610,6 +945,8 @@ export const ConditionEditorPanel: React.FC<Props> = ({
     } catch {}
 
     return () => {
+      // Dispose demo child panes first
+      demoPanesLocal.forEach((p) => { try { p.dispose(); } catch {} });
       pane.dispose();
       paneRef.current = null;
       tauInputRef.current = null;
@@ -805,13 +1142,15 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       try {
         const el: HTMLElement | undefined = (grid as any)?.controller?.valueController?.view?.element;
         if (!el) return;
-        el.style.gridTemplateRows = `repeat(${rows}, 48px)`;
+        el.style.gridTemplateRows = `repeat(${rows}, 104px)`;
         const btns = Array.from(el.querySelectorAll('button')) as HTMLElement[];
         btns.forEach((b) => {
-          b.style.height = '48px';
-          b.style.padding = '0 8px';
-          b.style.lineHeight = '48px';
-          b.style.fontWeight = '600';
+          b.style.height = '104px';
+          b.style.padding = '2px';
+          b.style.lineHeight = '1';
+          b.style.display = 'flex';
+          b.style.alignItems = 'center';
+          b.style.justifyContent = 'center';
         });
       } catch {}
     };
@@ -825,6 +1164,11 @@ export const ConditionEditorPanel: React.FC<Props> = ({
         if (!el) return;
         el.style.opacity = disabled ? '0.5' : '1';
         (el.style as any).pointerEvents = disabled ? 'none' : 'auto';
+        // Also update SVG colors for better visibility
+        const svgs = el.querySelectorAll('svg');
+        svgs.forEach(svg => {
+          (svg as HTMLElement).style.opacity = disabled ? '0.5' : '1';
+        });
       } catch {}
     };
     setDisabled(alignGridRef.current, !alignEnabled);
