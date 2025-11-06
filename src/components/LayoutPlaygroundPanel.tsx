@@ -25,6 +25,7 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
         id: 'blade-helpers',
         css: `
           .tp-bl-slot .tp-lblv, .tp-bl-slot .tp-lblv_v { min-width: 0; max-width: 100%; box-sizing: border-box; }
+          .tp-bl-slot { padding-top: 4px; padding-bottom: 4px; }
           /* Zero vertical gaps inside slots to eliminate extra spacing */
           .tp-bl-slot .tp-lblv { margin-top: 0 !important; margin-bottom: 0 !important; }
           .tp-bl-slot .tp-rotv, .tp-bl-slot .tp-rotv_c, .tp-bl-slot .tp-cntv { padding-top: 0 !important; padding-bottom: 0 !important; }

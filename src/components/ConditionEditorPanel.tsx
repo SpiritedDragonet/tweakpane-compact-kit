@@ -271,6 +271,8 @@ export const ConditionEditorPanel: React.FC<Props> = ({
         css: `
           /* Let TP value views respect container width inside BladeLayout slots */
           .tp-bl-slot .tp-lblv, .tp-bl-slot .tp-lblv_v { min-width: 0; max-width: 100%; box-sizing: border-box; }
+          /* Add subtle 4px vertical breathing space per slot */
+          .tp-bl-slot { padding-top: 4px; padding-bottom: 4px; }
           /* Zero vertical gaps inside slots to eliminate extra spacing */
           .tp-bl-slot .tp-lblv { margin-top: 0 !important; margin-bottom: 0 !important; }
           .tp-bl-slot .tp-rotv, .tp-bl-slot .tp-rotv_c, .tp-bl-slot .tp-cntv { padding-top: 0 !important; padding-bottom: 0 !important; }

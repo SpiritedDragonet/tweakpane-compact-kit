@@ -224,18 +224,16 @@ export function mountBladeLayout(opts: {
     const unitPx = computeUnitPx(root.ownerDocument || document);
     // Helper: choose a meaningful inner element to measure natural content height.
     const pickMeasurable = (cell: HTMLElement): HTMLElement => {
-      // 1) Prefer nested BladeLayout root if present (represents column sum-of-rows)
-      const nestedRoot = cell.querySelector('.tp-bladelayout') as HTMLElement | null;
-      if (nestedRoot) return nestedRoot;
-      // 2) Prefer Tweakpane pane root to include official paddings/margins
-      const tpRoot = cell.querySelector('.tp-rotv') as HTMLElement | null;
-      if (tpRoot) return tpRoot;
-      // 3) Else prefer Tweakpane content box (single leaf)
-      const tpContent = cell.querySelector('.tp-rotv_c') as HTMLElement | null;
-      if (tpContent) return tpContent;
-      // 4) Else fallback to immediate child or the cell itself
+      // Prefer measuring the immediate slot element (includes its own padding)
       const first = cell.firstElementChild as HTMLElement | null;
       if (first) return first;
+      // Fallbacks in case structure is different
+      const nestedRoot = cell.querySelector('.tp-bladelayout') as HTMLElement | null;
+      if (nestedRoot) return nestedRoot;
+      const tpRoot = cell.querySelector('.tp-rotv') as HTMLElement | null;
+      if (tpRoot) return tpRoot;
+      const tpContent = cell.querySelector('.tp-rotv_c') as HTMLElement | null;
+      if (tpContent) return tpContent;
       return cell;
     };
     const rowHeightsUnits: number[] = [];
