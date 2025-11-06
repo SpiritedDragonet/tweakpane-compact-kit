@@ -222,6 +222,13 @@ export function mountBladeLayout(opts: {
     childLayouts.forEach((cl) => { try { cl.refresh?.(); } catch {} });
 
     const unitPx = computeUnitPx(root.ownerDocument || document);
+    const rowGapPx = (() => {
+      const g = spec.gutter?.row;
+      if (!g) return 0;
+      if (typeof g === 'number') return Math.max(0, Math.round(g));
+      if (g.unit === 'px') return Math.max(0, Math.round(g.value));
+      return Math.max(0, Math.round(g.value * unitPx));
+    })();
     // Helper: choose a meaningful inner element to measure natural content height.
     const pickMeasurable = (cell: HTMLElement): HTMLElement => {
       // Prefer measuring the immediate slot element (includes its own padding)
@@ -264,7 +271,10 @@ export function mountBladeLayout(opts: {
     const rowHeightsPx = rowHeightsUnits.map((u) => Math.max(1, Math.round(u * unitPx)));
     root.style.gridTemplateRows = rowHeightsPx.map((px) => `${px}px`).join(' ');
     const totalUnitsNow = rowHeightsUnits.reduce((a, b) => a + b, 0);
-    const totalPx = (containerPolicy === 'grow' ? totalUnitsNow : totalUnits) * unitPx;
+    let totalPx = (containerPolicy === 'grow' ? totalUnitsNow : totalUnits) * unitPx;
+    if (rowHeightsPx.length > 1 && rowGapPx > 0) {
+      totalPx += (rowHeightsPx.length - 1) * rowGapPx;
+    }
     root.style.height = `${Math.max(1, Math.round(totalPx))}px`;
   }
 

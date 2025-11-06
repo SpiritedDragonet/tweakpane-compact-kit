@@ -66,14 +66,14 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
         layout: {
           units: rc,
           rows: Array.from({ length: rc }, () => ({ units: 1, cols: { mode: 'equal', count: 1 }, children: ['leaf'] })),
-          gutter: { row: { value: 0, unit: 'px' } },
+          gutter: { row: { value: 4, unit: 'px' } },
         },
       }));
       const baseUnits = 2;
       return {
         units: baseUnits,
         rows: [{ units: baseUnits, cols: split, children }],
-        gutter: { col: { value: 0, unit: 'px' } },
+        gutter: { col: { value: 0, unit: 'px' }, row: { value: 4, unit: 'px' } },
         sizing: { container: 'grow', row: 'grow', snap: 'ceil' },
       } as BladeLayoutSpec;
     };
