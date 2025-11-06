@@ -3,6 +3,7 @@ import { Pane } from 'tweakpane';
 import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
 import type { ButtonGridApi } from '@tweakpane/plugin-essentials';
 import { addBladeLayout } from '../plugins/addBladeLayout';
+import { installBladeViewShims } from '../plugins/tpBladePlugins';
 import type { BladeLayoutSpec } from '../plugins/BladeLayout';
 import { addSizedButton } from '../plugins/addSizedButton';
 
@@ -45,6 +46,7 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
     paneRef.current = pane;
 
     const folder = pane.addFolder({ title: '布局试验（Playground）', expanded: true });
+    const uninstallFolderShim = installBladeViewShims(folder as any);
 
     const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
     const sample = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -162,7 +164,8 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
       childPanes.splice(0).forEach((cp) => { try { cp.dispose(); } catch {} });
       if (layoutApi) { try { layoutApi.dispose(); } catch {} layoutApi = null; }
       if (!currentSpec) currentSpec = buildRandomSpec();
-      layoutApi = addBladeLayout(folder, currentSpec);
+      // Use shimmed blade view
+      layoutApi = (folder as any).addBlade({ view: 'blade-layout', ...currentSpec });
       layoutApi.slots.forEach((s) => fillSlot(s));
       try { layoutApi.refresh(); } catch {}
     };
@@ -174,6 +177,7 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
       try { childPanes.splice(0).forEach((cp) => cp.dispose()); } catch {}
       try { layoutApi?.dispose(); } catch {}
       try { pane.dispose(); } catch {}
+      try { uninstallFolderShim(); } catch {}
       paneRef.current = null;
     };
   }, [onRun]);
