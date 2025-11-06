@@ -269,26 +269,26 @@ export const ConditionEditorPanel: React.FC<Props> = ({
       pane.registerPlugin({
         id: 'blade-helpers',
         css: `
-          /* Let TP value views respect container width inside BladeLayout slots */
-          .tp-bl-slot .tp-lblv, .tp-bl-slot .tp-lblv_v { min-width: 0; max-width: 100%; box-sizing: border-box; }
-          /* Add subtle 4px vertical breathing space per slot */
-          .tp-bl-slot { padding-top: 4px; padding-bottom: 4px; }
-          /* Zero vertical gaps inside slots to eliminate extra spacing */
-          .tp-bl-slot .tp-lblv { margin-top: 0 !important; margin-bottom: 0 !important; }
-          .tp-bl-slot .tp-rotv, .tp-bl-slot .tp-rotv_c, .tp-bl-slot .tp-cntv { padding-top: 0 !important; padding-bottom: 0 !important; }
-          .tp-bl-slot .tp-rotv_c > * { margin-top: 0 !important; margin-bottom: 0 !important; }
-          .tp-bl-slot .tp-fldv { margin-top: 0 !important; margin-bottom: 0 !important; }
-          .tp-bl-slot .tp-fldv_c { padding-top: 0 !important; padding-bottom: 0 !important; }
-          .tp-bl-slot .tp-v-fst, .tp-bl-slot .tp-v-vfst, .tp-bl-slot .tp-v-lst, .tp-bl-slot .tp-v-vlst {
+          /* Value views respect container width inside layout scope */
+          .tp-bl-scope .tp-lblv, .tp-bl-scope .tp-lblv_v { min-width: 0; max-width: 100%; box-sizing: border-box; }
+          /* 4px breathing space per slot */
+          .tp-bl-scope .tp-bl-slot { padding-top: 4px; padding-bottom: 4px; }
+          /* Zero vertical gaps within scope (override TP defaults) */
+          .tp-bl-scope .tp-lblv { margin-top: 0 !important; margin-bottom: 0 !important; }
+          .tp-bl-scope .tp-rotv, .tp-bl-scope .tp-rotv_c, .tp-bl-scope .tp-cntv { padding-top: 0 !important; padding-bottom: 0 !important; }
+          .tp-bl-scope .tp-rotv_c > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+          .tp-bl-scope .tp-fldv { margin-top: 0 !important; margin-bottom: 0 !important; }
+          .tp-bl-scope .tp-fldv_c { padding-top: 0 !important; padding-bottom: 0 !important; }
+          .tp-bl-scope .tp-v-fst, .tp-bl-scope .tp-v-vfst, .tp-bl-scope .tp-v-lst, .tp-bl-scope .tp-v-vlst {
             padding-top: 0 !important; padding-bottom: 0 !important;
             margin-top: 0 !important; margin-bottom: 0 !important;
           }
-          /* Ensure nested row cells clip overflow and don't bleed across columns */
-          .tp-bl-row > .tp-bl-cell { overflow: hidden; box-sizing: border-box; }
-          /* Remove left label box for all non-checkbox controls within blade slots */
-          .tp-bl-slot .tp-lblv:not(:has(.tp-ckbv)) { padding-left: 0; }
-          .tp-bl-slot .tp-lblv:not(:has(.tp-ckbv)) .tp-lblv_l { display: none; width: 0; margin: 0; padding: 0; }
-          .tp-bl-slot .tp-lblv:not(:has(.tp-ckbv)) .tp-lblv_v { margin-left: 0; }
+          /* Ensure nested row cells clip overflow */
+          .tp-bl-scope .tp-bl-row > .tp-bl-cell { overflow: hidden; box-sizing: border-box; }
+          /* Remove left label box for all non-checkbox controls */
+          .tp-bl-scope .tp-lblv:not(:has(.tp-ckbv)) { padding-left: 0; }
+          .tp-bl-scope .tp-lblv:not(:has(.tp-ckbv)) .tp-lblv_l { display: none; width: 0; margin: 0; padding: 0; }
+          .tp-bl-scope .tp-lblv:not(:has(.tp-ckbv)) .tp-lblv_v { margin-left: 0; }
         `,
       } as any);
     } catch {}

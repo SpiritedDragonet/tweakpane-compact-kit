@@ -24,6 +24,8 @@ export function addBladeLayout(hostApi: any, spec: BladeLayoutSpec): BladeLayout
   const wrapper = hostEl.ownerDocument.createElement('div');
   wrapper.style.width = '100%';
   wrapper.style.boxSizing = 'border-box';
+  // Scope class for layout-specific CSS (spacing resets, etc.)
+  wrapper.classList.add('tp-bl-scope');
   hostEl.appendChild(wrapper);
 
   const inst = mountBladeLayout({ container: wrapper, spec });
@@ -38,4 +40,3 @@ export function addBladeLayout(hostApi: any, spec: BladeLayoutSpec): BladeLayout
     },
   };
 }
-
