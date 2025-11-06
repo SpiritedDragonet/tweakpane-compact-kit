@@ -271,8 +271,8 @@ export const ConditionEditorPanel: React.FC<Props> = ({
         css: `
           /* Value views respect container width inside layout scope */
           .tp-bl-scope .tp-lblv, .tp-bl-scope .tp-lblv_v { min-width: 0; max-width: 100%; box-sizing: border-box; }
-          /* 4px breathing space per slot */
-          .tp-bl-scope .tp-bl-slot { padding-top: 4px; padding-bottom: 4px; }
+          /* No extra breathing space; keep 0px to eliminate gaps */
+          .tp-bl-scope .tp-bl-slot { padding-top: 0; padding-bottom: 0; }
           /* Zero vertical gaps within scope (override TP defaults) */
           .tp-bl-scope .tp-lblv { margin-top: 0 !important; margin-bottom: 0 !important; }
           .tp-bl-scope .tp-rotv, .tp-bl-scope .tp-rotv_c, .tp-bl-scope .tp-cntv { padding-top: 0 !important; padding-bottom: 0 !important; }
