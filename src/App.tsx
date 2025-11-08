@@ -265,8 +265,8 @@ export const App: React.FC = () => {
           labelBox.style.color = '#aaa';
           labelBox.style.margin = '0';
           labelBox.style.padding = '0';
-          // Limit width to 70% and truncate with ellipsis
-          labelBox.style.maxWidth = '70%';
+          // Limit width to 60% and truncate with ellipsis
+          labelBox.style.maxWidth = '60%';
           labelBox.style.overflow = 'hidden';
           labelBox.style.textOverflow = 'ellipsis';
           labelBox.style.whiteSpace = 'nowrap';

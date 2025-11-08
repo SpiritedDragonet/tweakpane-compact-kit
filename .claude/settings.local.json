@@ -6,7 +6,9 @@
       "Bash(npm run dev:*)",
       "Read(//g/BProj/ECGsplitter(matlab)/**)",
       "Read(//g/BProj/**)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
