@@ -2,12 +2,64 @@
 // - Provides flexible row/column split with draggable gutters
 // - Exposes leaf slots so callers can mount child Panes per slot
 // - Keeps implementation self-contained; clean up listeners on dispose
+// - Auto-applies optimized styles for tight layout (no gaps)
+// - Auto-tweaks slider labels to prevent overflow
 //
 // NOTE: We purposely keep typings light (any) to avoid coupling to
 // Tweakpane's internal plugin types. External API is stable enough:
 //   pane.registerPlugin(SplitLayoutPlugin)
 //   const api = folder.addBlade({ view: 'split-layout', ... }) as any
 //   const slots: HTMLElement[] = api.getSlots()
+
+// Auto-tweak slider labels to prevent overflow and truncate long text
+function installSliderLabelAutoTweak(container: HTMLElement): () => void {
+  const observers: MutationObserver[] = [];
+  const tweakSliderLabel = (labeledView: HTMLElement) => {
+    try {
+      if (!labeledView.classList?.contains('tp-lblv')) return;
+      const valueBox = labeledView.querySelector('.tp-lblv_v') as HTMLElement | null;
+      if (!valueBox) return;
+      const hasSlider = !!(valueBox.querySelector('.tp-sldv') || valueBox.querySelector('.tp-sldtxtv'));
+      if (!hasSlider) return;
+      const labelBox = labeledView.querySelector('.tp-lblv_l') as HTMLElement | null;
+      if (!labelBox) return;
+      // Move label into value box as overlay
+      labelBox.style.position = 'absolute';
+      labelBox.style.left = '6px';
+      labelBox.style.top = '4px';
+      labelBox.style.fontSize = '10px';
+      labelBox.style.lineHeight = '1';
+      labelBox.style.color = '#aaa';
+      labelBox.style.margin = '0';
+      labelBox.style.padding = '0';
+      // Limit width to 60% and truncate with ellipsis
+      labelBox.style.maxWidth = '60%';
+      labelBox.style.overflow = 'hidden';
+      labelBox.style.textOverflow = 'ellipsis';
+      labelBox.style.whiteSpace = 'nowrap';
+      // Make background transparent and place behind slider
+      labelBox.style.paddingRight = '4px';
+      labelBox.style.background = 'transparent';
+      labelBox.style.zIndex = '1';
+      // Ensure slider handle is above label
+      const sliderHandle = labeledView.querySelector('.tp-txtv_k') as HTMLElement | null;
+      if (sliderHandle) {
+        sliderHandle.style.zIndex = '2';
+        sliderHandle.style.position = 'relative';
+      }
+      try { valueBox.insertBefore(labelBox, valueBox.firstChild); } catch {}
+    } catch {}
+  };
+  const patchAll = (root: HTMLElement) => {
+    const labeled = root.querySelectorAll('.tp-lblv');
+    labeled.forEach((lv) => tweakSliderLabel(lv as HTMLElement));
+  };
+  patchAll(container);
+  const mo = new MutationObserver(() => patchAll(container));
+  mo.observe(container, { childList: true, subtree: true });
+  observers.push(mo);
+  return () => { observers.forEach((o) => { try { o.disconnect(); } catch {} }); };
+}
 
 export type SplitDirection = 'row' | 'column';
 
@@ -223,6 +275,11 @@ function buildSplit(
       try { (container.dataset as any).splitPath = path.concat(i).join('.'); } catch {}
       leaves.push(container);
       paneEls.push(container);
+      // Auto-apply slider label tweaks for this leaf
+      try {
+        const cleanupSlider = installSliderLabelAutoTweak(container);
+        disposers.push(cleanupSlider);
+      } catch {}
       // Live adjust height when content changes for column+rowUnits mode
       if (direction === 'column' && rowUnits && rowUnits.length === n) {
         try {
@@ -457,6 +514,81 @@ export const SplitLayoutPlugin: any = {
   api(args: any) {
     return new SplitLayoutApi(args.controller as SplitLayoutController);
   },
+  // Auto-inject styles for tight layout (no gaps, no overflow)
+  css: `
+    /* Hide Tweakpane title bar and spacing elements to eliminate vertical gaps */
+    .tp-split-leaf .tp-rotv_b {
+      display: none !important;
+      height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .tp-split-leaf .tp-rotv_i {
+      display: none !important;
+      height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* Make all containers shrink to content height */
+    .tp-split-leaf.tp-split-leaf.tp-split-leaf {
+      height: auto !important;
+    }
+    .tp-split-root-column > .tp-split-panel.tp-split-panel {
+      flex: 0 0 auto !important;
+    }
+    .tp-split-leaf .tp-rotv.tp-rotv.tp-rotv {
+      height: auto !important;
+      border-radius: 0 !important;
+      border-top-left-radius: 0 !important;
+      border-top-right-radius: 0 !important;
+      border-bottom-left-radius: 0 !important;
+      border-bottom-right-radius: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+    .tp-split-leaf .tp-rotv_c.tp-rotv_c.tp-rotv_c {
+      flex: 0 0 auto !important;
+      height: auto !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      gap: 0 !important;
+    }
+
+    /* Remove bottom margins/paddings to eliminate gaps */
+    .tp-split-leaf .tp-lblv, .tp-split-leaf .tp-lblv_v { margin-bottom: 0 !important; }
+    .tp-split-leaf .tp-v-fst, .tp-split-leaf .tp-v-vfst, .tp-split-leaf .tp-v-lst, .tp-split-leaf .tp-v-vlst {
+      padding-bottom: 0 !important;
+      margin-bottom: 0 !important;
+    }
+    .tp-split-leaf .tp-rotv_c > * { margin-bottom: 0 !important; }
+
+    /* Fix all control layouts - prevent value containers from overflowing parent */
+    .tp-split-leaf .tp-lblv {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+    .tp-split-leaf .tp-lblv_v {
+      width: auto !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      flex-shrink: 1 !important;
+      box-sizing: border-box !important;
+    }
+    /* Exception for slider value containers */
+    .tp-split-leaf .tp-lblv:has(.tp-sldv) .tp-lblv_v,
+    .tp-split-leaf .tp-lblv:has(.tp-sldtxtv) .tp-lblv_v {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    .tp-split-leaf .tp-lblv_l {
+      flex-basis: 30% !important;
+      min-width: 0 !important;
+      width: auto !important;
+      box-sizing: border-box !important;
+    }
+  `,
 };
 
 // Helper to mount split layout without formal plugin registration (shim-style)
