@@ -3,6 +3,27 @@ import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
 import { addSizedButton } from './plugins/addSizedButton';
 import { randomInt, type LeafPlan } from './layoutPlan';
 
+function removeLabelFor(bindingApi: any): void {
+  // Remove the left label area entirely for non-slider/checkbox controls
+  try {
+    const elA: HTMLElement | undefined = (bindingApi?.controller?.view?.element);
+    const elB: HTMLElement | undefined = (bindingApi?.controller?.labelController?.view?.element);
+    const base = (elA || elB) as HTMLElement | undefined;
+    if (!base) return;
+    // Find the enclosing labeled view root
+    const rootEl = (base.classList?.contains('tp-lblv') ? base : base.closest('.tp-lblv')) as HTMLElement | null;
+    if (!rootEl) return;
+    const labelBox = rootEl.querySelector('.tp-lblv_l') as HTMLElement | null;
+    if (labelBox && labelBox.parentElement) {
+      try { labelBox.parentElement.removeChild(labelBox); } catch {}
+    }
+    const valueBox = rootEl.querySelector('.tp-lblv_v') as HTMLElement | null;
+    if (valueBox) {
+      (valueBox.style as any).marginLeft = '0';
+    }
+  } catch {}
+}
+
 export function renderLeaf(pane: Pane, leaf: LeafPlan): void {
   if (leaf.kind === 'button') {
     pane.addButton({ title: 'Button' });
@@ -10,14 +31,17 @@ export function renderLeaf(pane: Pane, leaf: LeafPlan): void {
     addSizedButton(pane, { title: 'Multi-line', units: Math.max(2, leaf.sizedUnits ?? 2) });
   } else if (leaf.kind === 'number') {
     const o = { n: randomInt(-50, 50) };
-    pane.addBinding(o, 'n', { min: -100, max: 100, step: 1 });
+    const api = pane.addBinding(o, 'n', { min: -100, max: 100, step: 1 });
+    removeLabelFor(api);
   } else if (leaf.kind === 'slider') {
     const o = { v: Math.random() };
     pane.addBinding(o, 'v', { min: 0, max: 1, step: 0.01, label: 'VeryLongSliderLabelText' } as any);
   } else if (leaf.kind === 'range') {
     const o = { lo: randomInt(0, 40), hi: randomInt(60, 100) };
-    pane.addBinding(o, 'lo', { min: 0, max: 100, step: 1 });
-    pane.addBinding(o, 'hi', { min: 0, max: 100, step: 1 });
+    const api1 = pane.addBinding(o, 'lo', { min: 0, max: 100, step: 1 });
+    const api2 = pane.addBinding(o, 'hi', { min: 0, max: 100, step: 1 });
+    removeLabelFor(api1);
+    removeLabelFor(api2);
   } else if (leaf.kind === 'dropdown') {
     const items = [
       { text: 'Option A', value: 0 },
@@ -31,14 +55,18 @@ export function renderLeaf(pane: Pane, leaf: LeafPlan): void {
     pane.addBinding(o, 'b', { label: 'Option' } as any);
   } else if (leaf.kind === 'color') {
     const o = { c: '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0') };
-    pane.addBinding(o, 'c');
+    const api = pane.addBinding(o, 'c');
+    removeLabelFor(api);
   } else if (leaf.kind === 'point2d') {
     const o = { x: randomInt(-10, 10), y: randomInt(-10, 10) };
-    pane.addBinding(o, 'x', { min: -100, max: 100, step: 1 });
-    pane.addBinding(o, 'y', { min: -100, max: 100, step: 1 });
+    const ax = pane.addBinding(o, 'x', { min: -100, max: 100, step: 1 });
+    const ay = pane.addBinding(o, 'y', { min: -100, max: 100, step: 1 });
+    removeLabelFor(ax);
+    removeLabelFor(ay);
   } else if (leaf.kind === 'text') {
     const o = { s: `Text${randomInt(1, 99)}` };
-    pane.addBinding(o, 's');
+    const api = pane.addBinding(o, 's');
+    removeLabelFor(api);
   } else if (leaf.kind === 'buttongrid') {
     const cols = randomInt(2, 3);
     const rows = randomInt(1, 2);
