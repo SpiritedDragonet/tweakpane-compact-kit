@@ -100,7 +100,7 @@ export const App: React.FC = () => {
           if (!lv.classList?.contains('tp-lblv')) return;
           const valueBox = lv.querySelector('.tp-lblv_v') as HTMLElement | null;
           const labelBox = lv.querySelector('.tp-lblv_l') as HTMLElement | null;
-          if (!valueBox || !labelBox) return;
+          if (!valueBox) return;
           // Heuristic: treat as slider if valueBox contains an element whose class includes 'sld'
           const isSlider = !!valueBox.querySelector('[class*="sld"]');
           if (!isSlider) return;
@@ -114,19 +114,22 @@ export const App: React.FC = () => {
           (lv.style as any).maxWidth = '100%';
           (lv.style as any).boxSizing = 'border-box';
           (lv.style as any).position = (lv.style.position && lv.style.position !== 'static') ? lv.style.position : 'relative';
-          labelBox.style.display = 'block';
-          labelBox.style.position = 'absolute';
-          labelBox.style.left = '6px';
-          labelBox.style.top = '4px';
-          labelBox.style.fontSize = '10px';
-          labelBox.style.lineHeight = '1';
-          labelBox.style.color = '#aaa';
-          labelBox.style.margin = '0';
-          labelBox.style.padding = '0';
-          try { valueBox.insertBefore(labelBox, valueBox.firstChild); } catch {}
+          if (labelBox) {
+            labelBox.style.display = 'block';
+            labelBox.style.position = 'absolute';
+            labelBox.style.left = '6px';
+            labelBox.style.top = '4px';
+            labelBox.style.fontSize = '10px';
+            labelBox.style.lineHeight = '1';
+            labelBox.style.color = '#aaa';
+            labelBox.style.margin = '0';
+            labelBox.style.padding = '0';
+            try { valueBox.insertBefore(labelBox, valueBox.firstChild); } catch {}
+          }
           // Flatten the slider a bit to make room visually
           // Only vertically scale slider's inner surface without changing blade height
-          const sldSurface = valueBox.querySelector('.tp-sldtxtv_s') as HTMLElement | null;
+          const sldSurface = (valueBox.querySelector('.tp-sldtxtv_s') as HTMLElement | null)
+            || (valueBox.querySelector('.tp-sldv_s') as HTMLElement | null);
           if (sldSurface) {
             // Keep the slider visually anchored to the bottom; shrink height by 50%
             sldSurface.style.transformOrigin = 'bottom left';

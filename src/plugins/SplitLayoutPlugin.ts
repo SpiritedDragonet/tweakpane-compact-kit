@@ -109,7 +109,8 @@ function buildSplit(
   const children = params.children;
   const n = children.length;
   let sizes = normalizeSizes(n, params.sizes);
-  const minSize = params.minSize ?? 5;
+  // Allow zero-width panels when dragging unless caller overrides
+  const minSize = params.minSize ?? 0;
   // Enforce a 4px gutter to avoid overflow and keep visuals tight
   const gutter = 4;
   const interactive = !!params.interactive; // default static
