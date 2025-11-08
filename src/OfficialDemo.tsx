@@ -11,14 +11,14 @@ export const OfficialDemo: React.FC = () => {
   useEffect(() => {
     const container = hostRef.current;
     if (!container) return;
-    const pane = new Pane({ container, title: 'Split Layout Plugin Demo (Official)' });
+    const pane = new Pane({ container, title: 'Plugin Demo (Self-Contained)' });
 
     // Register required plugins
     try { pane.registerPlugin(EssentialsPlugin as any); } catch {}
     try { pane.registerPlugin(SplitLayoutPlugin as any); } catch {}
 
     // Demo 1: Horizontal split with equal columns
-    const demo1Folder = pane.addFolder({ title: 'Demo 1: Equal Horizontal Split', expanded: true });
+    const demo1Folder = pane.addFolder({ title: 'Demo 1: Equal Horizontal Split', expanded: false });
     const uninstall1 = installBladeViewShims(demo1Folder as any);
     const equalSplit = demo1Folder.addBlade({
       view: 'split-equal',

@@ -14,15 +14,19 @@
 // Auto-tweak slider labels to prevent overflow and truncate long text
 function installSliderLabelAutoTweak(container: HTMLElement): () => void {
   const observers: MutationObserver[] = [];
+  const tweakedSet = new WeakSet<HTMLElement>();
   const tweakSliderLabel = (labeledView: HTMLElement) => {
     try {
       if (!labeledView.classList?.contains('tp-lblv')) return;
+      if (tweakedSet.has(labeledView)) return; // Skip already tweaked
       const valueBox = labeledView.querySelector('.tp-lblv_v') as HTMLElement | null;
       if (!valueBox) return;
       const hasSlider = !!(valueBox.querySelector('.tp-sldv') || valueBox.querySelector('.tp-sldtxtv'));
       if (!hasSlider) return;
       const labelBox = labeledView.querySelector('.tp-lblv_l') as HTMLElement | null;
       if (!labelBox) return;
+      // Mark as tweaked before modifying DOM
+      tweakedSet.add(labeledView);
       // Move label into value box as overlay
       labelBox.style.position = 'absolute';
       labelBox.style.left = '6px';
