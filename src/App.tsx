@@ -441,8 +441,8 @@ export const App: React.FC = () => {
                   .tp-split-leaf .tp-fldv_c { padding-bottom: 0 !important; }
                   .tp-split-leaf .tp-fldv_c > * { margin-bottom: 0 !important; }
 
-                  /* Debug outline for development */
-                  .tp-split-leaf {
+                  /* Debug outline for development (only in dev demo) */
+                  .dev-demo-container .tp-split-leaf {
                     outline: 1px dashed #444 !important;
                     outline-offset: 0px !important;
                   }
@@ -625,7 +625,7 @@ export const App: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 12, boxSizing: 'border-box', gap: 12 }}>
       {/* Development Demo (with manual CSS plugin) */}
-      <div style={{ flex: '0 1 auto', border: '1px solid #333', borderRadius: 8, background: '#0a0b0e', minHeight: 0 }}>
+      <div className="dev-demo-container" style={{ flex: '0 1 auto', border: '1px solid #333', borderRadius: 8, background: '#0a0b0e', minHeight: 0 }}>
         <div ref={hostRef} style={{ width: '100%', height: '100%' }} />
       </div>
 
