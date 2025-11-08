@@ -269,8 +269,12 @@ export const App: React.FC = () => {
     const removeLabelFor = (bindingApi: any) => {
       // Remove the left label area entirely for non-slider/checkbox controls
       try {
-        const rootEl: HTMLElement | undefined = (bindingApi?.controller?.labelController?.view?.element)
-          || (bindingApi?.controller?.view?.element);
+        const elA: HTMLElement | undefined = (bindingApi?.controller?.view?.element);
+        const elB: HTMLElement | undefined = (bindingApi?.controller?.labelController?.view?.element);
+        const base = (elA || elB) as HTMLElement | undefined;
+        if (!base) return;
+        // Find the enclosing labeled view root
+        const rootEl = (base.classList?.contains('tp-lblv') ? base : base.closest('.tp-lblv')) as HTMLElement | null;
         if (!rootEl) return;
         const labelBox = rootEl.querySelector('.tp-lblv_l') as HTMLElement | null;
         if (labelBox && labelBox.parentElement) {
