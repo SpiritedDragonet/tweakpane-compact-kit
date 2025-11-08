@@ -213,7 +213,7 @@ function buildSplit(
       container.style.flexDirection = 'column';
       container.style.alignItems = 'stretch';
       container.style.width = '100%';
-      container.style.height = '100%';
+      container.style.height = 'auto';
       container.style.minHeight = '0';
       container.classList.add('tp-split-leaf');
       container.style.boxSizing = 'border-box';

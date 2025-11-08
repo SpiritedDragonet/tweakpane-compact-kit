@@ -265,6 +265,21 @@ export const App: React.FC = () => {
           labelBox.style.color = '#aaa';
           labelBox.style.margin = '0';
           labelBox.style.padding = '0';
+          // Limit width to 70% and truncate with ellipsis
+          labelBox.style.maxWidth = '70%';
+          labelBox.style.overflow = 'hidden';
+          labelBox.style.textOverflow = 'ellipsis';
+          labelBox.style.whiteSpace = 'nowrap';
+          // Make background transparent and place behind slider
+          labelBox.style.paddingRight = '4px';
+          labelBox.style.background = 'transparent';
+          labelBox.style.zIndex = '1';
+          // Ensure slider handle is above label
+          const sliderHandle = labelBox.closest('.tp-lblv')?.querySelector('.tp-txtv_k') as HTMLElement;
+          if (sliderHandle) {
+            sliderHandle.style.zIndex = '2';
+            sliderHandle.style.position = 'relative';
+          }
           try { valueBox.insertBefore(labelBox, valueBox.firstChild); } catch {}
         }
       } catch {}
@@ -322,18 +337,108 @@ export const App: React.FC = () => {
               p.registerPlugin({
                 id: 'leaf-layout-fix',
                 css: `
-                  .tp-split-leaf .tp-rotv, .tp-split-leaf .tp-rotv_c { padding-top: 0 !important; padding-bottom: 0 !important; }
-                  .tp-split-leaf .tp-cntv { padding-top: 0 !important; padding-bottom: 0 !important; }
-                  .tp-split-leaf .tp-lblv, .tp-split-leaf .tp-lblv_v, .tp-split-leaf .tp-lblv_l { margin-top: 0 !important; margin-bottom: 0 !important; }
-                  .tp-split-leaf .tp-v-fst, .tp-split-leaf .tp-v-vfst, .tp-split-leaf .tp-v-lst, .tp-split-leaf .tp-v-vlst { padding-top: 0 !important; padding-bottom: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; }
-                  .tp-split-leaf .tp-rotv_c { gap: 0 !important; row-gap: 0 !important; }
-                  .tp-split-leaf .tp-rotv_c > * { margin-top: 0 !important; margin-bottom: 0 !important; }
-                  /* (no forced 100% heights here to avoid feedback loops) */
-                  /* Folder view: remove extra paddings; avoid forcing 100% height to keep natural measurement */
-                  .tp-split-leaf .tp-fldv { padding-top: 0 !important; padding-bottom: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; box-sizing: border-box; }
-                  .tp-split-leaf .tp-fldv_c { min-height: 0; padding-top: 0 !important; padding-bottom: 0 !important; }
-                  .tp-split-leaf .tp-fldv_b { margin: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
-                  .tp-split-leaf .tp-fldv_c > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+                  /* Hide Tweakpane title bar and spacing elements to eliminate vertical gaps */
+                  .tp-split-leaf .tp-rotv_b {
+                    display: none !important;
+                    height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                  }
+                  .tp-split-leaf .tp-rotv_i {
+                    display: none !important;
+                    height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                  }
+
+                  /* Make all containers shrink to content height */
+                  .tp-split-leaf.tp-split-leaf.tp-split-leaf {
+                    height: auto !important;
+                  }
+                  .tp-split-root-column > .tp-split-panel.tp-split-panel {
+                    flex: 0 0 auto !important;
+                  }
+                  .tp-split-leaf .tp-rotv.tp-rotv.tp-rotv {
+                    height: auto !important;
+                    border-radius: 0 !important;
+                    border-top-left-radius: 0 !important;
+                    border-top-right-radius: 0 !important;
+                    border-bottom-left-radius: 0 !important;
+                    border-bottom-right-radius: 0 !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                  }
+                  .tp-split-leaf .tp-rotv_c.tp-rotv_c.tp-rotv_c {
+                    flex: 0 0 auto !important;
+                    height: auto !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    gap: 0 !important;
+                  }
+
+                  /* Remove bottom margins/paddings to eliminate gaps */
+                  .tp-split-leaf .tp-lblv, .tp-split-leaf .tp-lblv_v { margin-bottom: 0 !important; }
+                  .tp-split-leaf .tp-v-fst, .tp-split-leaf .tp-v-vfst, .tp-split-leaf .tp-v-lst, .tp-split-leaf .tp-v-vlst {
+                    padding-bottom: 0 !important;
+                    margin-bottom: 0 !important;
+                  }
+                  .tp-split-leaf .tp-rotv_c > * { margin-bottom: 0 !important; }
+
+                  /* Fix all control layouts - prevent value containers from overflowing parent */
+                  .tp-split-leaf .tp-lblv {
+                    /* Ensure labeled view container respects leaf width */
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    box-sizing: border-box !important;
+                  }
+                  /* Exception for sliders - keep custom width handling */
+                  .tp-split-leaf .tp-lblv:has(.tp-sldv),
+                  .tp-split-leaf .tp-lblv:has(.tp-sldtxtv) {
+                    /* Sliders use absolute positioning, keep custom styles */
+                  }
+                  .tp-split-leaf .tp-lblv_v {
+                    /* Allow value container to shrink instead of fixed width */
+                    width: auto !important;
+                    max-width: 100% !important;
+                    min-width: 0 !important;
+                    flex-shrink: 1 !important;
+                    box-sizing: border-box !important;
+                  }
+                  /* Exception for slider value containers */
+                  .tp-split-leaf .tp-lblv:has(.tp-sldv) .tp-lblv_v,
+                  .tp-split-leaf .tp-lblv:has(.tp-sldtxtv) .tp-lblv_v {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                  }
+                  .tp-split-leaf .tp-lblv_l {
+                    /* Ensure label has space and doesn't get crushed to 0 */
+                    flex-basis: 30% !important;
+                    min-width: 0 !important;
+                    width: auto !important;
+                    box-sizing: border-box !important;
+                  }
+                  /* Make specific controls respect container width */
+                  .tp-split-leaf .tp-colv,
+                  .tp-split-leaf .tp-txtv,
+                  .tp-split-leaf .tp-p2dv {
+                    max-width: 100% !important;
+                    box-sizing: border-box !important;
+                  }
+                  .tp-split-leaf .tp-ckbv {
+                    padding-left: 0 !important;
+                  }
+                  .tp-split-leaf .tp-ckbv_l {
+                    padding-right: 8px !important;
+                    margin-right: 0 !important;
+                  }
+
+                  /* Folder specific adjustments */
+                  .tp-split-leaf .tp-fldv {
+                    padding-bottom: 0 !important;
+                    margin-bottom: 0 !important;
+                  }
+                  .tp-split-leaf .tp-fldv_c { padding-bottom: 0 !important; }
+                  .tp-split-leaf .tp-fldv_c > * { margin-bottom: 0 !important; }
                 `,
               } as any);
             } catch {}
@@ -359,7 +464,7 @@ export const App: React.FC = () => {
               removeLabelFor(api);
             } else if (leaf.kind === 'slider') {
               const o = { v: Math.random() } as { v: number };
-              const sliderLabel = '值';
+              const sliderLabel = 'VeryLongSliderLabelText';
               const api = p.addBinding(o, 'v', { min: 0, max: 1, step: 0.01, label: sliderLabel } as any);
               // Apply style immediately and on next tick to cover async layout
               tweakSliderLabel(api, sliderLabel);

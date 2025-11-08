@@ -76,12 +76,16 @@ export function addSizedButton(host: Pane | any, opts: SizedButtonOptions = {}) 
       // Button itself should fill the area
       const bEl = rootEl.querySelector('button') as HTMLElement | null;
       if (bEl) {
-        // Make official button occupy N blade rows
+        // Make official button occupy N blade rows, with gap compensation
+        // When units > 1, add (units - 1) * 4px to match the gap between separate blades
+        const gutter = 4; // match the gutter in SplitLayoutPlugin
         if (unitPx > 0) {
-          bEl.style.height = `${units * unitPx}px`;
+          const totalHeight = units * unitPx + (units - 1) * gutter;
+          bEl.style.height = `${totalHeight}px`;
         } else {
-          // Fall back to CSS var-based calc (no hardcoded px fallback)
-          bEl.style.height = `calc(var(--cnt-usz) * ${units})`;
+          // Fall back to CSS var-based calc with gap compensation
+          const gapPx = (units - 1) * gutter;
+          bEl.style.height = `calc(var(--cnt-usz) * ${units} + ${gapPx}px)`;
         }
         bEl.style.width = '100%';
         bEl.style.display = 'flex';
