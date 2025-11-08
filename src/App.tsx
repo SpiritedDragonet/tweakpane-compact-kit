@@ -4,6 +4,7 @@ import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
 import { SplitLayoutPlugin } from './plugins/SplitLayoutPlugin';
 import { installBladeViewShims } from './plugins/tpBladePlugins';
 import { addSizedButton } from './plugins/addSizedButton';
+import { OfficialDemo } from './OfficialDemo';
 
 // Minimal app for SplitLayoutPlugin development
 // - Removes unrelated states and features
@@ -616,9 +617,18 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <div style={{ display: 'flex', height: '100%', padding: 12, boxSizing: 'border-box' }}>
-      <div style={{ flex: '1 1 auto', border: '1px solid #333', borderRadius: 8, background: '#0a0b0e' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 12, boxSizing: 'border-box', gap: 12 }}>
+      {/* Development Demo (with manual CSS plugin) */}
+      <div style={{ flex: '0 1 auto', border: '1px solid #333', borderRadius: 8, background: '#0a0b0e', minHeight: 0 }}>
         <div ref={hostRef} style={{ width: '100%', height: '100%' }} />
+      </div>
+
+      {/* Official Plugin Demo (self-contained, no manual CSS) */}
+      <div style={{ flex: '0 1 auto', border: '1px solid #666', borderRadius: 8, background: '#0a0b0e', minHeight: 0, padding: 8 }}>
+        <h3 style={{ margin: '0 0 8px 0', fontSize: 14, color: '#888', textAlign: 'center' }}>
+          Official Plugin Demo (Self-Contained)
+        </h3>
+        <OfficialDemo />
       </div>
     </div>
   );
