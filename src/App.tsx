@@ -266,6 +266,22 @@ export const App: React.FC = () => {
         }
       } catch {}
     };
+    const removeLabelFor = (bindingApi: any) => {
+      // Remove the left label area entirely for non-slider/checkbox controls
+      try {
+        const rootEl: HTMLElement | undefined = (bindingApi?.controller?.labelController?.view?.element)
+          || (bindingApi?.controller?.view?.element);
+        if (!rootEl) return;
+        const labelBox = rootEl.querySelector('.tp-lblv_l') as HTMLElement | null;
+        if (labelBox && labelBox.parentElement) {
+          try { labelBox.parentElement.removeChild(labelBox); } catch {}
+        }
+        const valueBox = rootEl.querySelector('.tp-lblv_v') as HTMLElement | null;
+        if (valueBox) {
+          (valueBox.style as any).marginLeft = '0';
+        }
+      } catch {}
+    };
     const fillSlotsWithPlan = (apiObj: any, plan: LayoutPlan) => {
       const slots: HTMLElement[] = apiObj?.getSlots?.() ?? [];
       let idx = 0;
@@ -332,7 +348,8 @@ export const App: React.FC = () => {
               addSizedButton(p, { title: '多行按钮', units: Math.max(2, leaf.sizedUnits ?? 2) });
             } else if (leaf.kind === 'number') {
               const o = { n: randomInt(-50, 50) } as { n: number };
-              p.addBinding(o, 'n', { min: -100, max: 100, step: 1 });
+              const api = p.addBinding(o, 'n', { min: -100, max: 100, step: 1 });
+              removeLabelFor(api);
             } else if (leaf.kind === 'slider') {
               const o = { v: Math.random() } as { v: number };
               const sliderLabel = '值';
@@ -342,8 +359,10 @@ export const App: React.FC = () => {
               setTimeout(() => tweakSliderLabel(api, sliderLabel), 0);
             } else if (leaf.kind === 'range') {
               const o = { lo: randomInt(0, 40), hi: randomInt(60, 100) } as { lo: number; hi: number };
-              p.addBinding(o, 'lo', { min: 0, max: 100, step: 1 });
-              p.addBinding(o, 'hi', { min: 0, max: 100, step: 1 });
+              const api1 = p.addBinding(o, 'lo', { min: 0, max: 100, step: 1 });
+              const api2 = p.addBinding(o, 'hi', { min: 0, max: 100, step: 1 });
+              removeLabelFor(api1);
+              removeLabelFor(api2);
             } else if (leaf.kind === 'dropdown') {
               createDropdown(p);
             } else if (leaf.kind === 'checkbox') {
@@ -351,14 +370,20 @@ export const App: React.FC = () => {
               p.addBinding(o, 'b', { label: '选项' } as any);
             } else if (leaf.kind === 'color') {
               const o = { c: '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0') } as { c: string };
-              try { p.addBinding(o, 'c'); } catch {}
+              try {
+                const api = p.addBinding(o, 'c');
+                removeLabelFor(api);
+              } catch {}
             } else if (leaf.kind === 'point2d') {
               const o = { x: randomInt(-10, 10), y: randomInt(-10, 10) } as { x: number; y: number };
-              p.addBinding(o, 'x', { min: -100, max: 100, step: 1 });
-              p.addBinding(o, 'y', { min: -100, max: 100, step: 1 });
+              const ax = p.addBinding(o, 'x', { min: -100, max: 100, step: 1 });
+              const ay = p.addBinding(o, 'y', { min: -100, max: 100, step: 1 });
+              removeLabelFor(ax);
+              removeLabelFor(ay);
             } else if (leaf.kind === 'text') {
               const o = { s: `文本${randomInt(1, 99)}` } as { s: string };
-              p.addBinding(o, 's');
+              const api = p.addBinding(o, 's');
+              removeLabelFor(api);
             } else if (leaf.kind === 'buttongrid') {
               const cols = randomInt(2, 3);
               const rows = randomInt(1, 2);
