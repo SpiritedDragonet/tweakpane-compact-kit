@@ -273,9 +273,6 @@ function buildSplit(
       container.style.minHeight = '0';
       container.classList.add('tp-split-leaf');
       container.style.boxSizing = 'border-box';
-      // Debug frame to visualize leaf bounds during development
-      container.style.outline = '1px dashed #444';
-      container.style.outlineOffset = '0px';
       try { (container.dataset as any).splitPath = path.concat(i).join('.'); } catch {}
       leaves.push(container);
       paneEls.push(container);

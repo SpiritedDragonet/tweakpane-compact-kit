@@ -440,6 +440,12 @@ export const App: React.FC = () => {
                   }
                   .tp-split-leaf .tp-fldv_c { padding-bottom: 0 !important; }
                   .tp-split-leaf .tp-fldv_c > * { margin-bottom: 0 !important; }
+
+                  /* Debug outline for development */
+                  .tp-split-leaf {
+                    outline: 1px dashed #444 !important;
+                    outline-offset: 0px !important;
+                  }
                 `,
               } as any);
             } catch {}
