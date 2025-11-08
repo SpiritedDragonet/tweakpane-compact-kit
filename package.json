@@ -1,12 +1,38 @@
 {
-  "name": "ecgsplitter2-demo",
-  "private": true,
-  "version": "0.0.0",
+  "name": "tweakpane-plugin-split-layout",
+  "version": "1.0.0",
+  "description": "A flexible split-layout plugin for Tweakpane with auto-optimized styles",
   "type": "module",
+  "main": "./dist/tweakpane-split-layout.umd.js",
+  "module": "./dist/tweakpane-split-layout.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/tweakpane-split-layout.es.js",
+      "require": "./dist/tweakpane-split-layout.umd.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:lib": "vite build --config vite.config.lib.ts",
     "preview": "vite preview --port 5173"
+  },
+  "keywords": [
+    "tweakpane",
+    "plugin",
+    "split-layout",
+    "ui",
+    "control-panel"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "tweakpane": "^4.0.0"
   },
   "dependencies": {
     "@tweakpane/plugin-essentials": "0.2.1",

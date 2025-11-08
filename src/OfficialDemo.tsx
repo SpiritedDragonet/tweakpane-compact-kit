@@ -34,18 +34,18 @@ export const OfficialDemo: React.FC = () => {
 
     // Add controls to first column
     childPane1.addButton({ title: 'Button A' });
-    childPane1.addInput({ value: 50 }, 'value', { min: 0, max: 100 });
-    childPane1.addInput({ value: '#ff0000' }, 'value', { view: 'color' });
+    childPane1.addBinding({ value: 50 }, 'value', { min: 0, max: 100 });
+    childPane1.addBinding({ color: '#ff0000' }, 'color');
 
     // Add controls to second column
     childPane2.addButton({ title: 'Button B' });
-    childPane2.addInput({ value: 25 }, 'value', { min: 0, max: 100 });
-    childPane2.addInput({ value: true }, 'value');
+    childPane2.addBinding({ value: 25 }, 'value', { min: 0, max: 100 });
+    childPane2.addBinding({ enabled: true }, 'enabled');
 
     // Add controls to third column
     childPane3.addButton({ title: 'Button C' });
-    childPane3.addInput({ value: 75 }, 'value', { min: 0, max: 100 });
-    childPane3.addInput({ text: 'Sample' }, 'text');
+    childPane3.addBinding({ value: 75 }, 'value', { min: 0, max: 100 });
+    childPane3.addBinding({ text: 'Sample' }, 'text');
 
     // Demo 2: Horizontal split with ratio
     const demo2Folder = pane.addFolder({ title: 'Demo 2: Ratio Horizontal Split', expanded: false });
@@ -63,12 +63,14 @@ export const OfficialDemo: React.FC = () => {
 
     // Left column (30%)
     childPane4.addButton({ title: 'Narrow' });
-    childPane4.addInput({ value: 10 }, 'value', { min: 0, max: 100 });
+    childPane4.addBinding({ value: 10 }, 'value', { min: 0, max: 100 });
 
     // Right column (70%)
     childPane5.addButton({ title: 'Wide Column' });
-    childPane5.addInput({ value: 'VeryLongLabelTextHere' }, 'value', { min: 0, max: 100 });
-    childPane5.addInput({ x: 50, y: 50 }, 'position', { x: { step: 1 }, y: { step: 1 } });
+    childPane5.addBinding({ value: 50 }, 'value', { min: 0, max: 100, label: 'VeryLongLabelTextHere' });
+    const pos = { x: 50, y: 50 };
+    childPane5.addBinding(pos, 'x', { min: 0, max: 100, step: 1 });
+    childPane5.addBinding(pos, 'y', { min: 0, max: 100, step: 1 });
 
     // Demo 3: Vertical split with row units
     const demo3Folder = pane.addFolder({ title: 'Demo 3: Vertical Split with Row Units', expanded: false });
@@ -88,12 +90,12 @@ export const OfficialDemo: React.FC = () => {
 
     // Row 1 (2 units)
     childPane6.addButton({ title: 'Two Unit Button' });
-    childPane6.addInput({ value: 20 }, 'value', { min: 0, max: 100 });
+    childPane6.addBinding({ value: 20 }, 'value', { min: 0, max: 100 });
 
     // Row 2 (3 units)
     childPane7.addFolder({ title: 'Folder' });
-    childPane7.addInput({ value: '#00ff00' }, 'value', { view: 'color' });
-    childPane7.addInput({ value: 0.5 }, 'value', { min: 0, max: 1 });
+    childPane7.addBinding({ color: '#00ff00' }, 'color');
+    childPane7.addBinding({ ratio: 0.5 }, 'ratio', { min: 0, max: 1 });
     childPane7.addButton({ title: 'Action' });
 
     // Row 3 (1 unit)
@@ -133,7 +135,7 @@ export const OfficialDemo: React.FC = () => {
     childPane10.addButton({ title: 'BL' });
     // Right column
     childPane11.addButton({ title: 'Right' });
-    childPane11.addInput({ value: 60 }, 'value', { min: 0, max: 100 });
+    childPane11.addBinding({ value: 60 }, 'value', { min: 0, max: 100 });
 
     // Demo 5: Mixed content
     const demo5Folder = pane.addFolder({ title: 'Demo 5: Mixed Content Types', expanded: false });
@@ -150,11 +152,11 @@ export const OfficialDemo: React.FC = () => {
     const childPane13 = new Pane({ container: slots5[1] });
 
     // Left side - various inputs
-    childPane12.addInput({ value: 42 }, 'value', { min: 0, max: 100 });
-    childPane12.addInput({ value: 0.75 }, 'value', { min: 0, max: 1 });
-    childPane12.addInput({ value: '#ff00ff' }, 'value', { view: 'color' });
-    childPane12.addInput({ value: true }, 'value');
-    childPane12.addInput({ text: 'Hello' }, 'text');
+    childPane12.addBinding({ number: 42 }, 'number', { min: 0, max: 100 });
+    childPane12.addBinding({ percent: 0.75 }, 'percent', { min: 0, max: 1 });
+    childPane12.addBinding({ color: '#ff00ff' }, 'color');
+    childPane12.addBinding({ enabled: true }, 'enabled');
+    childPane12.addBinding({ text: 'Hello' }, 'text');
 
     // Right side - buttongrid
     childPane13.addBlade({
@@ -190,7 +192,7 @@ export const OfficialDemo: React.FC = () => {
     // Right side - mix of sized buttons and controls
     childPane15.addButton({ title: 'Standard Button' });
     addSizedButton(childPane15, { title: '2 Unit Wide', units: 2, onClick: () => console.log('2 units') });
-    childPane15.addInput({ value: 30 }, 'value', { min: 0, max: 100 });
+    childPane15.addBinding({ value: 30 }, 'value', { min: 0, max: 100 });
 
     return () => {
       try { uninstall1(); } catch {}
