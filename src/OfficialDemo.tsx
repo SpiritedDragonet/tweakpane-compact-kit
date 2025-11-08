@@ -4,7 +4,8 @@ import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
 import { SplitLayoutPlugin } from './plugins/SplitLayoutPlugin';
 import { installBladeViewShims } from './plugins/tpBladePlugins';
 import { useLayout } from './LayoutContext';
-import { randomInt, type LayoutPlan } from './layoutPlan';
+import { type LayoutPlan } from './layoutPlan';
+import { renderLeaf, renderCustomDom } from './renderLeaf';
 
 export const OfficialDemo: React.FC = () => {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -52,17 +53,16 @@ export const OfficialDemo: React.FC = () => {
     for (let c = 0; c < layoutPlan.cols.length; c++) {
       for (let r = 0; r < layoutPlan.cols[c].rows; r++) {
         if (slotIndex >= slots.length) break;
-        const p = new Pane({ container: slots[slotIndex] });
+        const slot = slots[slotIndex];
         const leaf = layoutPlan.cols[c].leaves[r];
-        childPanes.push(p);
 
-        // Add control based on leaf kind
-        if (leaf.kind === 'button') {
-          p.addButton({ title: 'Button' });
-        } else if (leaf.kind === 'number' || leaf.kind === 'slider') {
-          p.addBinding({ value: randomInt(0, 100) }, 'value', { min: 0, max: 100 });
+        if (leaf.kind === 'customDom') {
+          renderCustomDom(slot, leaf);
         } else {
-          p.addButton({ title: leaf.kind });
+          const p = new Pane({ container: slot });
+          try { p.registerPlugin(EssentialsPlugin as any); } catch {}
+          childPanes.push(p);
+          renderLeaf(p, leaf);
         }
 
         slotIndex++;
