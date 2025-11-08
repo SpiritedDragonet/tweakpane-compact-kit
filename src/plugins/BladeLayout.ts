@@ -294,7 +294,9 @@ export function mountBladeLayout(opts: {
       // Observe each row container and cell; safe if ResizeObserver exists
       rowElems.forEach((re) => { try { ro!.observe(re); } catch {} });
       rowCells.forEach((cells) => cells.forEach((c) => { try { ro!.observe(c); } catch {} }));
-      try { ro.observe(root); } catch {}
+      if (ro) {
+        try { ro.observe(root); } catch {}
+      }
     }
   } catch {}
 

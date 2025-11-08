@@ -168,8 +168,10 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
       if (!currentSpec) currentSpec = buildRandomSpec();
       // Use shimmed blade view
       layoutApi = (folder as any).addBlade({ view: 'blade-layout', ...currentSpec });
-      layoutApi.slots.forEach((s) => fillSlot(s));
-      try { layoutApi.refresh(); } catch {}
+      if (layoutApi) {
+        try { layoutApi.slots.forEach((s: HTMLElement) => fillSlot(s)); } catch {}
+        try { layoutApi.refresh(); } catch {}
+      }
     };
 
     currentSpec = buildRandomSpec();
