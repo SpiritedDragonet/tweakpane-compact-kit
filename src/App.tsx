@@ -77,7 +77,7 @@ export const App: React.FC = () => {
         children: Array.from({ length: col.rows }, () => 'leaf'),
         // Keep gutter consistent with plugin (4px)
         gutter: 4,
-        interactive: true,
+        interactive: false,
       }));
       return {
         view: 'split-layout',
@@ -86,7 +86,7 @@ export const App: React.FC = () => {
         children,
         // Keep gutter consistent with plugin (4px)
         gutter: 4,
-        interactive: true,
+        interactive: false,
       };
     };
 
