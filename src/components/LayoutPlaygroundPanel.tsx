@@ -32,6 +32,8 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
           .tp-bl-scope .tp-rotv_c > * { margin-top: 0 !important; margin-bottom: 0 !important; }
           .tp-bl-scope .tp-fldv { margin-top: 0 !important; margin-bottom: 0 !important; }
           .tp-bl-scope .tp-fldv_c { padding-top: 0 !important; padding-bottom: 0 !important; }
+          /* Critical: remove default vertical margins for direct children under folder content */
+          .tp-bl-scope .tp-fldv_c > * { margin-top: 0 !important; margin-bottom: 0 !important; }
           .tp-bl-scope .tp-v-fst, .tp-bl-scope .tp-v-vfst, .tp-bl-scope .tp-v-lst, .tp-bl-scope .tp-v-vlst {
             padding-top: 0 !important; padding-bottom: 0 !important;
             margin-top: 0 !important; margin-bottom: 0 !important;
