@@ -18,17 +18,16 @@ A compact layout toolkit for Tweakpane that provides space-efficient layouts and
 npm install tweakpane-compact-kit
 ```
 
-## Quick Start
+## Quick Start (Tweakpane v4)
 
-```typescript
+```ts
 import { Pane } from 'tweakpane';
-import { SplitLayoutPlugin, SizedButtonPlugin } from 'tweakpane-compact-kit';
+import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
 
-// Register the plugins
-pane.registerPlugin(SplitLayoutPlugin);
-pane.registerPlugin(SizedButtonPlugin);
+// Register the bundle (contains both SplitLayout + SizedButton)
+pane.registerPlugin(CompactKitBundle);
 ```
 
 ## Core Features
@@ -39,21 +38,20 @@ Create flexible split layouts with draggable gutters between panes.
 
 #### Basic Usage
 
-```typescript
-// Simple two-column layout
+```ts
+// Two equal columns
 const splitApi = pane.addBlade({
   view: 'split-layout',
   direction: 'row',
-  sizes: [40, 60], // percentages
+  sizes: '1fr 1fr',
+  gutter: 6,
   children: ['leaf', 'leaf'],
 });
 
-// Get slots to mount child panes
+// Get slots and mount child panes
 const slots = splitApi.getSlots();
 const leftPane = new Pane({ container: slots[0] });
 const rightPane = new Pane({ container: slots[1] });
-
-// Add controls to child panes
 leftPane.addBinding(params, 'prop1');
 rightPane.addBinding(params, 'prop2');
 ```
@@ -177,7 +175,7 @@ slotMap.get('preview')?.forEach(slot => {
 
 **Utility Methods:**
 
-```typescript
+```ts
 // Get all unique categories used in the layout
 const categories = splitApi.getCategories();
 console.log(categories); // ['track', 'master']
@@ -197,7 +195,7 @@ slotsByCategory.forEach((slots, category) => {
 
 Multiple ways to specify sizes:
 
-```typescript
+```ts
 // Array of percentages (automatically normalized)
 sizes: [30, 40, 30]  // → [30, 40, 30] (sum = 100)
 sizes: [1, 2, 1]     // → [25, 50, 25] (sum = 4, normalized to 100)
@@ -231,7 +229,7 @@ sizes: [
 
 Built-in presets for common layouts:
 
-```typescript
+```ts
 // Sidebar layout: 300px | 1fr
 const sidebar = pane.addBlade({
   view: 'split-layout',
@@ -271,7 +269,7 @@ All available presets:
 
 #### Nested Layouts
 
-```typescript
+```ts
 const nested = pane.addBlade({
   view: 'split-layout',
   direction: 'column',
@@ -289,7 +287,7 @@ const nested = pane.addBlade({
 
 #### Configuration Options
 
-```typescript
+```ts
 const splitApi = pane.addBlade({
   view: 'split-layout',
   direction: 'row', // 'row' or 'column'
@@ -297,8 +295,8 @@ const splitApi = pane.addBlade({
   children: ['leaf', 'leaf'],
   gutter: 8, // Gutter size in pixels (default: 6)
   minSize: 10, // Minimum size percentage (default: 5)
-  height: 200, // Only for column direction
-  interactive: true, // Enable dragging (default: true)
+  height: 200, // Only for direction === 'column'
+  interactive: true, // Enable dragging
 });
 ```
 
@@ -306,7 +304,7 @@ const splitApi = pane.addBlade({
 
 Create buttons that span multiple blade rows:
 
-```typescript
+```ts
 // Single-line button (default)
 pane.addBlade({
   view: 'sized-button',
@@ -358,7 +356,7 @@ The plugin automatically applies compact styles:
 - Numeric inputs are scaled and positioned at top-right
 - Drag handles are hidden for cleaner appearance
 
-```typescript
+```ts
 // These styles are applied automatically when using SplitLayout
 // No additional configuration needed
 ```
@@ -380,7 +378,7 @@ pane.addBlade({
 
 Full TypeScript definitions included:
 
-```typescript
+```ts
 import type {
   SplitDirection,
   SizeExpression,
@@ -393,16 +391,12 @@ import type {
 
 ### Complete Control Panel
 
-```typescript
+```ts
 import { Pane } from 'tweakpane';
-import {
-  SplitLayoutPlugin,
-  SizedButtonPlugin
-} from 'tweakpane-compact-kit';
+import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
-pane.registerPlugin(SplitLayoutPlugin);
-pane.registerPlugin(SizedButtonPlugin);
+pane.registerPlugin(CompactKitBundle);
 
 // Create main layout
 const main = pane.addBlade({

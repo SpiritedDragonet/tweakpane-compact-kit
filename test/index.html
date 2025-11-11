@@ -7,17 +7,39 @@
     <style>
       html, body { height: 100%; margin: 0; }
       body { display: grid; place-items: start center; background: #111; color: #ddd; }
-      .wrap { width: min(960px, 100%); padding: 16px; }
-      .pane-host { width: 100%; height: 520px; background: #1b1b1b; border: 1px solid #333; }
-      h1 { font: 600 16px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0 0 8px; }
-      p { margin: 0 0 10px; color: #aaa; font-size: 12px; }
+      .wrap { width: 320px; max-width: 100%; padding: 16px; box-sizing: border-box; }
+      .section { margin-bottom: 16px; }
+      .title { font: 600 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0 0 8px; color: #e6e6e6; }
+      .desc { margin: 0 8px 8px 0; color: #aaa; font-size: 12px; }
+      .pane-host { width: 300px; height: 220px; background: #1b1b1b; border: 1px solid #333; box-sizing: border-box; }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <h1>Tweakpane Compact Kit 示例</h1>
-      <p>左右分栏 + 上下分栏（行高按单元计算），右侧示例包含多行按钮。</p>
-      <div id="pane" class="pane-host"></div>
+      <div class="section">
+        <div class="title">1. 注册插件（v4）</div>
+        <div class="desc">后续示例均通过插件的 addBlade 接口创建。</div>
+      </div>
+      <div class="section">
+        <div class="title">2. 基础分栏</div>
+        <div id="host-basic" class="pane-host"></div>
+      </div>
+      <div class="section">
+        <div class="title">3. 分类槽位</div>
+        <div id="host-category" class="pane-host"></div>
+      </div>
+      <div class="section">
+        <div class="title">4. 嵌套布局</div>
+        <div id="host-nested" class="pane-host"></div>
+      </div>
+      <div class="section">
+        <div class="title">5. 多行按钮</div>
+        <div id="host-button" class="pane-host"></div>
+      </div>
+      <div class="section">
+        <div class="title">6. 可拖拽分割</div>
+        <div id="host-interactive" class="pane-host"></div>
+      </div>
     </div>
     <script type="module" src="/main.ts"></script>
   </body>

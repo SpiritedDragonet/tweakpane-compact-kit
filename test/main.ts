@@ -5,75 +5,101 @@
 import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
-function main() {
-  const host = document.getElementById('pane');
-  if (!host) return;
-
-  const pane = new Pane({ container: host, title: 'Compact Kit Demo' });
-
-  // 2 columns: left is column-split by units, right is a leaf slot
-  // Register plugin bundle (v4). If失败，直接报错，确保我们只通过正式插件路径运行。
-  try {
-    pane.registerPlugin(CompactKitBundle as any);
-  } catch (e) {
+function ensureRegistered(pane: Pane) {
+  try { pane.registerPlugin(CompactKitBundle as any); } catch (e) {
     console.error('Failed to register CompactKitBundle:', e);
     throw e;
   }
+}
 
-  // Build split layout via正式插件 API
-  const splitApi: any = (pane as any).addBlade({
-    view: 'split-layout',
-    direction: 'row',
-    sizes: '1fr 2fr',
-    gutter: 6,
-    interactive: false,
-    children: [
-      {
-        view: 'split-layout',
-        direction: 'column',
-        // Three rows by units (e.g., 2,1,1)
-        rowUnits: [2, 1, 1],
-        children: ['leaf', 'leaf', 'leaf'],
-        gutter: 6,
-      },
-      'leaf',
-    ],
+function buildBasic(container: HTMLElement) {
+  const pane = new Pane({ container, title: '基础分栏' });
+  ensureRegistered(pane);
+  const api: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6,
+    children: ['leaf', 'leaf']
   });
+  if (typeof api.getSlots !== 'function') throw new Error('plugin API missing');
+  const slots = api.getSlots();
+  const left = new Pane({ container: slots[0] });
+  const right = new Pane({ container: slots[1] });
+  (left as any).addBinding({ gain: 0.7 }, 'gain', { min: 0, max: 1 });
+  (right as any).addBinding({ pitch: 440 }, 'pitch', { min: 220, max: 880 });
+}
 
-  if (typeof (splitApi as any).getSlots !== 'function') {
-    throw new Error('splitApi.getSlots is not available; plugin API not installed');
-  }
-  const slots: HTMLElement[] = (splitApi as any).getSlots();
+function buildCategory(container: HTMLElement) {
+  const pane = new Pane({ container, title: '分类槽位' });
+  ensureRegistered(pane);
+  const api: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'row', sizes: 'equal',
+    children: ['track', 'master']
+  });
+  if (typeof api.getSlotsByCategory !== 'function') throw new Error('plugin API missing');
+  const track = { name: 'Track', volume: 0.8, pan: 0 };
+  api.getSlotsByCategory('track').forEach((slot: HTMLElement) => {
+    const p = new Pane({ container: slot });
+    (p as any).addBinding(track, 'volume', { min: 0, max: 1 });
+    (p as any).addBinding(track, 'pan', { min: -1, max: 1 });
+  });
+  const master = { volume: 1.0 };
+  api.getSlotsByCategory('master').forEach((slot: HTMLElement) => {
+    const p = new Pane({ container: slot });
+    (p as any).addBinding(master, 'volume', { min: 0, max: 1 });
+  });
+}
 
-  // Left column rows
-  const state = { opacity: 0.75, speed: 2, width: 320, height: 180, enabled: true, threshold: 42 };
-  const row1 = new Pane({ container: slots[0] });
-  (row1 as any).addBinding(state, 'opacity', { min: 0, max: 1, label: 'Opacity' });
-  (row1 as any).addBinding(state, 'speed', { min: 0, max: 10, label: 'Speed' });
+function buildNested(container: HTMLElement) {
+  const pane = new Pane({ container, title: '嵌套布局' });
+  ensureRegistered(pane);
+  const api: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'column', gutter: 6,
+    children: [
+      'leaf',
+      { view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf', 'leaf'] },
+    ]
+  });
+  if (typeof api.getSlots !== 'function') throw new Error('plugin API missing');
+  const slots = api.getSlots();
+  const top = new Pane({ container: slots[0] });
+  (top as any).addBinding({ title: 'Header' }, 'title');
+  new Pane({ container: slots[1] }).addFolder({ title: 'Left' });
+  new Pane({ container: slots[2] }).addFolder({ title: 'Right' });
+}
 
-  const row2 = new Pane({ container: slots[1] });
-  (row2 as any).addBinding(state, 'width', { min: 100, max: 600, label: 'Width' });
-  (row2 as any).addBinding(state, 'height', { min: 100, max: 400, label: 'Height' });
+function buildButton(container: HTMLElement) {
+  const pane = new Pane({ container, title: '多行按钮' });
+  ensureRegistered(pane);
+  (pane as any).addBlade({ view: 'sized-button', title: 'Run\nAction', units: 2 });
+}
 
-  const row3 = new Pane({ container: slots[2] });
-  // Demo with regular button
-  (row3 as any).addButton({ title: 'Run Action' });
+function buildInteractive(container: HTMLElement) {
+  const pane = new Pane({ container, title: '可拖拽分割' });
+  ensureRegistered(pane);
+  const api: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'row', sizes: [50, 50], gutter: 6, interactive: true,
+    children: ['leaf', 'leaf']
+  });
+  if (typeof api.getSlots !== 'function') throw new Error('plugin API missing');
+  const slots = api.getSlots();
+  const left = new Pane({ container: slots[0] });
+  const right = new Pane({ container: slots[1] });
+  (left as any).addBinding({ a: 1 }, 'a', { min: 0, max: 2, step: 1 });
+  (right as any).addBinding({ b: true }, 'b');
+}
 
-  // Right side leaf
-  const right = new Pane({ container: slots[3] });
-  (right as any).addBinding(state, 'enabled', { label: 'Enabled' });
-  (right as any).addBinding(state, 'threshold', { min: 0, max: 100, step: 1, label: 'Threshold' });
+function main() {
+  const elBasic = document.getElementById('host-basic') as HTMLElement | null;
+  const elCat = document.getElementById('host-category') as HTMLElement | null;
+  const elNest = document.getElementById('host-nested') as HTMLElement | null;
+  const elBtn = document.getElementById('host-button') as HTMLElement | null;
+  const elInter = document.getElementById('host-interactive') as HTMLElement | null;
+  if (!elBasic || !elCat || !elNest || !elBtn || !elInter) return;
 
-  // Cleanup on hot-reload
-  if (import.meta && (import.meta as any).hot) {
-    (import.meta as any).hot.dispose(() => {
-      try { row1.dispose(); } catch {}
-      try { row2.dispose(); } catch {}
-      try { row3.dispose(); } catch {}
-      try { right.dispose(); } catch {}
-      try { pane.dispose(); } catch {}
-    });
-  }
+  buildBasic(elBasic);
+  buildCategory(elCat);
+  buildNested(elNest);
+  buildButton(elBtn);
+  buildInteractive(elInter);
 }
 
 main();
