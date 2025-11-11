@@ -36,6 +36,9 @@
   ],
   "author": "",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "tweakpane": "^4.0.0"
   },

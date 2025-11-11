@@ -48,6 +48,23 @@ function buildCategory(container: HTMLElement) {
   });
 }
 
+function buildPresets(container: HTMLElement) {
+  const pane = new Pane({ container, title: '预设布局' });
+  ensureRegistered(pane);
+  const api: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'row', sizes: 'panels',
+    children: ['leaf', 'leaf', 'leaf']
+  });
+  if (typeof api.getSlots !== 'function') throw new Error('plugin API missing');
+  const slots = api.getSlots();
+  const a = new Pane({ container: slots[0] });
+  const b = new Pane({ container: slots[1] });
+  const c = new Pane({ container: slots[2] });
+  (a as any).addBinding({ v: 0.2 }, 'v', { min: 0, max: 1, label: 'A' });
+  (b as any).addBinding({ v: 0.5 }, 'v', { min: 0, max: 1, label: 'B' });
+  (c as any).addBinding({ v: 0.8 }, 'v', { min: 0, max: 1, label: 'C' });
+}
+
 function buildNested(container: HTMLElement) {
   const pane = new Pane({ container, title: '嵌套布局' });
   ensureRegistered(pane);
@@ -69,7 +86,22 @@ function buildNested(container: HTMLElement) {
 function buildButton(container: HTMLElement) {
   const pane = new Pane({ container, title: '多行按钮' });
   ensureRegistered(pane);
-  (pane as any).addBlade({ view: 'sized-button', title: 'Run\nAction', units: 2 });
+  // Multi-line button demo
+  (pane as any).addBlade({ view: 'sized-button', title: '多行\n按钮', units: 3 });
+}
+
+function buildCompact(container: HTMLElement) {
+  const pane = new Pane({ container, title: '紧凑样式' });
+  ensureRegistered(pane);
+  const api: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'column',
+    children: ['leaf']
+  });
+  if (typeof api.getSlots !== 'function') throw new Error('plugin API missing');
+  const slots = api.getSlots();
+  const p = new Pane({ container: slots[0] });
+  (p as any).addBinding({ level: 0.75 }, 'level', { min: 0, max: 1, label: '音量' });
+  (p as any).addBinding({ freq: 440 }, 'freq', { min: 100, max: 1000, label: '频率' });
 }
 
 function buildInteractive(container: HTMLElement) {
@@ -89,16 +121,20 @@ function buildInteractive(container: HTMLElement) {
 
 function main() {
   const elBasic = document.getElementById('host-basic') as HTMLElement | null;
+  const elPresets = document.getElementById('host-presets') as HTMLElement | null;
   const elCat = document.getElementById('host-category') as HTMLElement | null;
   const elNest = document.getElementById('host-nested') as HTMLElement | null;
   const elBtn = document.getElementById('host-button') as HTMLElement | null;
+  const elCompact = document.getElementById('host-compact') as HTMLElement | null;
   const elInter = document.getElementById('host-interactive') as HTMLElement | null;
-  if (!elBasic || !elCat || !elNest || !elBtn || !elInter) return;
+  if (!elBasic || !elPresets || !elCat || !elNest || !elBtn || !elCompact || !elInter) return;
 
   buildBasic(elBasic);
+  buildPresets(elPresets);
   buildCategory(elCat);
   buildNested(elNest);
   buildButton(elBtn);
+  buildCompact(elCompact);
   buildInteractive(elInter);
 }
 

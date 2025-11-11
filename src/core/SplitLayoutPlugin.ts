@@ -816,6 +816,7 @@ export const SplitLayoutPlugin: any = {
   },
   // Expose a simple API to retrieve leaf slots so callers can mount UIs
   api(args: any) {
+    if (!(args.controller instanceof SplitLayoutController)) return null;
     return new SplitLayoutApi(args.controller as SplitLayoutController);
   },
   // Auto-inject styles for tight layout (no gaps, no overflow)

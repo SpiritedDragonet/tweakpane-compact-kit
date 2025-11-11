@@ -4,6 +4,10 @@ node_modules/
 # Production build output
 dist/
 dist-demo/
+.claude/
+CLAUDE.md
+nul
+*.timestamp-*.mjs
 
 # Vite cache
 .vite/

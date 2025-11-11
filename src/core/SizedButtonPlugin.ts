@@ -12,6 +12,7 @@ class SizedButtonController {
   public blade: any;
   public view: { element: HTMLElement };
   public viewProps: any;
+  public buttonEl!: HTMLButtonElement;
   private disposeFn: () => void;
 
   constructor(args: {
@@ -33,9 +34,11 @@ class SizedButtonController {
 
     // Create the button
     const button = document.createElement('button');
-    button.className = 'tp-sb-button tp-btn-v';
+    // Use Tweakpane's default button view class to inherit colors
+    button.className = 'tp-sb-button tp-btnv_b';
     button.textContent = params.title || '';
     container.appendChild(button);
+    this.buttonEl = button;
 
     // Apply click handler
     if (params.onClick && typeof params.onClick === 'function') {
@@ -50,26 +53,7 @@ class SizedButtonController {
     // Set initial height
     this.updateHeight(params.units || 1);
 
-    // Create blade API
-    this.blade = {
-      controller: this,
-      disabled: false,
-      hidden: false,
-      on(eventName: string, handler: Function) {
-        // Basic event handling
-        if (eventName === 'click') {
-          button.addEventListener('click', handler as EventListener);
-        }
-        return this;
-      },
-      off(eventName: string, handler: Function) {
-        if (eventName === 'click') {
-          button.removeEventListener('click', handler as EventListener);
-        }
-        return this;
-      },
-      dispose: () => this.dispose(),
-    } as any;
+    // Hook disposal to view props lifecycle
     try { this.viewProps?.handleDispose?.(() => this.dispose()); } catch {}
   }
 
@@ -148,11 +132,17 @@ class SizedButtonApi {
   }
 
   on(eventName: string, handler: Function) {
-    return this._c.blade.on(eventName, handler);
+    if (eventName === 'click') {
+      this._c.buttonEl?.addEventListener('click', handler as any);
+    }
+    return this;
   }
 
   off(eventName: string, handler: Function) {
-    return this._c.blade.off(eventName, handler);
+    if (eventName === 'click') {
+      this._c.buttonEl?.removeEventListener('click', handler as any);
+    }
+    return this;
   }
 }
 
@@ -178,7 +168,7 @@ export const SizedButtonPlugin: any = {
       margin: 0;
     }
 
-    .tp-sb-button.tp-btn-v {
+    .tp-sb-button.tp-btnv_b {
       width: 100%;
       min-width: 0;
       padding: 0 8px;
@@ -186,10 +176,6 @@ export const SizedButtonPlugin: any = {
       line-height: 1.4;
       font-weight: 600;
       letter-spacing: 0.08em;
-      border-radius: 4px;
-      border: 1px solid var(--base-bg);
-      background-color: var(--base-bg);
-      color: var(--base-fg);
       cursor: pointer;
       transition: all 0.1s ease;
       display: flex;
@@ -201,26 +187,11 @@ export const SizedButtonPlugin: any = {
       box-sizing: border-box;
     }
 
-    .tp-sb-button.tp-btn-v:hover {
-      background-color: var(--btn-bg-hover);
-      border-color: var(--btn-border-hover);
-    }
-
-    .tp-sb-button.tp-btn-v:active {
-      background-color: var(--btn-bg-active);
-      border-color: var(--btn-border-active);
-    }
-
-    .tp-sb-button.tp-btn-v:focus {
-      outline: none;
-      box-shadow: 0 0 0 1px var(--accent-color);
-    }
-
     /* Align with Tweakpane's compact styling */
     .tp-sb-container {
       padding: 0;
     }
-    .tp-sb-button.tp-btn-v {
+    .tp-sb-button.tp-btnv_b {
       margin: 0;
     }
   `,
@@ -245,6 +216,7 @@ export const SizedButtonPlugin: any = {
     return new SizedButtonController(args);
   },
   api(args: any) {
+    if (!(args.controller instanceof SizedButtonController)) return null;
     return new SizedButtonApi(args.controller as SizedButtonController);
   }
 };
