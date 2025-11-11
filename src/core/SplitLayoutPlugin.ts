@@ -119,14 +119,16 @@ export type SplitLayoutNode =
   | {
       view: 'split-layout';
       direction: SplitDirection;
-      sizes?: number[]; // percentages per child (sum ~100)
+      // Allow full SizeExpression for nested nodes to support presets like 'equal'
+      sizes?: SizeExpression;
       // When direction === 'column', optional per-row heights in blade units.
       // If provided, overrides 'sizes' and computes container height from units.
-      rowUnits?: number[];
+      rowUnits?: SizeExpression;
       children: SplitLayoutNode[];
       minSize?: number; // min percentage for each pane (default 5)
-      gutter?: number; // gutter size in px (default 6)
-      height?: number; // only meaningful when direction === 'column'
+      // Allow string for convenience (e.g., '6')
+      gutter?: number | string; // gutter size in px (default 6)
+      height?: number | string; // only meaningful when direction === 'column'
     };
 
 // Enhanced size expressions supporting CSS Grid-like syntax
@@ -176,6 +178,23 @@ export type SplitLayoutParams = {
   // Gap between items (alias for gutter)
   gap?: number | string;
   // Additional CSS classes
+  className?: string;
+};
+
+// Params after normalization, used internally by builder/controller
+type NormalizedSplitLayoutParams = {
+  view: 'split-layout';
+  direction: SplitDirection;
+  sizes: number[]; // normalized percentages per child (sum ~100)
+  children: SplitLayoutNode[];
+  rowUnits?: number[]; // normalized when direction === 'column'
+  height?: number | string;
+  gutter: number; // px
+  minSize: number;
+  interactive: boolean;
+  compactSliders: boolean;
+  align?: 'start' | 'center' | 'end' | 'stretch';
+  gap?: number | string; // retained for completeness
   className?: string;
 };
 
@@ -321,7 +340,7 @@ function applyPreset(preset: LayoutPreset, direction: SplitDirection): { sizes: 
   }
 }
 
-function normalizeSplitParams(input: any): SplitLayoutParams {
+function normalizeSplitParams(input: any): NormalizedSplitLayoutParams {
   // Clone to avoid mutating caller object
   const p: any = { ...input };
   const dir: SplitDirection = p.direction === 'column' ? 'column' : 'row';
@@ -340,7 +359,7 @@ function normalizeSplitParams(input: any): SplitLayoutParams {
   const panelCount = Math.max(
     children.length || 2,
     Array.isArray(p.sizes) ? p.sizes.length :
-    typeof p.sizes === 'string' ? p.sizes.trim().split(/\s+/).filter(p => p).length :
+    typeof p.sizes === 'string' ? p.sizes.trim().split(/\s+/).filter((x: string) => x).length :
     typeof p.sizes === 'object' && 'equal' in p.sizes ? p.sizes.equal :
     typeof p.sizes === 'object' && 'auto' in p.sizes ? p.sizes.auto :
     typeof p.sizes === 'object' && 'ratio' in p.sizes ? p.sizes.ratio.length :
@@ -393,7 +412,7 @@ function normalizeSizes(count: number, sizes?: number[]): number[] {
 
 function buildSplit(
   doc: Document,
-  params: SplitLayoutParams,
+  params: NormalizedSplitLayoutParams,
   path: number[] = [],
   envEl?: HTMLElement,
 ): BuildResult {
@@ -401,16 +420,14 @@ function buildSplit(
   const children = params.children || [];
   const n = children.length;
   // params.sizes is already normalized to number[] by normalizeSplitParams
-  let sizes = Array.isArray(params.sizes) ? params.sizes : normalizeSizes(n, params.sizes as number[] | undefined);
+  let sizes = normalizeSizes(n, params.sizes);
   // Allow zero-width panels when dragging unless caller overrides
   const minSize = params.minSize ?? 20;
   // Use specified gutter or default to 4px for tight visuals
   const gutter = params.gutter ?? 4;
   const interactive = !!params.interactive; // default static
   // rowUnits is already normalized to number[] by normalizeSplitParams
-  const rowUnits = (direction === 'column' && params.rowUnits && Array.isArray(params.rowUnits))
-    ? params.rowUnits
-    : undefined;
+  const rowUnits = direction === 'column' ? params.rowUnits : undefined;
   const computeUnitPx = (fallbackEl: HTMLElement): number => {
     const anchor = envEl || fallbackEl || doc.body;
     const probe = doc.createElement('div');
@@ -594,7 +611,8 @@ function buildSplit(
         } catch {}
       }
     } else if (child && (child as any).view === 'split-layout') {
-      const res = buildSplit(doc, child as SplitLayoutParams, path.concat(i), envEl);
+      // Normalize nested split-layout node before building
+      const res = buildSplit(doc, normalizeSplitParams(child as SplitLayoutParams), path.concat(i), envEl);
       container.appendChild(res.element);
       leaves.push(...res.leaves);
       disposers.push(res.cleanup);
@@ -720,15 +738,20 @@ function buildSplit(
 
 class SplitLayoutController {
   public view: { element: HTMLElement };
+  public blade: any;
+  public viewProps: any;
   public slots: HTMLElement[];
   private _dispose: () => void;
   constructor(args: any) {
     const doc: Document = args.document ?? document;
-    const params: SplitLayoutParams = normalizeSplitParams(args.params);
+    const params: NormalizedSplitLayoutParams = normalizeSplitParams(args.params);
     const built = buildSplit(doc, params);
     this.view = { element: built.element };
+    this.blade = args.blade;
+    this.viewProps = args.viewProps;
     this.slots = built.leaves;
     this._dispose = built.cleanup;
+    try { this.viewProps?.handleDispose?.(() => { try { built.cleanup(); } catch {} }); } catch {}
   }
   dispose() {
     this._dispose?.();
@@ -736,9 +759,11 @@ class SplitLayoutController {
 }
 
 class SplitLayoutApi {
+  public controller: any;
   private _c: SplitLayoutController;
   constructor(controller: SplitLayoutController) {
     this._c = controller;
+    this.controller = controller as any;
   }
   getSlots(): HTMLElement[] {
     return this._c.slots;
@@ -773,10 +798,15 @@ class SplitLayoutApi {
   }
 }
 
+// NOTE: The 'core' semver here refers to @tweakpane/core's major version.
+// For Tweakpane v4.x, @tweakpane/core's major is 2.
+
 export const SplitLayoutPlugin: any = {
   id: 'split-layout',
   // Mark as blade plugin so it can be added via addBlade({ view: 'split-layout' })
   type: 'blade',
+  // Tweakpane compatibility: match @tweakpane/core major version (v2 for Tweakpane v4)
+  core: { major: 2, minor: 0, patch: 0 },
   accept(params: any) {
     if (!params || params.view !== 'split-layout') return null;
     return { params };

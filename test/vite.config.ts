@@ -1,18 +1,18 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
-// Test/Demo dev server config
+// Minimal demo dev server config (vanilla TS)
 export default defineConfig({
-  plugins: [react()],
   root: './test',
-  // Remove alias to use default module resolution
+  resolve: {
+    alias: {
+      // Map source imports to the actual source files for development
+      'tweakpane-compact-kit': resolve(__dirname, '../src/index.ts'),
+    },
+  },
   server: {
     port: 5173,
     open: true,
   },
-  build: {
-    outDir: '../dist-demo',
-    emptyOutDir: true,
-  },
+  // No production site build for demo; use dev server only
 });

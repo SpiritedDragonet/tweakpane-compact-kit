@@ -3,6 +3,7 @@ node_modules/
 
 # Production build output
 dist/
+dist-demo/
 
 # Vite cache
 .vite/

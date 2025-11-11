@@ -11,7 +11,6 @@
 - Install deps: `npm install`
 - Start dev server: `npm run dev` → open the shown URL
 - Production build: `npm run build` → static output in `dist/`
-- Preview production build: `npm run preview`
 - Three.js version is pinned (`three@0.165.0`). Keep versions pinned.
 
 ## Coding Style & Naming Conventions

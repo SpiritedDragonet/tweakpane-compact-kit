@@ -1,12 +1,24 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tweakpane Compact Kit - Demo</title>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="./src/main.tsx"></script>
-</body>
-</html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tweakpane Compact Kit - Demo</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body { display: grid; place-items: start center; background: #111; color: #ddd; }
+      .wrap { width: min(960px, 100%); padding: 16px; }
+      .pane-host { width: 100%; height: 520px; background: #1b1b1b; border: 1px solid #333; }
+      h1 { font: 600 16px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0 0 8px; }
+      p { margin: 0 0 10px; color: #aaa; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Tweakpane Compact Kit 示例</h1>
+      <p>左右分栏 + 上下分栏（行高按单元计算），右侧示例包含多行按钮。</p>
+      <div id="pane" class="pane-host"></div>
+    </div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+  </html>

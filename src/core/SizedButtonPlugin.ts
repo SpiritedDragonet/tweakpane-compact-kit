@@ -4,22 +4,27 @@
 // - Includes gap compensation for proper alignment
 // - Minimal API: { view: 'sized-button', title?, units?, onClick? }
 
-import type { BladeApi } from 'tweakpane';
+// import type { BladeApi } from 'tweakpane';
+// Using any to avoid coupling to Tweakpane's internal types
 
 // Controller for the sized button blade
 class SizedButtonController {
-  public blade: BladeApi<any>;
-  public element: HTMLElement;
+  public blade: any;
+  public view: { element: HTMLElement };
+  public viewProps: any;
   private disposeFn: () => void;
 
   constructor(args: {
     document: Document;
     params: any;
+    viewProps?: any;
   }) {
-    const { document, params } = args;
+    const { document, params, viewProps } = args;
     const element = document.createElement('div');
     element.className = 'tp-sized-button';
-    this.element = element;
+    this.view = { element };
+    this.blade = (args as any).blade;
+    this.viewProps = viewProps;
 
     // Create container for the button
     const container = document.createElement('div');
@@ -65,15 +70,16 @@ class SizedButtonController {
       },
       dispose: () => this.dispose(),
     } as any;
+    try { this.viewProps?.handleDispose?.(() => this.dispose()); } catch {}
   }
 
   updateHeight(units: number) {
-    const button = this.element.querySelector('.tp-sb-button') as HTMLElement;
+    const button = this.view.element.querySelector('.tp-sb-button') as HTMLElement;
     if (!button) return;
 
     // Compute 1 blade unit (px)
     const computeUnitPx = (): number => {
-      const doc = this.element.ownerDocument;
+      const doc = this.view.element.ownerDocument;
       const findContainer = (el: HTMLElement | null): HTMLElement | null => {
         let cur: HTMLElement | null = el;
         while (cur) {
@@ -82,7 +88,7 @@ class SizedButtonController {
         }
         return el;
       };
-      const cont = findContainer(this.element) || this.element;
+      const cont = findContainer(this.view.element) || this.view.element;
       try {
         const cs = (cont && (cont.ownerDocument?.defaultView || window).getComputedStyle(cont)) as CSSStyleDeclaration;
         const v = cs.getPropertyValue('--cnt-usz')?.trim();
@@ -99,7 +105,7 @@ class SizedButtonController {
         probe.style.visibility = 'hidden';
         probe.style.height = 'var(--cnt-usz)';
         probe.style.width = '1px';
-        (cont || this.element).appendChild(probe);
+        (cont || this.view.element).appendChild(probe);
         const px = probe.getBoundingClientRect().height || probe.offsetHeight || 0;
         probe.remove();
         if (px) return Math.max(1, Math.round(px));
@@ -129,10 +135,12 @@ class SizedButtonController {
 
 // API class for the sized button
 class SizedButtonApi {
+  public controller: any;
   private _c: SizedButtonController;
 
   constructor(controller: SizedButtonController) {
     this._c = controller;
+    this.controller = controller as any;
   }
 
   dispose() {
@@ -148,10 +156,15 @@ class SizedButtonApi {
   }
 }
 
+// NOTE: The 'core' semver here refers to @tweakpane/core's major version.
+// For Tweakpane v4.x, @tweakpane/core's major is 2.
+
 // Plugin definition
 export const SizedButtonPlugin: any = {
   id: 'sized-button',
   type: 'blade',
+  // Tweakpane compatibility: match @tweakpane/core major version (v2 for Tweakpane v4)
+  core: { major: 2, minor: 0, patch: 0 },
   css: `
     /* Sized button blade styles */
     .tp-sized-button {

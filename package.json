@@ -19,10 +19,9 @@
   "scripts": {
     "build": "npm run build:lib",
     "build:lib": "vite build --config vite.config.lib.ts",
-    "dev": "npm run build:lib -- --watch",
-    "demo": "vite --config test/vite.config.ts",
-    "build:demo": "vite build --config test/vite.config.ts",
-    "preview": "vite preview --port 5173 --outDir dist-demo"
+    "dev": "npm run build:lib && vite --config test/vite.config.ts",
+    "dev:lib": "npm run build:lib -- --watch",
+    "demo": "npm run build:lib && vite --config test/vite.config.ts"
   },
   "keywords": [
     "tweakpane",
