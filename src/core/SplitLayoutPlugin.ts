@@ -12,7 +12,7 @@
 //   const slots: HTMLElement[] = api.getSlots()
 
 // Auto-tweak slider labels to prevent overflow and truncate long text
-function installSliderLabelAutoTweak(container: HTMLElement): () => void {
+function installSliderLabelAutoTweak(container: HTMLElement, compactSliders: boolean = true): () => void {
   const observers: MutationObserver[] = [];
   const tweakedSet = new WeakSet<HTMLElement>();
   const tweakSliderLabel = (labeledView: HTMLElement) => {
@@ -23,35 +23,82 @@ function installSliderLabelAutoTweak(container: HTMLElement): () => void {
       if (!valueBox) return;
       const hasSlider = !!(valueBox.querySelector('.tp-sldv') || valueBox.querySelector('.tp-sldtxtv'));
       if (!hasSlider) return;
+
+      // Find label box (may not exist if removed by removeLabelFor)
       const labelBox = labeledView.querySelector('.tp-lblv_l') as HTMLElement | null;
-      if (!labelBox) return;
+
       // Mark as tweaked before modifying DOM
       tweakedSet.add(labeledView);
-      // Move label into value box as overlay
-      labelBox.style.position = 'absolute';
-      labelBox.style.left = '6px';
-      labelBox.style.top = '4px';
-      labelBox.style.fontSize = '10px';
-      labelBox.style.lineHeight = '1';
-      labelBox.style.color = '#aaa';
-      labelBox.style.margin = '0';
-      labelBox.style.padding = '0';
-      // Limit width to 60% and truncate with ellipsis
-      labelBox.style.maxWidth = '60%';
-      labelBox.style.overflow = 'hidden';
-      labelBox.style.textOverflow = 'ellipsis';
-      labelBox.style.whiteSpace = 'nowrap';
-      // Make background transparent and place behind slider
-      labelBox.style.paddingRight = '4px';
-      labelBox.style.background = 'transparent';
-      labelBox.style.zIndex = '1';
-      // Ensure slider handle is above label
-      const sliderHandle = labeledView.querySelector('.tp-txtv_k') as HTMLElement | null;
-      if (sliderHandle) {
-        sliderHandle.style.zIndex = '2';
-        sliderHandle.style.position = 'relative';
+
+      // Apply slider scaling styles only if compactSliders is enabled
+      if (compactSliders) {
+      const sldSurface = valueBox.querySelector('.tp-sldtxtv_s') as HTMLElement | null
+        || valueBox.querySelector('.tp-sldv_s') as HTMLElement | null;
+      if (sldSurface) {
+        // Keep the slider visually anchored to the bottom; shrink height by 50%
+        sldSurface.style.transformOrigin = 'bottom left';
+        sldSurface.style.transform = 'scaleY(0.5)';
+        (sldSurface.style as any).willChange = 'transform';
+        // Hide a potential draggable handle/knob within the slider surface
+        const handle = sldSurface.querySelector('.tp-sldv_h')
+          || sldSurface.querySelector('[class*="sldv_h"]')
+          || sldSurface.querySelector('[class*="knob"]')
+          || sldSurface.querySelector('[class*="handle"]')
+          || sldSurface.querySelector('[class*="thumb"]') as HTMLElement | null;
+        if (handle) {
+          (handle as HTMLElement).style.display = 'none';
+        }
       }
-      try { valueBox.insertBefore(labelBox, valueBox.firstChild); } catch {}
+
+      // Place the entire text area (.tp-sldtxtv_t) at the top-right, unscaled by slider surface
+      const sldTextArea = valueBox.querySelector('.tp-sldtxtv_t') as HTMLElement | null;
+      if (sldTextArea) {
+        // Ensure value container is positioning root, then mount here
+        try { valueBox.appendChild(sldTextArea); } catch {}
+        sldTextArea.style.position = 'absolute';
+        sldTextArea.style.right = '6px';
+        sldTextArea.style.top = '2px';
+        sldTextArea.style.transformOrigin = 'top right';
+        sldTextArea.style.transform = 'scale(0.3333, 0.5)';
+        (sldTextArea.style as any).willChange = 'transform';
+        sldTextArea.style.zIndex = '1';
+        // Enlarge numeric text for readability (pre-scale), and bold
+        const inputEl = sldTextArea.querySelector('input') as HTMLElement | null;
+        if (inputEl) {
+          // Pre-scale font so post-scale ~12px (scaleY=0.5)
+          inputEl.style.fontSize = '24px';
+          inputEl.style.fontWeight = '';
+          inputEl.style.lineHeight = '1';
+          // Use Tweakpane default font (inherit)
+          inputEl.style.fontFamily = '';
+          inputEl.style.letterSpacing = '0.01em';
+        }
+      }
+      }
+
+      // Handle label if it exists
+      if (labelBox && compactSliders) {
+        // Move label into value box as overlay
+        labelBox.style.position = 'absolute';
+        labelBox.style.left = '6px';
+        labelBox.style.top = '4px';
+        labelBox.style.fontSize = '10px';
+        labelBox.style.lineHeight = '1';
+        labelBox.style.color = '#aaa';
+        labelBox.style.margin = '0';
+        labelBox.style.padding = '0';
+        // Limit width to 60% and truncate with ellipsis
+        labelBox.style.maxWidth = '60%';
+        labelBox.style.overflow = 'hidden';
+        labelBox.style.textOverflow = 'ellipsis';
+        labelBox.style.whiteSpace = 'nowrap';
+        // Make background transparent and place behind slider
+        labelBox.style.paddingRight = '4px';
+        labelBox.style.background = 'transparent';
+        labelBox.style.zIndex = '1';
+        // Insert label into value box
+        try { valueBox.insertBefore(labelBox, valueBox.firstChild); } catch {}
+      }
     } catch {}
   };
   const patchAll = (root: HTMLElement) => {
@@ -68,7 +115,7 @@ function installSliderLabelAutoTweak(container: HTMLElement): () => void {
 export type SplitDirection = 'row' | 'column';
 
 export type SplitLayoutNode =
-  | 'leaf'
+  | string // Any string represents a leaf category (e.g., 'leaf', 'audio', 'video', 'controls')
   | {
       view: 'split-layout';
       direction: SplitDirection;
@@ -82,22 +129,54 @@ export type SplitLayoutNode =
       height?: number; // only meaningful when direction === 'column'
     };
 
+// Enhanced size expressions supporting CSS Grid-like syntax
+export type SizeExpression =
+  | number[]                           // [100, 200] - pixels
+  | string[]                          // ['100px', '2fr', '30%']
+  | string                            // '1fr 2fr 1fr' or '100px 200px'
+  | 'equal'                           // Equal distribution
+  | { equal: number }                 // Equal split into N parts
+  | { ratio: number[] }               // Ratio-based [1, 2, 1] = 1:2:1
+  | { auto: number }                  // N auto-sized columns
+  | { min: number, max?: number }[];  // Min/max constraints
+
+// Layout presets for common patterns
+export type LayoutPreset =
+  | 'sidebar'                         // 300px | 1fr
+  | 'panels'                          // 1fr | 1fr | 1fr
+  | 'main-sidebar'                    // 1fr | 250px
+  | 'header-main'                     // auto | 1fr
+  | 'triple'                          // 1fr 2fr 1fr
+  | 'golden'                          // 0.618fr | 1fr
+  | 'nested';                         // Auto-generate nested layout
+
 export type SplitLayoutParams = {
   view: 'split-layout';
   direction: SplitDirection;
-  sizes?: number[];
-  rowUnits?: number[]; // only for direction === 'column'
-  children: SplitLayoutNode[];
+  // Unified size expression - replaces sizes/mode/count/ratio
+  sizes?: SizeExpression;
+  // Optional preset for common layouts
+  preset?: LayoutPreset;
+  // Children - inferred from sizes if not provided
+  children?: SplitLayoutNode[];
+  // Vertical unit allocation for column layout (supports same expressions)
+  rowUnits?: SizeExpression;
+  // Optional fixed height for row layout
+  height?: number | string;
+  // Gutter size (default: 6px)
+  gutter?: number | string;
+  // Minimum size for each panel (default: 20)
   minSize?: number;
-  gutter?: number;
-  height?: number;
-  // When true, show draggable gutters and enable pointer resize
-  // Default false for static layout per project needs
+  // Enable interactive resizing
   interactive?: boolean;
-  // Optional sugar for constructing sizes
-  mode?: 'equal' | 'ratio';
-  count?: number; // when mode==='equal'
-  ratio?: number; // (0,1), when mode==='ratio'
+  // Apply compact slider styles (default: true)
+  compactSliders?: boolean;
+  // CSS Grid-like alignment
+  align?: 'start' | 'center' | 'end' | 'stretch';
+  // Gap between items (alias for gutter)
+  gap?: number | string;
+  // Additional CSS classes
+  className?: string;
 };
 
 type BuildResult = {
@@ -106,41 +185,198 @@ type BuildResult = {
   cleanup: () => void;
 };
 
+// Parse size expression into normalized percentages
+function parseSizeExpression(expr: SizeExpression | undefined, count: number = 2): number[] {
+  if (!expr) {
+    // Default to equal split
+    return Array.from({ length: count }, () => 100 / count);
+  }
+
+  // Handle preset strings
+  if (expr === 'equal' || (typeof expr === 'object' && 'equal' in expr)) {
+    const n = typeof expr === 'object' ? expr.equal : count;
+    return Array.from({ length: Math.max(1, n) }, () => 100 / Math.max(1, n));
+  }
+
+  // Handle auto
+  if (typeof expr === 'object' && 'auto' in expr) {
+    return Array.from({ length: Math.max(1, expr.auto) }, () => 100 / Math.max(1, expr.auto));
+  }
+
+  // Handle ratio
+  if (typeof expr === 'object' && 'ratio' in expr) {
+    const ratios = expr.ratio;
+    const sum = ratios.reduce((a, b) => a + b, 0);
+    return ratios.map(r => (r / sum) * 100);
+  }
+
+  // Handle string expressions
+  if (typeof expr === 'string') {
+    // Parse '1fr 2fr 1fr' or '100px 200px 30%'
+    const parts = expr.trim().split(/\s+/).filter(p => p);
+    if (parts.length === 0) return Array.from({ length: count }, () => 100 / count);
+
+    const values = parts.map(part => {
+      if (part.endsWith('fr')) {
+        return parseFloat(part);
+      } else if (part.endsWith('px')) {
+        return parseFloat(part);
+      } else if (part.endsWith('%')) {
+        return parseFloat(part) / 100;
+      }
+      return parseFloat(part) || 1;
+    });
+
+    const hasFr = parts.some(p => p.endsWith('fr'));
+    if (hasFr) {
+      const totalFr = parts.filter(p => p.endsWith('fr')).reduce((sum, p) => sum + parseFloat(p), 0);
+      return values.map((v, i) => {
+        if (parts[i].endsWith('fr')) {
+          return (v / totalFr) * 100;
+        }
+        // Convert px/% to approximate fr equivalent (assuming 1000px total)
+        return Math.min(v * 10, 100); // Rough conversion
+      });
+    }
+
+    // All px/% values
+    const total = values.reduce((a, b) => a + b, 0);
+    return total > 0 ? values.map(v => (v / total) * 100) : Array.from({ length: count }, () => 100 / count);
+  }
+
+  // Handle array of numbers or strings
+  if (Array.isArray(expr)) {
+    if (expr.length === 0) return Array.from({ length: count }, () => 100 / count);
+
+    // Check if string array with units
+    if (typeof expr[0] === 'string') {
+      return parseSizeExpression((expr as string[]).join(' '), expr.length);
+    }
+
+    // Check if min/max constraints
+    if (typeof expr[0] === 'object' && expr[0] !== null && 'min' in expr[0]) {
+      return Array.from({ length: expr.length }, () => 100 / expr.length);
+    }
+
+    // Pure number array
+    const numbers = expr as number[];
+    const total = numbers.reduce((a, b) => a + b, 0);
+    return total > 0 ? numbers.map(v => (v / total) * 100) : Array.from({ length: numbers.length }, () => 100 / numbers.length);
+  }
+
+  return Array.from({ length: count }, () => 100 / count);
+}
+
+// Apply layout presets
+function applyPreset(preset: LayoutPreset, direction: SplitDirection): { sizes: number[], children: SplitLayoutNode[] } {
+  switch (preset) {
+    case 'sidebar':
+      return {
+        sizes: direction === 'row' ? [30, 70] : [20, 80],
+        children: ['leaf', 'leaf']
+      };
+    case 'panels':
+      return {
+        sizes: [33.33, 33.33, 33.34],
+        children: ['leaf', 'leaf', 'leaf']
+      };
+    case 'main-sidebar':
+      return {
+        sizes: direction === 'row' ? [70, 30] : [80, 20],
+        children: ['leaf', 'leaf']
+      };
+    case 'header-main':
+      return {
+        sizes: [20, 80],
+        children: ['leaf', 'leaf']
+      };
+    case 'triple':
+      return {
+        sizes: [25, 50, 25],
+        children: ['leaf', 'leaf', 'leaf']
+      };
+    case 'golden':
+      return {
+        sizes: [38.2, 61.8],
+        children: ['leaf', 'leaf']
+      };
+    case 'nested':
+      return {
+        sizes: [50, 50],
+        children: [
+          'leaf',
+          {
+            view: 'split-layout',
+            direction: direction === 'row' ? 'column' : 'row',
+            sizes: 'equal',
+            children: ['leaf', 'leaf']
+          }
+        ]
+      };
+    default:
+      return {
+        sizes: [50, 50],
+        children: ['leaf', 'leaf']
+      };
+  }
+}
+
 function normalizeSplitParams(input: any): SplitLayoutParams {
   // Clone to avoid mutating caller object
   const p: any = { ...input };
   const dir: SplitDirection = p.direction === 'column' ? 'column' : 'row';
-  const children: SplitLayoutNode[] = Array.isArray(p.children) ? p.children.slice() : [];
-  const gutter = typeof p.gutter === 'number' ? p.gutter : 6;
-  const interactive = !!p.interactive;
-  const minSize = typeof p.minSize === 'number' ? p.minSize : undefined;
-  const height = typeof p.height === 'number' ? p.height : undefined;
 
-  if (p.mode === 'equal') {
-    const cnt = Math.max(1, Math.floor(Number(p.count) || children.length || 1));
-    // Ensure children length matches count
-    if (children.length < cnt) {
-      for (let i = children.length; i < cnt; i++) children.push('leaf');
-    } else if (children.length > cnt) {
-      children.length = cnt;
-    }
-    const sizes = Array.from({ length: cnt }, () => 100 / cnt);
-    return { view: 'split-layout', direction: dir, sizes, children, gutter, interactive, minSize, height } as SplitLayoutParams;
+  // Handle presets first
+  if (p.preset) {
+    const preset = applyPreset(p.preset, dir);
+    p.sizes = preset.sizes;
+    p.children = p.children || preset.children;
   }
-  if (p.mode === 'ratio') {
-    let r = Number(p.ratio);
-    if (!Number.isFinite(r)) r = 0.5;
-    r = Math.min(0.9, Math.max(0.1, r));
-    if (children.length < 2) {
-      while (children.length < 2) children.push('leaf');
-    } else if (children.length > 2) {
-      children.length = 2;
-    }
-    const sizes = [r * 100, (1 - r) * 100];
-    return { view: 'split-layout', direction: dir, sizes, children, gutter, interactive, minSize, height } as SplitLayoutParams;
+
+  // Parse children
+  const children: SplitLayoutNode[] = Array.isArray(p.children) ? p.children.slice() : [];
+
+  // Determine panel count
+  const panelCount = Math.max(
+    children.length || 2,
+    Array.isArray(p.sizes) ? p.sizes.length :
+    typeof p.sizes === 'string' ? p.sizes.trim().split(/\s+/).filter(p => p).length :
+    typeof p.sizes === 'object' && 'equal' in p.sizes ? p.sizes.equal :
+    typeof p.sizes === 'object' && 'auto' in p.sizes ? p.sizes.auto :
+    typeof p.sizes === 'object' && 'ratio' in p.sizes ? p.sizes.ratio.length :
+    2
+  );
+
+  // Ensure we have enough children
+  while (children.length < panelCount) {
+    children.push('leaf');
   }
-  // Default pass-through (support sizes/rowUnits forms)
-  return { view: 'split-layout', direction: dir, sizes: p.sizes, rowUnits: p.rowUnits, children, gutter, interactive, minSize, height } as SplitLayoutParams;
+
+  // Parse sizes
+  const sizes = parseSizeExpression(p.sizes, panelCount);
+
+  // Normalize gutter/gap
+  const gutter = p.gap !== undefined ? (typeof p.gap === 'string' ? parseInt(p.gap) || 6 : p.gap) :
+                 typeof p.gutter === 'string' ? parseInt(p.gutter) || 6 :
+                 typeof p.gutter === 'number' ? p.gutter : 6;
+
+  // Parse rowUnits if present
+  const rowUnits = p.rowUnits ? parseSizeExpression(p.rowUnits, children.length) : undefined;
+
+  return {
+    view: 'split-layout',
+    direction: dir,
+    sizes,
+    children,
+    rowUnits,
+    height: p.height,
+    gutter,
+    minSize: typeof p.minSize === 'number' ? p.minSize : 20,
+    interactive: !!p.interactive,
+    compactSliders: p.compactSliders !== false,
+    align: p.align || 'stretch',
+    className: p.className
+  };
 }
 
 function clamp(n: number, lo: number, hi: number) {
@@ -162,16 +398,18 @@ function buildSplit(
   envEl?: HTMLElement,
 ): BuildResult {
   const direction: SplitDirection = params.direction;
-  const children = params.children;
+  const children = params.children || [];
   const n = children.length;
-  let sizes = normalizeSizes(n, params.sizes);
+  // params.sizes is already normalized to number[] by normalizeSplitParams
+  let sizes = Array.isArray(params.sizes) ? params.sizes : normalizeSizes(n, params.sizes as number[] | undefined);
   // Allow zero-width panels when dragging unless caller overrides
-  const minSize = params.minSize ?? 0;
-  // Enforce a 4px gutter to avoid overflow and keep visuals tight
-  const gutter = 4;
+  const minSize = params.minSize ?? 20;
+  // Use specified gutter or default to 4px for tight visuals
+  const gutter = params.gutter ?? 4;
   const interactive = !!params.interactive; // default static
-  const rowUnits = (direction === 'column' && Array.isArray((params as any).rowUnits))
-    ? ((params as any).rowUnits as number[])
+  // rowUnits is already normalized to number[] by normalizeSplitParams
+  const rowUnits = (direction === 'column' && params.rowUnits && Array.isArray(params.rowUnits))
+    ? params.rowUnits
     : undefined;
   const computeUnitPx = (fallbackEl: HTMLElement): number => {
     const anchor = envEl || fallbackEl || doc.body;
@@ -232,8 +470,11 @@ function buildSplit(
       panel.style.height = '100%';
     } else {
       if (rowUnits && rowUnits.length === n) {
-        const units = Math.max(1, Math.floor((currentUnits ? currentUnits[i] : rowUnits[i]) || 0));
-        (panel.style as any).flex = `0 0 ${units * (unitPxForColumn || computeUnitPx(root))}px`;
+        // rowUnits is now percentage-based (0-100), convert to actual pixels
+        const percentage = Math.max(0.0001, rowUnits[i]);
+        panel.style.flexGrow = String(percentage);
+        panel.style.flexShrink = '0';
+        panel.style.flexBasis = '0px';
       } else {
         panel.style.flexGrow = String(Math.max(0.0001, sizes[i]));
         panel.style.flexShrink = '0';
@@ -264,7 +505,8 @@ function buildSplit(
   for (let i = 0; i < n; i++) {
     const child = children[i];
     const container = panelWrappers[i].firstElementChild as HTMLElement;
-    if (child === 'leaf') {
+    // Check if child is a string (leaf category) - allows user-defined categories
+    if (typeof child === 'string') {
       container.style.display = 'flex';
       container.style.flexDirection = 'column';
       container.style.alignItems = 'stretch';
@@ -273,12 +515,15 @@ function buildSplit(
       container.style.minHeight = '0';
       container.classList.add('tp-split-leaf');
       container.style.boxSizing = 'border-box';
-      try { (container.dataset as any).splitPath = path.concat(i).join('.'); } catch {}
+      try {
+        (container.dataset as any).splitPath = path.concat(i).join('.');
+        (container.dataset as any).leafCategory = child; // Store user-defined category
+      } catch {}
       leaves.push(container);
       paneEls.push(container);
       // Auto-apply slider label tweaks for this leaf
       try {
-        const cleanupSlider = installSliderLabelAutoTweak(container);
+        const cleanupSlider = installSliderLabelAutoTweak(container, params.compactSliders !== false);
         disposers.push(cleanupSlider);
       } catch {}
       // Live adjust height when content changes for column+rowUnits mode
@@ -498,6 +743,34 @@ class SplitLayoutApi {
   getSlots(): HTMLElement[] {
     return this._c.slots;
   }
+  // Get slots by category (user-defined leaf types)
+  getSlotsByCategory(category: string): HTMLElement[] {
+    return this._c.slots.filter(slot =>
+      slot.dataset && slot.dataset.leafCategory === category
+    );
+  }
+  // Get all unique categories
+  getCategories(): string[] {
+    const categories = new Set<string>();
+    this._c.slots.forEach(slot => {
+      if (slot.dataset && slot.dataset.leafCategory) {
+        categories.add(slot.dataset.leafCategory);
+      }
+    });
+    return Array.from(categories);
+  }
+  // Get slots as a map of category -> slots[]
+  getSlotsByCategoryMap(): Map<string, HTMLElement[]> {
+    const map = new Map<string, HTMLElement[]>();
+    this._c.slots.forEach(slot => {
+      const category = slot.dataset?.leafCategory || 'leaf';
+      if (!map.has(category)) {
+        map.set(category, []);
+      }
+      map.get(category)!.push(slot);
+    });
+    return map;
+  }
 }
 
 export const SplitLayoutPlugin: any = {
@@ -569,6 +842,7 @@ export const SplitLayoutPlugin: any = {
       width: 100% !important;
       max-width: 100% !important;
       box-sizing: border-box !important;
+      position: relative !important;
     }
     .tp-split-leaf .tp-lblv_v {
       width: auto !important;
@@ -582,6 +856,7 @@ export const SplitLayoutPlugin: any = {
     .tp-split-leaf .tp-lblv:has(.tp-sldtxtv) .tp-lblv_v {
       width: 100% !important;
       max-width: 100% !important;
+      position: relative !important;
     }
     .tp-split-leaf .tp-lblv_l {
       flex-basis: 30% !important;

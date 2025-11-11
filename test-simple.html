@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Simple Plugin Test</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    #pane { width: 400px; height: 600px; }
+  </style>
+</head>
+<body>
+  <h1>Simple Plugin Test</h1>
+  <div id="pane"></div>
+
+  <script type="module">
+    import { Pane } from 'https://cdn.skypack.dev/tweakpane@4';
+    import * as TweakpaneCompactKit from './dist/tweakpane-compact-kit.umd.js';
+
+    console.log('Available exports:', Object.keys(TweakpaneCompactKit));
+    console.log('SplitLayoutPlugin:', TweakpaneCompactKit.SplitLayoutPlugin);
+    console.log('SizedButtonPlugin:', TweakpaneCompactKit.SizedButtonPlugin);
+
+    const pane = new Pane({ container: document.getElementById('pane') });
+
+    // Register plugins
+    pane.registerPlugin(TweakpaneCompactKit.SplitLayoutPlugin);
+    pane.registerPlugin(TweakpaneCompactKit.SizedButtonPlugin);
+
+    // Test split layout
+    const splitBlade = pane.addBlade({
+      view: 'split-layout',
+      direction: 'row',
+      sizes: [50, 50],
+      children: ['leaf', 'leaf']
+    });
+
+    // Test sized button
+    pane.addBlade({
+      view: 'sized-button',
+      title: 'Test Button',
+      units: 2
+    });
+  </script>
+</body>
+</html>

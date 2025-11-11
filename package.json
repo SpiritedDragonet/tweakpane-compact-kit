@@ -1,15 +1,15 @@
 {
-  "name": "tweakpane-plugin-split-layout",
+  "name": "tweakpane-compact-kit",
   "version": "1.0.0",
-  "description": "A flexible split-layout plugin for Tweakpane with auto-optimized styles",
+  "description": "A compact layout toolkit for Tweakpane with split-layout, grid, and auto-optimized styles",
   "type": "module",
-  "main": "./dist/tweakpane-split-layout.umd.js",
-  "module": "./dist/tweakpane-split-layout.es.js",
+  "main": "./dist/tweakpane-compact-kit.umd.js",
+  "module": "./dist/tweakpane-compact-kit.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/tweakpane-split-layout.es.js",
-      "require": "./dist/tweakpane-split-layout.umd.js",
+      "import": "./dist/tweakpane-compact-kit.es.js",
+      "require": "./dist/tweakpane-compact-kit.umd.js",
       "types": "./dist/index.d.ts"
     }
   },
@@ -17,35 +17,40 @@
     "dist"
   ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:lib",
     "build:lib": "vite build --config vite.config.lib.ts",
-    "preview": "vite preview --port 5173"
+    "dev": "npm run build:lib -- --watch",
+    "demo": "vite --config test/vite.config.ts",
+    "build:demo": "vite build --config test/vite.config.ts",
+    "preview": "vite preview --port 5173 --outDir dist-demo"
   },
   "keywords": [
     "tweakpane",
     "plugin",
+    "compact",
+    "layout",
     "split-layout",
+    "grid",
     "ui",
-    "control-panel"
+    "control-panel",
+    "toolkit"
   ],
   "author": "",
   "license": "MIT",
   "peerDependencies": {
     "tweakpane": "^4.0.0"
   },
-  "dependencies": {
+  "devDependencies": {
     "@tweakpane/plugin-essentials": "0.2.1",
+    "@types/react": "18.3.5",
+    "@types/react-dom": "18.3.0",
+    "@vitejs/plugin-react": "4.3.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "three": "0.165.0",
-    "tweakpane": "4.0.5"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "4.3.1",
-    "@types/react": "18.3.5",
-    "@types/react-dom": "18.3.0",
+    "tweakpane": "^4.0.0",
     "typescript": "5.6.2",
-    "vite": "5.4.3"
+    "vite": "5.4.3",
+    "vite-plugin-dts": "^4.5.4"
   }
 }

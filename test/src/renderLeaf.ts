@@ -1,6 +1,6 @@
 import { Pane } from 'tweakpane';
 import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
-import { addSizedButton } from './plugins/addSizedButton';
+import { SizedButtonPlugin } from '../../src/core/SplitLayoutPlugin';
 import { randomInt, type LeafPlan } from './layoutPlan';
 
 function removeLabelFor(bindingApi: any): void {
@@ -28,7 +28,7 @@ export function renderLeaf(pane: Pane, leaf: LeafPlan): void {
   if (leaf.kind === 'button') {
     pane.addButton({ title: 'Button' });
   } else if (leaf.kind === 'sizedbutton') {
-    addSizedButton(pane, { title: 'Multi-line', units: Math.max(2, leaf.sizedUnits ?? 2) });
+    pane.addBlade({ view: 'sized-button', title: 'Multi-line', units: Math.max(2, leaf.sizedUnits ?? 2) });
   } else if (leaf.kind === 'number') {
     const o = { n: randomInt(-50, 50) };
     const api = pane.addBinding(o, 'n', { min: -100, max: 100, step: 1 });
@@ -91,17 +91,68 @@ export function renderLeaf(pane: Pane, leaf: LeafPlan): void {
 
 export function renderCustomDom(slot: HTMLElement, leaf: LeafPlan): void {
   if (leaf.kind !== 'customDom') return;
-  const n = Math.max(1, leaf.customUnits ?? 1);
+  const units = Math.max(1, leaf.customUnits ?? 1);
   const box = slot.ownerDocument.createElement('div');
   box.classList.add('tp-demo-domleaf');
   box.style.width = '100%';
-  box.style.height = `calc(var(--cnt-usz) * ${n})`;
   box.style.boxSizing = 'border-box';
   box.style.display = 'flex';
-  box.style.alignItems = 'center';
-  box.style.justifyContent = 'center';
+  box.style.alignItems = 'stretch';
+  box.style.justifyContent = 'stretch';
+
+  // Compute height the same way as sizedButton
+  const computeUnitPx = () => {
+    const doc = slot.ownerDocument;
+    const findContainer = (el: HTMLElement | null): HTMLElement | null => {
+      let cur: HTMLElement | null = el;
+      while (cur) {
+        if (cur.classList?.contains('tp-cntv') || cur.classList?.contains('tp-rotv')) return cur;
+        cur = cur.parentElement;
+      }
+      return el;
+    };
+    const cont = findContainer(slot) || slot;
+    try {
+      const cs = (cont && (cont.ownerDocument?.defaultView || window).getComputedStyle(cont)) as CSSStyleDeclaration;
+      const v = cs.getPropertyValue('--cnt-usz')?.trim();
+      if (v) {
+        const m = v.match(/([0-9]+\.?[0-9]*)\s*px/i);
+        if (m) return Math.max(1, Math.round(parseFloat(m[1])));
+        const f = parseFloat(v);
+        if (Number.isFinite(f) && f > 0) return Math.round(f);
+      }
+    } catch {}
+    try {
+      const probe = doc.createElement('div');
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      probe.style.height = 'var(--cnt-usz)';
+      probe.style.width = '1px';
+      (cont || slot).appendChild(probe);
+      const px = probe.getBoundingClientRect().height || probe.offsetHeight || 0;
+      probe.remove();
+      if (px) return Math.max(1, Math.round(px));
+    } catch {}
+    return 0;
+  };
+  const unitPx = computeUnitPx();
+
+  // Apply height with gap compensation (same as sizedButton)
+  const gutter = 4; // match the gutter in SplitLayoutPlugin
+  if (unitPx > 0) {
+    const totalHeight = units * unitPx + (units - 1) * gutter;
+    box.style.height = `${totalHeight}px`;
+  } else {
+    const gapPx = (units - 1) * gutter;
+    box.style.height = `calc(var(--cnt-usz) * ${units} + ${gapPx}px)`;
+  }
+
+  // Development only visual styling (no text content)
   box.style.border = '1px dashed #444';
   box.style.background = 'rgba(255,255,255,0.06)';
-  box.textContent = `DOM(${n}u)`;
+
+  // Add a data attribute for identification but no visible text
+  box.setAttribute('data-dom-units', units.toString());
+
   slot.appendChild(box);
 }

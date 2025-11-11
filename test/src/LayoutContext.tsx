@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { LayoutPlan, buildPlan } from './layoutPlan';
 
 interface LayoutContextType {
@@ -16,6 +16,11 @@ export const LayoutProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const plan = buildPlan();
     setLayoutPlan(plan);
   }, []);
+
+  // Generate initial layout on mount
+  useEffect(() => {
+    generateLayout();
+  }, [generateLayout]);
 
   return (
     <LayoutContext.Provider value={{ layoutPlan, generateLayout, setLayoutPlan }}>

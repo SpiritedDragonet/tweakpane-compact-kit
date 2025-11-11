@@ -1,15 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { Pane } from 'tweakpane';
 import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
-import { SplitLayoutPlugin } from './plugins/SplitLayoutPlugin';
-import { installBladeViewShims } from './plugins/tpBladePlugins';
+import * as TweakpaneCompactKit from '../../dist/tweakpane-compact-kit.es.js';
 import { useLayout } from './LayoutContext';
 import { type LayoutPlan } from './layoutPlan';
 import { renderLeaf, renderCustomDom } from './renderLeaf';
 
 export const OfficialDemo: React.FC = () => {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const { layoutPlan } = useLayout();
+  const { layoutPlan, generateLayout } = useLayout();
 
   useEffect(() => {
     const container = hostRef.current;
@@ -19,9 +18,19 @@ export const OfficialDemo: React.FC = () => {
 
     // Register required plugins
     try { pane.registerPlugin(EssentialsPlugin as any); } catch {}
-    try { pane.registerPlugin(SplitLayoutPlugin as any); } catch {}
+    try { pane.registerPlugin(TweakpaneCompactKit.SplitLayoutPlugin); } catch (e) {
+      console.error('Failed to register SplitLayoutPlugin:', e);
+    }
+    try { pane.registerPlugin(TweakpaneCompactKit.SizedButtonPlugin); } catch (e) {
+      console.error('Failed to register SizedButtonPlugin:', e);
+    }
 
-    const uninstall = installBladeViewShims(pane as any);
+    // Add control buttons
+    const controls = pane.addFolder({ title: 'Controls', expanded: true });
+    controls.addButton({ title: 'Random Layout', onClick: () => generateLayout() });
+
+    // Add folder for split layout
+    const folder = pane.addFolder({ title: 'Split Layout', expanded: true });
 
     // Build split layout based on plan
     const buildSpecFromPlan = (plan: LayoutPlan): any => {
@@ -44,7 +53,7 @@ export const OfficialDemo: React.FC = () => {
       };
     };
 
-    const splitApi = pane.addBlade(buildSpecFromPlan(layoutPlan));
+    const splitApi = folder.addBlade(buildSpecFromPlan(layoutPlan));
     const slots = splitApi.getSlots();
     const childPanes: Pane[] = [];
 
@@ -61,6 +70,7 @@ export const OfficialDemo: React.FC = () => {
         } else {
           const p = new Pane({ container: slot });
           try { p.registerPlugin(EssentialsPlugin as any); } catch {}
+          try { p.registerPlugin(TweakpaneCompactKit.SizedButtonPlugin as any); } catch {}
           childPanes.push(p);
           renderLeaf(p, leaf);
         }
@@ -70,11 +80,10 @@ export const OfficialDemo: React.FC = () => {
     }
 
     return () => {
-      try { uninstall(); } catch {}
       childPanes.forEach(cp => { try { cp.dispose(); } catch {} });
       pane.dispose();
     };
-  }, [layoutPlan]);
+  }, [layoutPlan, generateLayout]);
 
   return (
     <div className="demo-container">

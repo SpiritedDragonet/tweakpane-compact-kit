@@ -2,10 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { Pane } from 'tweakpane';
 import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
 import type { ButtonGridApi } from '@tweakpane/plugin-essentials';
-import { addBladeLayout } from '../plugins/addBladeLayout';
-import { installBladeViewShims } from '../plugins/tpBladePlugins';
-import type { BladeLayoutSpec } from '../plugins/BladeLayout';
-import { addSizedButton } from '../plugins/addSizedButton';
+import { addBladeLayout } from '../../../src/blades/addBladeLayout';
+import { SplitLayoutPlugin, SizedButtonPlugin } from '../../../src/core/SplitLayoutPlugin';
+import type { BladeLayoutSpec } from '../../../src/blades/BladeLayout';
 
 type Props = {
   onRun?: () => void;
@@ -20,6 +19,8 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
     if (!container) return;
     const pane = new Pane({ container, title: '布局试验' });
     pane.registerPlugin(EssentialsPlugin as any);
+    pane.registerPlugin(SplitLayoutPlugin as any);
+    pane.registerPlugin(SizedButtonPlugin as any);
     // Scoped CSS helpers for slots
     try {
       pane.registerPlugin({
@@ -48,7 +49,6 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
     paneRef.current = pane;
 
     const folder = pane.addFolder({ title: '布局试验（Playground）', expanded: true });
-    const uninstallFolderShim = installBladeViewShims(folder as any);
 
     const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
     const sample = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -114,7 +114,7 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
       const t = randomInt(0, 7); // 0:button,1:slider,2:dropdown,3:checkbox,4:folder,5:text,6:number,7:color
       if (t === 0) {
         const units = randomInt(1, 4);
-        try { addSizedButton(p, { title: `按钮（${units} 行）`, units }); }
+        try { p.addBlade({ view: 'sized-button', title: `按钮（${units} 行）`, units }); }
         catch { p.addButton({ title: `按钮 ${randomInt(1, 99)}` }); }
       } else if (t === 1) {
         const obj = { v: Math.random() } as { v: number };
@@ -166,8 +166,7 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
       childPanes.splice(0).forEach((cp) => { try { cp.dispose(); } catch {} });
       if (layoutApi) { try { layoutApi.dispose(); } catch {} layoutApi = null; }
       if (!currentSpec) currentSpec = buildRandomSpec();
-      // Use shimmed blade view
-      layoutApi = (folder as any).addBlade({ view: 'blade-layout', ...currentSpec });
+      layoutApi = addBladeLayout(folder, currentSpec);
       if (layoutApi) {
         try { layoutApi.slots.forEach((s: HTMLElement) => fillSlot(s)); } catch {}
         try { layoutApi.refresh(); } catch {}
@@ -181,7 +180,6 @@ const LayoutPlaygroundPanel: React.FC<Props> = ({ onRun }) => {
       try { childPanes.splice(0).forEach((cp) => cp.dispose()); } catch {}
       try { layoutApi?.dispose(); } catch {}
       try { pane.dispose(); } catch {}
-      try { uninstallFolderShim(); } catch {}
       paneRef.current = null;
     };
   }, [onRun]);
