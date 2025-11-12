@@ -30,16 +30,14 @@ function mountDomUnits(slot: HTMLElement, units: number, inner?: (box: HTMLEleme
   box.style.height = `calc(${units} * var(--cnt-usz) + ${(units - 1) * gutter}px)`;
   box.style.display = 'grid';
   box.style.placeItems = 'center';
-  box.style.background = '#fff';
-  box.style.border = '1px dashed #ddd';
-  box.style.color = '#666';
+  // Use default/inherited colors; no hard-coded color
   box.style.fontSize = '12px';
   slot.appendChild(box);
   if (inner) inner(box);
   else box.textContent = `${units}u DOM (not a Tweakpane control)`;
 }
 
-function drawWave(container: HTMLElement, color = '#3b82f6') {
+function drawWave(container: HTMLElement, color = 'currentColor') {
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(100, container.clientWidth - 16);
   canvas.height = Math.max(50, container.clientHeight - 16);

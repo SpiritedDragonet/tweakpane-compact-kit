@@ -84,7 +84,6 @@ function installSliderLabelAutoTweak(container: HTMLElement, compactSliders: boo
         labelBox.style.top = '4px';
         labelBox.style.fontSize = '10px';
         labelBox.style.lineHeight = '1';
-        labelBox.style.color = '#aaa';
         labelBox.style.margin = '0';
         labelBox.style.padding = '0';
         // Limit width to 60% and truncate with ellipsis

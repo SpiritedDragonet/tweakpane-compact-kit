@@ -42,7 +42,6 @@ const box = document.createElement('div');
 box.style.height = 'calc(3 * var(--cnt-usz) + 2 * 4px)';
 box.style.display = 'grid';
 box.style.placeItems = 'center';
-box.style.border = '1px dashed #ddd';
 box.textContent = '3u DOM';
 right.appendChild(box);
 ```
@@ -174,4 +173,3 @@ MIT
 ## Contributing
 
 Issues and PRs are welcome.
-
