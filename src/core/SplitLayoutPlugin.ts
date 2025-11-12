@@ -30,11 +30,7 @@ function installSliderLabelAutoTweak(
       // Find label box (may not exist if already removed)
       const labelBox = labeledView.querySelector('.tp-lblv_l') as HTMLElement | null;
 
-      // If leaf policy requests hiding labels, remove the label box entirely (for any control)
-      if (hideLabels && labelBox) {
-        try { labelBox.remove(); } catch {}
-        try { labeledView.classList.add('tp-lblv-nol'); } catch {}
-      }
+      // Since we cannot reliably know if label was passed, we don't modify labels here.
 
       // Mark as tweaked before modifying DOM
       tweakedSet.add(labeledView);
@@ -86,7 +82,9 @@ function installSliderLabelAutoTweak(
       }
 
       // Handle label if it exists
-      if (labelBox && compactSliders && !hideLabels && hasSlider) {
+      // Overlay label only if it remains visible
+      const labelStillVisible = !!(labelBox && (!hideLabels || (hideLabels && labelBox.isConnected)));
+      if (labelBox && compactSliders && labelStillVisible && hasSlider) {
         // Move label into value box as overlay
         labelBox.style.position = 'absolute';
         labelBox.style.left = '6px';
@@ -181,9 +179,6 @@ export type SplitLayoutParams = {
   interactive?: boolean;
   // Apply compact slider styles (default: true)
   compactSliders?: boolean;
-  // If false (default), labels inside leaves are hidden by default;
-  // set true to preserve labels inside this split layout
-  preserveLabels?: boolean;
   // CSS Grid-like alignment
   align?: 'start' | 'center' | 'end' | 'stretch';
   // Gap between items (alias for gutter)
@@ -204,7 +199,6 @@ type NormalizedSplitLayoutParams = {
   minSize: number;
   interactive: boolean;
   compactSliders: boolean;
-  preserveLabels: boolean;
   align?: 'start' | 'center' | 'end' | 'stretch';
   gap?: number | string; // retained for completeness
   className?: string;
@@ -405,7 +399,6 @@ function normalizeSplitParams(input: any): NormalizedSplitLayoutParams {
     minSize: typeof p.minSize === 'number' ? p.minSize : 20,
     interactive: !!p.interactive,
     compactSliders: p.compactSliders !== false,
-    preserveLabels: !!p.preserveLabels,
     align: p.align || 'stretch',
     className: p.className
   };
@@ -544,7 +537,7 @@ function buildSplit(
       container.style.height = 'auto';
       container.style.minHeight = '0';
       container.classList.add('tp-split-leaf');
-      try { (container.dataset as any).ckHideLabels = params.preserveLabels ? 'false' : 'true'; } catch {}
+      // No automatic label hiding here; label policy is enforced via pane wrapper at addBinding time
       container.style.boxSizing = 'border-box';
       try {
         (container.dataset as any).splitPath = path.concat(i).join('.');
@@ -554,8 +547,7 @@ function buildSplit(
       paneEls.push(container);
       // Auto-apply slider label tweaks for this leaf
       try {
-        const hideLabels = (container.dataset as any).ckHideLabels !== 'false';
-        const cleanupSlider = installSliderLabelAutoTweak(container, params.compactSliders !== false, hideLabels);
+        const cleanupSlider = installSliderLabelAutoTweak(container, params.compactSliders !== false, false);
         disposers.push(cleanupSlider);
       } catch {}
       // Live adjust height when content changes for column+rowUnits mode
@@ -814,6 +806,25 @@ class SplitLayoutApi {
       map.get(category)!.push(slot);
     });
     return map;
+  }
+
+  // Wrap a Pane instance so that addBinding() hides label when not explicitly provided
+  wrapPane<T extends { addBinding: Function }>(pane: T): T {
+    const orig = (pane.addBinding as Function).bind(pane);
+    (pane as any).addBinding = (obj: unknown, key: string, params?: Record<string, unknown>) => {
+      const hasLabel = !!(params && Object.prototype.hasOwnProperty.call(params, 'label'));
+      const labelEmpty = hasLabel && (params as any).label === '';
+      const api = orig(obj, key, params);
+      if (!hasLabel || labelEmpty) {
+        try {
+          const el = (api as any)?.controller?.view?.element as HTMLElement | undefined;
+          const lbl = el?.querySelector('.tp-lblv_l') as HTMLElement | null;
+          if (lbl) { lbl.remove(); el?.classList.add('tp-lblv-nol'); }
+        } catch {}
+      }
+      return api;
+    };
+    return pane;
   }
 }
 

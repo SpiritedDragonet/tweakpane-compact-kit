@@ -98,6 +98,8 @@ function main() {
   }) as unknown as SplitApi;
   row2.getSlots().forEach((slot: HTMLElement, i: number) => {
     const p = new Pane({ container: slot });
+    // Hide default auto-labels for bindings in this leaf unless explicitly provided
+    if ((row2 as any).wrapPane) { (row2 as any).wrapPane(p); }
     ensureRegistered(p);
     p.addBlade({ view: 'sized-button', title: `Button\n${i + 1}`, units: 2 });
   });
@@ -108,6 +110,7 @@ function main() {
   }) as unknown as SplitApi;
   row3.getSlots().forEach((slot: HTMLElement, i: number) => {
     const p = new Pane({ container: slot });
+    if ((row3 as any).wrapPane) { (row3 as any).wrapPane(p); }
     ensureRegistered(p);
     p.addBlade({ view: 'sized-button', title: `Equal\n${i + 1}`, units: 2 });
   });
@@ -118,6 +121,7 @@ function main() {
   }) as unknown as SplitApi;
   row4.getSlots().forEach((slot: HTMLElement, i: number) => {
     const p = new Pane({ container: slot });
+    if ((row4 as any).wrapPane) { (row4 as any).wrapPane(p); }
     ensureRegistered(p);
     p.addBlade({ view: 'sized-button', title: `1fr\n2fr`, units: 2 });
   });
@@ -128,6 +132,7 @@ function main() {
   }) as unknown as SplitApi;
   row5.getSlots().forEach((slot: HTMLElement, i: number) => {
     const p = new Pane({ container: slot });
+    if ((row5 as any).wrapPane) { (row5 as any).wrapPane(p); }
     ensureRegistered(p);
     p.addBlade({ view: 'sized-button', title: `Normalized`, units: 2 });
   });
@@ -138,6 +143,7 @@ function main() {
   }) as unknown as SplitApi;
   const r6 = row6.getSlots();
   const r6p = new Pane({ container: r6[0] });
+  if ((row6 as any).wrapPane) { (row6 as any).wrapPane(r6p); }
   ensureRegistered(r6p);
   r6p.addBlade({ view: 'sized-button', title: 'Three\nUnits', units: 3 });
 
@@ -175,8 +181,8 @@ function main() {
       }) as unknown as SplitApi;
       rowApi = api;
       const [L, R] = api.getSlots();
-      const pl = new Pane({ container: L }); ensureRegistered(pl);
-      const pr = new Pane({ container: R }); ensureRegistered(pr);
+      const pl = new Pane({ container: L }); if ((api as any).wrapPane) { (api as any).wrapPane(pl); } ensureRegistered(pl);
+      const pr = new Pane({ container: R }); if ((api as any).wrapPane) { (api as any).wrapPane(pr); } ensureRegistered(pr);
       try { pl.registerPlugin(Essentials); } catch {}
       try { pr.registerPlugin(Essentials); } catch {}
       // Left: checkbox with label
@@ -211,15 +217,11 @@ function main() {
       // C1 fill
       {
         const [l, r] = c1.getSlots();
-        if (l) { const p = new Pane({ container: l }); ensureRegistered(p); p.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 }); }
+        if (l) { const p = new Pane({ container: l }); if ((c1 as any).wrapPane) { (c1 as any).wrapPane(p); } ensureRegistered(p); p.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 }); }
         if (r) {
-          const p = new Pane({ container: r }); ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {}
-          // Slider with a title (folder title acts as the text)
-          const f1 = p.addFolder({ title: 'Level' }) as unknown as FolderLike;
-          f1.addBinding({ v: 42 }, 'v', { min: 0, max: 100 });
-          // Checkbox with a title
-          const f2 = p.addFolder({ title: 'Enabled' }) as unknown as FolderLike;
-          f2.addBinding({ on: true }, 'on');
+          const p = new Pane({ container: r }); if ((c1 as any).wrapPane) { (c1 as any).wrapPane(p); } ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {}
+          p.addBinding({ v: 42 }, 'v', { min: 0, max: 100, label: 'Level' });
+          p.addBinding({ on: true }, 'on', { label: 'Enabled' });
           p.addBinding({ mode: 'a' }, 'mode', { options: { Alpha: 'a', Beta: 'b', Gamma: 'g' } });
         }
       }
@@ -227,24 +229,22 @@ function main() {
       // C2 fill (two controls per column, no labels to keep compact)
       {
         const [a, b, g] = c2.getSlots();
-        if (a) { const p = new Pane({ container: a }); ensureRegistered(p); p.addButton({ title: 'Action' }); p.addBinding({ text: 'hello' }, 'text'); }
-        if (b) { const p = new Pane({ container: b }); ensureRegistered(p); p.addBinding({ n: 3.14 }, 'n', { min: 0, max: 10 }); p.addBinding({ c: '#22d3ee' }, 'c'); }
-        if (g) { const p = new Pane({ container: g }); ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {} p.addBlade({ view: 'buttongrid', size: [2, 2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y * 2 + x)) }) }); const ff = p.addFolder({ title: 'Flag' }) as unknown as FolderLike; ff.addBinding({ flag: true }, 'flag'); }
+        if (a) { const p = new Pane({ container: a }); if ((c2 as any).wrapPane) { (c2 as any).wrapPane(p); } ensureRegistered(p); p.addButton({ title: 'Action' }); p.addBinding({ text: 'hello' }, 'text'); }
+        if (b) { const p = new Pane({ container: b }); if ((c2 as any).wrapPane) { (c2 as any).wrapPane(p); } ensureRegistered(p); p.addBinding({ n: 3.14 }, 'n', { min: 0, max: 10 }); p.addBinding({ c: '#22d3ee' }, 'c'); }
+        if (g) { const p = new Pane({ container: g }); if ((c2 as any).wrapPane) { (c2 as any).wrapPane(p); } ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {} p.addBlade({ view: 'buttongrid', size: [2, 2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y * 2 + x)) }) }); p.addBinding({ flag: true }, 'flag', { label: 'Flag' }); }
       }
 
       // C3 fill (three per side)
       {
         const [l, r] = c3.getSlots();
         if (l) {
-          const p = new Pane({ container: l }); ensureRegistered(p);
+          const p = new Pane({ container: l }); if ((c3 as any).wrapPane) { (c3 as any).wrapPane(p); } ensureRegistered(p);
           p.addBinding({ p: { x: 0.3, y: 0.7 } }, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 } });
-          // Checkbox with a title
-          const fl = p.addFolder({ title: 'Enabled' }) as unknown as FolderLike;
-          fl.addBinding({ on: false }, 'on');
+          p.addBinding({ on: false }, 'on', { label: 'Enabled' });
           p.addBinding({ txt: 'note' }, 'txt');
         }
         if (r) {
-          const p = new Pane({ container: r }); ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {}
+          const p = new Pane({ container: r }); if ((c3 as any).wrapPane) { (c3 as any).wrapPane(p); } ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {}
           p.addBinding({ p: { x: 0.1, y: 0.5, z: 0.9 } }, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 }, z: { min: 0, max: 1 } });
           p.addBlade({ view: 'cubicbezier', value: [0.5, 0.2, 0.5, 1] });
           p.addBlade({ view: 'fpsgraph' });
