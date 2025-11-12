@@ -12,7 +12,11 @@
 //   const slots: HTMLElement[] = api.getSlots()
 
 // Auto-tweak slider labels to prevent overflow and truncate long text
-function installSliderLabelAutoTweak(container: HTMLElement, compactSliders: boolean = true): () => void {
+function installSliderLabelAutoTweak(
+  container: HTMLElement,
+  compactSliders: boolean = true,
+  hideLabels: boolean = false,
+): () => void {
   const observers: MutationObserver[] = [];
   const tweakedSet = new WeakSet<HTMLElement>();
   const tweakSliderLabel = (labeledView: HTMLElement) => {
@@ -22,16 +26,21 @@ function installSliderLabelAutoTweak(container: HTMLElement, compactSliders: boo
       const valueBox = labeledView.querySelector('.tp-lblv_v') as HTMLElement | null;
       if (!valueBox) return;
       const hasSlider = !!(valueBox.querySelector('.tp-sldv') || valueBox.querySelector('.tp-sldtxtv'));
-      if (!hasSlider) return;
 
-      // Find label box (may not exist if removed by removeLabelFor)
+      // Find label box (may not exist if already removed)
       const labelBox = labeledView.querySelector('.tp-lblv_l') as HTMLElement | null;
+
+      // If leaf policy requests hiding labels, remove the label box entirely (for any control)
+      if (hideLabels && labelBox) {
+        try { labelBox.remove(); } catch {}
+        try { labeledView.classList.add('tp-lblv-nol'); } catch {}
+      }
 
       // Mark as tweaked before modifying DOM
       tweakedSet.add(labeledView);
 
-      // Apply slider scaling styles only if compactSliders is enabled
-      if (compactSliders) {
+      // Apply slider scaling styles only if compactSliders is enabled and target has slider UI
+      if (compactSliders && hasSlider) {
       const sldSurface = valueBox.querySelector('.tp-sldtxtv_s') as HTMLElement | null
         || valueBox.querySelector('.tp-sldv_s') as HTMLElement | null;
       if (sldSurface) {
@@ -77,7 +86,7 @@ function installSliderLabelAutoTweak(container: HTMLElement, compactSliders: boo
       }
 
       // Handle label if it exists
-      if (labelBox && compactSliders) {
+      if (labelBox && compactSliders && !hideLabels && hasSlider) {
         // Move label into value box as overlay
         labelBox.style.position = 'absolute';
         labelBox.style.left = '6px';
@@ -172,6 +181,9 @@ export type SplitLayoutParams = {
   interactive?: boolean;
   // Apply compact slider styles (default: true)
   compactSliders?: boolean;
+  // If false (default), labels inside leaves are hidden by default;
+  // set true to preserve labels inside this split layout
+  preserveLabels?: boolean;
   // CSS Grid-like alignment
   align?: 'start' | 'center' | 'end' | 'stretch';
   // Gap between items (alias for gutter)
@@ -192,6 +204,7 @@ type NormalizedSplitLayoutParams = {
   minSize: number;
   interactive: boolean;
   compactSliders: boolean;
+  preserveLabels: boolean;
   align?: 'start' | 'center' | 'end' | 'stretch';
   gap?: number | string; // retained for completeness
   className?: string;
@@ -392,6 +405,7 @@ function normalizeSplitParams(input: any): NormalizedSplitLayoutParams {
     minSize: typeof p.minSize === 'number' ? p.minSize : 20,
     interactive: !!p.interactive,
     compactSliders: p.compactSliders !== false,
+    preserveLabels: !!p.preserveLabels,
     align: p.align || 'stretch',
     className: p.className
   };
@@ -530,6 +544,7 @@ function buildSplit(
       container.style.height = 'auto';
       container.style.minHeight = '0';
       container.classList.add('tp-split-leaf');
+      try { (container.dataset as any).ckHideLabels = params.preserveLabels ? 'false' : 'true'; } catch {}
       container.style.boxSizing = 'border-box';
       try {
         (container.dataset as any).splitPath = path.concat(i).join('.');
@@ -539,7 +554,8 @@ function buildSplit(
       paneEls.push(container);
       // Auto-apply slider label tweaks for this leaf
       try {
-        const cleanupSlider = installSliderLabelAutoTweak(container, params.compactSliders !== false);
+        const hideLabels = (container.dataset as any).ckHideLabels !== 'false';
+        const cleanupSlider = installSliderLabelAutoTweak(container, params.compactSliders !== false, hideLabels);
         disposers.push(cleanupSlider);
       } catch {}
       // Live adjust height when content changes for column+rowUnits mode
