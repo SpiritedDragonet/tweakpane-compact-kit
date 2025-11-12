@@ -5,137 +5,128 @@
 import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
+// Utilities
 function ensureRegistered(pane: Pane) {
   try { pane.registerPlugin(CompactKitBundle as any); } catch (e) {
-    console.error('Failed to register CompactKitBundle:', e);
     throw e;
   }
 }
 
-function buildBasic(container: HTMLElement) {
-  const pane = new Pane({ container, title: '基础分栏' });
-  ensureRegistered(pane);
-  const api: any = (pane as any).addBlade({
-    view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6,
-    children: ['leaf', 'leaf']
-  });
-  if (typeof api.getSlots !== 'function') throw new Error('plugin API missing');
-  const slots = api.getSlots();
-  const left = new Pane({ container: slots[0] });
-  const right = new Pane({ container: slots[1] });
-  (left as any).addBinding({ gain: 0.7 }, 'gain', { min: 0, max: 1 });
-  (right as any).addBinding({ pitch: 440 }, 'pitch', { min: 220, max: 880 });
+function unitPx(el: HTMLElement): number {
+  try {
+    const cs = getComputedStyle(el);
+    const v = cs.getPropertyValue('--cnt-usz').trim();
+    const m = v.match(/([0-9]+\.?[0-9]*)\s*px/i);
+    if (m) return Math.max(1, Math.round(parseFloat(m[1])));
+  } catch {}
+  return 18; // sensible default
 }
 
-function buildCategory(container: HTMLElement) {
-  const pane = new Pane({ container, title: '分类槽位' });
-  ensureRegistered(pane);
-  const api: any = (pane as any).addBlade({
-    view: 'split-layout', direction: 'row', sizes: 'equal',
-    children: ['track', 'master']
-  });
-  if (typeof api.getSlotsByCategory !== 'function') throw new Error('plugin API missing');
-  const track = { name: 'Track', volume: 0.8, pan: 0 };
-  api.getSlotsByCategory('track').forEach((slot: HTMLElement) => {
-    const p = new Pane({ container: slot });
-    (p as any).addBinding(track, 'volume', { min: 0, max: 1 });
-    (p as any).addBinding(track, 'pan', { min: -1, max: 1 });
-  });
-  const master = { volume: 1.0 };
-  api.getSlotsByCategory('master').forEach((slot: HTMLElement) => {
-    const p = new Pane({ container: slot });
-    (p as any).addBinding(master, 'volume', { min: 0, max: 1 });
-  });
+function mountDomUnits(slot: HTMLElement, units: number, inner?: (box: HTMLElement) => void) {
+  const box = document.createElement('div');
+  box.className = 'tp-demo-domleaf';
+  const u = unitPx(slot);
+  const gutter = 4;
+  box.style.height = `calc(${units} * var(--cnt-usz) + ${(units - 1) * gutter}px)`;
+  box.style.display = 'grid';
+  box.style.placeItems = 'center';
+  box.style.background = '#fff';
+  box.style.border = '1px dashed #ddd';
+  box.style.color = '#666';
+  box.style.fontSize = '12px';
+  slot.appendChild(box);
+  if (inner) inner(box);
+  else box.textContent = `${units}u DOM (not a Tweakpane control)`;
 }
 
-function buildPresets(container: HTMLElement) {
-  const pane = new Pane({ container, title: '预设布局' });
-  ensureRegistered(pane);
-  const api: any = (pane as any).addBlade({
-    view: 'split-layout', direction: 'row', sizes: 'panels',
-    children: ['leaf', 'leaf', 'leaf']
-  });
-  if (typeof api.getSlots !== 'function') throw new Error('plugin API missing');
-  const slots = api.getSlots();
-  const a = new Pane({ container: slots[0] });
-  const b = new Pane({ container: slots[1] });
-  const c = new Pane({ container: slots[2] });
-  (a as any).addBinding({ v: 0.2 }, 'v', { min: 0, max: 1, label: 'A' });
-  (b as any).addBinding({ v: 0.5 }, 'v', { min: 0, max: 1, label: 'B' });
-  (c as any).addBinding({ v: 0.8 }, 'v', { min: 0, max: 1, label: 'C' });
-}
-
-function buildNested(container: HTMLElement) {
-  const pane = new Pane({ container, title: '嵌套布局' });
-  ensureRegistered(pane);
-  const api: any = (pane as any).addBlade({
-    view: 'split-layout', direction: 'column', gutter: 6,
-    children: [
-      'leaf',
-      { view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf', 'leaf'] },
-    ]
-  });
-  if (typeof api.getSlots !== 'function') throw new Error('plugin API missing');
-  const slots = api.getSlots();
-  const top = new Pane({ container: slots[0] });
-  (top as any).addBinding({ title: 'Header' }, 'title');
-  new Pane({ container: slots[1] }).addFolder({ title: 'Left' });
-  new Pane({ container: slots[2] }).addFolder({ title: 'Right' });
-}
-
-function buildButton(container: HTMLElement) {
-  const pane = new Pane({ container, title: '多行按钮' });
-  ensureRegistered(pane);
-  // Multi-line button demo
-  (pane as any).addBlade({ view: 'sized-button', title: '多行\n按钮', units: 3 });
-}
-
-function buildCompact(container: HTMLElement) {
-  const pane = new Pane({ container, title: '紧凑样式' });
-  ensureRegistered(pane);
-  const api: any = (pane as any).addBlade({
-    view: 'split-layout', direction: 'column',
-    children: ['leaf']
-  });
-  if (typeof api.getSlots !== 'function') throw new Error('plugin API missing');
-  const slots = api.getSlots();
-  const p = new Pane({ container: slots[0] });
-  (p as any).addBinding({ level: 0.75 }, 'level', { min: 0, max: 1, label: '音量' });
-  (p as any).addBinding({ freq: 440 }, 'freq', { min: 100, max: 1000, label: '频率' });
-}
-
-function buildInteractive(container: HTMLElement) {
-  const pane = new Pane({ container, title: '可拖拽分割' });
-  ensureRegistered(pane);
-  const api: any = (pane as any).addBlade({
-    view: 'split-layout', direction: 'row', sizes: [50, 50], gutter: 6, interactive: true,
-    children: ['leaf', 'leaf']
-  });
-  if (typeof api.getSlots !== 'function') throw new Error('plugin API missing');
-  const slots = api.getSlots();
-  const left = new Pane({ container: slots[0] });
-  const right = new Pane({ container: slots[1] });
-  (left as any).addBinding({ a: 1 }, 'a', { min: 0, max: 2, step: 1 });
-  (right as any).addBinding({ b: true }, 'b');
+function drawWave(container: HTMLElement, color = '#3b82f6') {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(100, container.clientWidth - 16);
+  canvas.height = Math.max(50, container.clientHeight - 16);
+  canvas.style.maxWidth = '100%';
+  const pad = 8;
+  container.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let x = 0; x < canvas.width; x++) {
+    const t = x / canvas.width * Math.PI * 4;
+    const y = canvas.height / 2 + Math.sin(t) * (canvas.height / 3);
+    if (x === 0) ctx.moveTo(pad, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
 }
 
 function main() {
-  const elBasic = document.getElementById('host-basic') as HTMLElement | null;
-  const elPresets = document.getElementById('host-presets') as HTMLElement | null;
-  const elCat = document.getElementById('host-category') as HTMLElement | null;
-  const elNest = document.getElementById('host-nested') as HTMLElement | null;
-  const elBtn = document.getElementById('host-button') as HTMLElement | null;
-  const elCompact = document.getElementById('host-compact') as HTMLElement | null;
-  const elInter = document.getElementById('host-interactive') as HTMLElement | null;
-  if (!elBasic || !elPresets || !elCat || !elNest || !elBtn || !elCompact || !elInter) return;
+  const host = document.getElementById('host') as HTMLElement | null;
+  if (!host) return;
 
-  buildBasic(elBasic);
-  buildPresets(elPresets);
-  buildCategory(elCat);
-  buildNested(elNest);
-  buildButton(elBtn);
-  buildCompact(elCompact);
-  buildInteractive(elInter);
+  const pane = new Pane({ container: host, title: 'Compact Kit — Rows' });
+  ensureRegistered(pane);
+
+  // Row 1: Quick peek — Multiline button + DOM side-by-side
+  const row1: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6,
+    children: ['leaf', 'leaf']
+  });
+  const r1 = row1.getSlots();
+  const r1l = new Pane({ container: r1[0] });
+  (r1l as any).addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 });
+  mountDomUnits(r1[1], 3, (box) => {
+    const p = document.createElement('div');
+    p.textContent = 'This is a plain DOM area';
+    p.style.margin = '4px 0 0';
+    p.style.color = '#888';
+    p.style.fontSize = '11px';
+    box.appendChild(p);
+  });
+
+  // Row 2: 66 / 34
+  const row2: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['leaf', 'leaf']
+  });
+  row2.getSlots().forEach((slot: HTMLElement, i: number) => {
+    const p = new Pane({ container: slot });
+    (p as any).addBlade({ view: 'sized-button', title: `Button\n${i + 1}`, units: 2 });
+  });
+
+  // Row 3: equal — 3 columns
+  const row3: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf', 'leaf', 'leaf']
+  });
+  row3.getSlots().forEach((slot: HTMLElement, i: number) => {
+    const p = new Pane({ container: slot });
+    (p as any).addBlade({ view: 'sized-button', title: `Equal\n${i + 1}`, units: 2 });
+  });
+
+  // Row 4: 1fr 2fr
+  const row4: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf', 'leaf']
+  });
+  row4.getSlots().forEach((slot: HTMLElement, i: number) => {
+    const p = new Pane({ container: slot });
+    (p as any).addBlade({ view: 'sized-button', title: `1fr\n2fr`, units: 2 });
+  });
+
+  // Row 5: 40 10 (normalized)
+  const row5: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'row', sizes: [40, 10], children: ['leaf', 'leaf']
+  });
+  row5.getSlots().forEach((slot: HTMLElement, i: number) => {
+    const p = new Pane({ container: slot });
+    (p as any).addBlade({ view: 'sized-button', title: `Normalized`, units: 2 });
+  });
+
+  // Row 6: 3u DOM with a tiny waveform (arbitrary HTML)
+  const row6: any = (pane as any).addBlade({
+    view: 'split-layout', direction: 'row', sizes: '1fr', children: ['leaf']
+  });
+  const r6 = row6.getSlots();
+  mountDomUnits(r6[0], 3, (box) => drawWave(box));
 }
 
 main();

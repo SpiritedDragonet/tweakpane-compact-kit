@@ -6,48 +6,20 @@
     <title>Tweakpane Compact Kit - Demo</title>
     <style>
       html, body { height: 100%; margin: 0; }
-      body { display: grid; place-items: start center; background: #111; color: #ddd; }
-      .wrap { width: 320px; max-width: 100%; padding: 16px; box-sizing: border-box; }
-      .section { margin-bottom: 16px; }
-      .title { font: 600 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0 0 8px; color: #e6e6e6; }
-      .desc { margin: 0 8px 8px 0; color: #aaa; font-size: 12px; }
-      .pane-host { width: 300px; height: 220px; background: #1b1b1b; border: 1px solid #333; box-sizing: border-box; }
+      body { display: grid; place-items: start center; background: #fff; color: #222; }
+      .wrap { width: 360px; max-width: 100%; padding: 16px; box-sizing: border-box; font: 13px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      .title { font-weight: 700; font-size: 14px; margin: 0 0 8px; }
+      .subtitle { color: #444; margin: 0 0 12px; }
+      .pane-host { width: 340px; min-height: 120px; background: #fafafa; border: 1px solid #e5e5e5; box-sizing: border-box; }
+      .note { color: #666; font-size: 12px; margin: 10px 0 0; }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div class="section">
-        <div class="title">1. 注册插件（v4）</div>
-        <div class="desc">后续示例均通过插件的 addBlade 接口创建。</div>
-      </div>
-      <div class="section">
-        <div class="title">2. 基础分栏</div>
-        <div id="host-basic" class="pane-host"></div>
-      </div>
-      <div class="section">
-        <div class="title">3. 预设布局</div>
-        <div id="host-presets" class="pane-host"></div>
-      </div>
-      <div class="section">
-        <div class="title">4. 分类槽位</div>
-        <div id="host-category" class="pane-host"></div>
-      </div>
-      <div class="section">
-        <div class="title">5. 嵌套布局</div>
-        <div id="host-nested" class="pane-host"></div>
-      </div>
-      <div class="section">
-        <div class="title">6. 多行按钮</div>
-        <div id="host-button" class="pane-host"></div>
-      </div>
-      <div class="section">
-        <div class="title">7. 紧凑样式（滑块/标签）</div>
-        <div id="host-compact" class="pane-host"></div>
-      </div>
-      <div class="section">
-        <div class="title">8. 可拖拽分割</div>
-        <div id="host-interactive" class="pane-host"></div>
-      </div>
+      <div class="title">Tweakpane Compact Kit — Demo (Rows)</div>
+      <p class="subtitle">Each row is a split-layout blade; left/right (or more) are its slots.</p>
+      <div id="host" class="pane-host"></div>
+      <p class="note">Tip: white background for clean screenshots.</p>
     </div>
     <script type="module" src="/main.ts"></script>
   </body>
