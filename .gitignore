@@ -4,6 +4,8 @@ node_modules/
 # Production build output
 dist/
 dist-demo/
+.release/
+*.tar.gz
 .claude/
 CLAUDE.md
 nul

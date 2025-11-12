@@ -75,6 +75,7 @@ function main() {
   });
   const r1 = row1.getSlots();
   const r1l = new Pane({ container: r1[0] });
+  ensureRegistered(r1l);
   (r1l as any).addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 });
   mountDomUnits(r1[1], 3, (box) => {
     const p = document.createElement('div');
@@ -91,6 +92,7 @@ function main() {
   });
   row2.getSlots().forEach((slot: HTMLElement, i: number) => {
     const p = new Pane({ container: slot });
+    ensureRegistered(p);
     (p as any).addBlade({ view: 'sized-button', title: `Button\n${i + 1}`, units: 2 });
   });
 
@@ -100,6 +102,7 @@ function main() {
   });
   row3.getSlots().forEach((slot: HTMLElement, i: number) => {
     const p = new Pane({ container: slot });
+    ensureRegistered(p);
     (p as any).addBlade({ view: 'sized-button', title: `Equal\n${i + 1}`, units: 2 });
   });
 
@@ -109,6 +112,7 @@ function main() {
   });
   row4.getSlots().forEach((slot: HTMLElement, i: number) => {
     const p = new Pane({ container: slot });
+    ensureRegistered(p);
     (p as any).addBlade({ view: 'sized-button', title: `1fr\n2fr`, units: 2 });
   });
 
@@ -118,6 +122,7 @@ function main() {
   });
   row5.getSlots().forEach((slot: HTMLElement, i: number) => {
     const p = new Pane({ container: slot });
+    ensureRegistered(p);
     (p as any).addBlade({ view: 'sized-button', title: `Normalized`, units: 2 });
   });
 

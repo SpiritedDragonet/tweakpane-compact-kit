@@ -3,7 +3,6 @@
 
 export {
   SplitLayoutPlugin,
-  addSplitLayout,
   type SplitDirection,
   type SplitLayoutNode,
   type SplitLayoutParams,
