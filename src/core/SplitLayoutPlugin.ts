@@ -592,7 +592,11 @@ function buildSplit(
                 }
               }
               const MAX_UNITS = 64;
-              const need = Math.max(1, Math.min(MAX_UNITS, Math.ceil(h / unitPx)));
+              // Subtract internal gaps for multi-unit panels so 3u content with 2*gutter doesn't round to 4u
+              const assumedUnits = (currentUnits && Number.isFinite(currentUnits[i])) ? Math.max(1, Math.floor(currentUnits[i])) : 1;
+              const gapOffset = Math.max(0, (assumedUnits - 1) * gutter);
+              const effectiveH = Math.max(0, h - gapOffset);
+              const need = Math.max(1, Math.min(MAX_UNITS, Math.ceil(effectiveH / Math.max(1, unitPx))));
               if (currentUnits && need !== currentUnits[i]) {
                 currentUnits[i] = need;
                 (panelWrappers[i].style as any).flex = `0 0 ${need * unitPx}px`;
