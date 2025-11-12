@@ -205,18 +205,18 @@ function main() {
         if (l) { const p = new Pane({ container: l }); ensureRegistered(p); (p as any).addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 }); }
         if (r) {
           const p = new Pane({ container: r }); ensureRegistered(p); try { p.registerPlugin(Essentials as any); } catch {}
-          p.addBinding({ v: 42 }, 'v', { min: 0, max: 100 });
-          p.addBinding({ on: true }, 'on');
-          p.addBinding({ mode: 'a' } as any, 'mode', { options: { Alpha: 'a', Beta: 'b', Gamma: 'g' } });
+          p.addBinding({ v: 42 }, 'v', { min: 0, max: 100, label: '' });
+          p.addBinding({ on: true }, 'on', { label: '' });
+          p.addBinding({ mode: 'a' } as any, 'mode', { options: { Alpha: 'a', Beta: 'b', Gamma: 'g' }, label: '' });
         }
       }
 
       // C2 fill (two controls per column, no labels to keep compact)
       {
         const [a, b, g] = c2.getSlots();
-        if (a) { const p = new Pane({ container: a }); ensureRegistered(p); p.addButton({ title: 'Action' }); p.addBinding({ text: 'hello' } as any, 'text'); }
-        if (b) { const p = new Pane({ container: b }); ensureRegistered(p); p.addBinding({ n: 3.14 }, 'n', { min: 0, max: 10 }); p.addBinding({ c: '#22d3ee' } as any, 'c'); }
-        if (g) { const p = new Pane({ container: g }); ensureRegistered(p); try { p.registerPlugin(Essentials as any); } catch {} (p as any).addBlade({ view: 'buttongrid', size: [2, 2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y * 2 + x)) }) }); p.addBinding({ flag: true }, 'flag'); }
+        if (a) { const p = new Pane({ container: a }); ensureRegistered(p); p.addButton({ title: 'Action' }); p.addBinding({ text: 'hello' } as any, 'text', { label: '' }); }
+        if (b) { const p = new Pane({ container: b }); ensureRegistered(p); p.addBinding({ n: 3.14 }, 'n', { min: 0, max: 10, label: '' }); p.addBinding({ c: '#22d3ee' } as any, 'c', { label: '' }); }
+        if (g) { const p = new Pane({ container: g }); ensureRegistered(p); try { p.registerPlugin(Essentials as any); } catch {} (p as any).addBlade({ view: 'buttongrid', size: [2, 2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y * 2 + x)) }) }); p.addBinding({ flag: true }, 'flag', { label: '' }); }
       }
 
       // C3 fill (three per side)
@@ -224,13 +224,13 @@ function main() {
         const [l, r] = c3.getSlots();
         if (l) {
           const p = new Pane({ container: l }); ensureRegistered(p);
-          p.addBinding({ p: { x: 0.3, y: 0.7 } } as any, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 } });
-          p.addBinding({ on: false }, 'on');
-          p.addBinding({ txt: 'note' } as any, 'txt');
+          p.addBinding({ p: { x: 0.3, y: 0.7 } } as any, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 }, label: '' });
+          p.addBinding({ on: false }, 'on', { label: '' });
+          p.addBinding({ txt: 'note' } as any, 'txt', { label: '' });
         }
         if (r) {
           const p = new Pane({ container: r }); ensureRegistered(p); try { p.registerPlugin(Essentials as any); } catch {}
-          p.addBinding({ p: { x: 0.1, y: 0.5, z: 0.9 } } as any, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 }, z: { min: 0, max: 1 } });
+          p.addBinding({ p: { x: 0.1, y: 0.5, z: 0.9 } } as any, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 }, z: { min: 0, max: 1 }, label: '' });
           (p as any).addBlade({ view: 'cubicbezier', value: [0.5, 0.2, 0.5, 1] });
           (p as any).addBlade({ view: 'fpsgraph' });
         }
