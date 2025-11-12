@@ -19,6 +19,7 @@ type SplitApi = {
   getSlotsByCategory?: (category: string) => HTMLElement[];
   dispose?: () => void;
 };
+type FolderLike = { addBinding: (obj: Record<string, unknown>, key: string, params?: Record<string, unknown>) => unknown; addBlade?: (p: Record<string, unknown>) => unknown };
 
 function unitPx(el: HTMLElement): number {
   try {
@@ -213,8 +214,12 @@ function main() {
         if (l) { const p = new Pane({ container: l }); ensureRegistered(p); p.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 }); }
         if (r) {
           const p = new Pane({ container: r }); ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {}
-          p.addBinding({ v: 42 }, 'v', { min: 0, max: 100 });
-          p.addBinding({ on: true }, 'on');
+          // Slider with a title (folder title acts as the text)
+          const f1 = p.addFolder({ title: 'Level' }) as unknown as FolderLike;
+          f1.addBinding({ v: 42 }, 'v', { min: 0, max: 100 });
+          // Checkbox with a title
+          const f2 = p.addFolder({ title: 'Enabled' }) as unknown as FolderLike;
+          f2.addBinding({ on: true }, 'on');
           p.addBinding({ mode: 'a' }, 'mode', { options: { Alpha: 'a', Beta: 'b', Gamma: 'g' } });
         }
       }
@@ -224,7 +229,7 @@ function main() {
         const [a, b, g] = c2.getSlots();
         if (a) { const p = new Pane({ container: a }); ensureRegistered(p); p.addButton({ title: 'Action' }); p.addBinding({ text: 'hello' }, 'text'); }
         if (b) { const p = new Pane({ container: b }); ensureRegistered(p); p.addBinding({ n: 3.14 }, 'n', { min: 0, max: 10 }); p.addBinding({ c: '#22d3ee' }, 'c'); }
-        if (g) { const p = new Pane({ container: g }); ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {} p.addBlade({ view: 'buttongrid', size: [2, 2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y * 2 + x)) }) }); p.addBinding({ flag: true }, 'flag'); }
+        if (g) { const p = new Pane({ container: g }); ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {} p.addBlade({ view: 'buttongrid', size: [2, 2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y * 2 + x)) }) }); const ff = p.addFolder({ title: 'Flag' }) as unknown as FolderLike; ff.addBinding({ flag: true }, 'flag'); }
       }
 
       // C3 fill (three per side)
@@ -233,7 +238,9 @@ function main() {
         if (l) {
           const p = new Pane({ container: l }); ensureRegistered(p);
           p.addBinding({ p: { x: 0.3, y: 0.7 } }, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 } });
-          p.addBinding({ on: false }, 'on');
+          // Checkbox with a title
+          const fl = p.addFolder({ title: 'Enabled' }) as unknown as FolderLike;
+          fl.addBinding({ on: false }, 'on');
           p.addBinding({ txt: 'note' }, 'txt');
         }
         if (r) {
