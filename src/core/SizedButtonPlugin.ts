@@ -28,16 +28,19 @@ class SizedButtonController {
     this.viewProps = viewProps;
 
     // Create container for the button
-    const container = document.createElement('div');
-    container.className = 'tp-sb-container';
-    element.appendChild(container);
+    // Create official button view structure: wrapper .tp-btnv with inner button .tp-btnv_b
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tp-btnv';
+    element.appendChild(wrapper);
 
-    // Create the button
     const button = document.createElement('button');
-    // Use Tweakpane's default button view class to inherit colors
-    button.className = 'tp-sb-button tp-btnv_b';
-    button.textContent = params.title || '';
-    container.appendChild(button);
+    button.className = 'tp-btnv_b';
+    // Put label in a span to allow multi-line without affecting button styles
+    const label = document.createElement('span');
+    label.className = 'tp-sb-label';
+    label.textContent = params.title || '';
+    button.appendChild(label);
+    wrapper.appendChild(button);
     this.buttonEl = button;
 
     // Apply click handler
@@ -58,7 +61,7 @@ class SizedButtonController {
   }
 
   updateHeight(units: number) {
-    const button = this.view.element.querySelector('.tp-sb-button') as HTMLElement;
+    const button = this.buttonEl as HTMLElement;
     if (!button) return;
 
     // Compute 1 blade unit (px)
@@ -156,44 +159,11 @@ export const SizedButtonPlugin: any = {
   // Tweakpane compatibility: match @tweakpane/core major version (v2 for Tweakpane v4)
   core: { major: 2, minor: 0, patch: 0 },
   css: `
-    /* Sized button blade styles */
-    .tp-sized-button {
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    .tp-sb-container {
-      width: 100%;
-      padding: 0;
-      margin: 0;
-    }
-
-    .tp-sb-button.tp-btnv_b {
-      width: 100%;
-      min-width: 0;
-      padding: 0 8px;
-      font-size: 12px;
-      line-height: 1.4;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      cursor: pointer;
-      transition: all 0.1s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      white-space: pre-line;
-      word-break: keep-all;
-      box-sizing: border-box;
-    }
-
-    /* Align with Tweakpane's compact styling */
-    .tp-sb-container {
-      padding: 0;
-    }
-    .tp-sb-button.tp-btnv_b {
-      margin: 0;
-    }
+    /* Sized button blade: keep defaults; only ensure sizing + multiline label */
+    .tp-sized-button { width: 100%; box-sizing: border-box; }
+    .tp-sized-button .tp-btnv { width: 100%; }
+    .tp-sized-button .tp-btnv_b { width: 100%; box-sizing: border-box; }
+    .tp-sb-label { white-space: pre-line; }
   `,
   accept(params: any) {
     if (!params || params.view !== 'sized-button') return null;
