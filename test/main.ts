@@ -37,7 +37,7 @@ function mountDomUnits(slot: HTMLElement, units: number, inner?: (box: HTMLEleme
   else box.textContent = `${units}u DOM (not a Tweakpane control)`;
 }
 
-function drawWave(container: HTMLElement, color = 'currentColor') {
+function drawWave(container: HTMLElement, stroke = '#22d3ee', bg = '#0f172a') {
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(100, container.clientWidth - 16);
   canvas.height = Math.max(50, container.clientHeight - 16);
@@ -46,8 +46,11 @@ function drawWave(container: HTMLElement, color = 'currentColor') {
   container.appendChild(canvas);
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = color;
+  // Dark background
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Bright line
+  ctx.strokeStyle = stroke;
   ctx.lineWidth = 2;
   ctx.beginPath();
   for (let x = 0; x < canvas.width; x++) {
@@ -129,7 +132,7 @@ function main() {
     view: 'split-layout', direction: 'row', sizes: '1fr', children: ['leaf']
   });
   const r6 = row6.getSlots();
-  mountDomUnits(r6[0], 3, (box) => drawWave(box));
+  mountDomUnits(r6[0], 3, (box) => drawWave(box, '#22d3ee', '#0f172a'));
 }
 
 main();
