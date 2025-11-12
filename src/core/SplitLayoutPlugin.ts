@@ -32,13 +32,8 @@ function installSliderLabelAutoTweak(
 
       // If leaf policy requests hiding labels, remove the label box entirely (for any control)
       if (hideLabels && labelBox) {
-        // Keep labels that look like meaningful text (length >= 2)
-        const txt = (labelBox.textContent || '').trim();
-        const meaningful = txt.length >= 2;
-        if (!meaningful) {
-          try { labelBox.remove(); } catch {}
-          try { labeledView.classList.add('tp-lblv-nol'); } catch {}
-        }
+        try { labelBox.remove(); } catch {}
+        try { labeledView.classList.add('tp-lblv-nol'); } catch {}
       }
 
       // Mark as tweaked before modifying DOM
