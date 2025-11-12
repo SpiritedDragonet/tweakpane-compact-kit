@@ -5,7 +5,6 @@
 import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 import * as Essentials from '@tweakpane/plugin-essentials';
-import * as Essentials from '@tweakpane/plugin-essentials';
 
 // Utilities
 function ensureRegistered(pane: Pane) {
@@ -14,7 +13,55 @@ function ensureRegistered(pane: Pane) {
   }
 }
 
-// No direct DOM editing in demo below; only Tweakpane API
+function unitPx(el: HTMLElement): number {
+  try {
+    const cs = getComputedStyle(el);
+    const v = cs.getPropertyValue('--cnt-usz').trim();
+    const m = v.match(/([0-9]+\.?[0-9]*)\s*px/i);
+    if (m) return Math.max(1, Math.round(parseFloat(m[1])));
+  } catch {}
+  return 18; // sensible default
+}
+
+function mountDomUnits(slot: HTMLElement, units: number, inner?: (box: HTMLElement) => void) {
+  const box = document.createElement('div');
+  box.className = 'tp-demo-domleaf';
+  const u = unitPx(slot);
+  const gutter = 4;
+  box.style.height = `calc(${units} * var(--cnt-usz) + ${(units - 1) * gutter}px)`;
+  box.style.display = 'grid';
+  box.style.placeItems = 'center';
+  // Use default/inherited colors; no hard-coded color
+  box.style.fontSize = '12px';
+  slot.appendChild(box);
+  if (inner) inner(box);
+  else box.textContent = `${units}u DOM (not a Tweakpane control)`;
+}
+
+function drawWave(container: HTMLElement, stroke = '#22d3ee', bg = '#0f172a') {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(100, container.clientWidth - 16);
+  canvas.height = Math.max(50, container.clientHeight - 16);
+  canvas.style.maxWidth = '100%';
+  const pad = 8;
+  container.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  // Dark background
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Bright line
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let x = 0; x < canvas.width; x++) {
+    const t = x / canvas.width * Math.PI * 4;
+    const y = canvas.height / 2 + Math.sin(t) * (canvas.height / 3);
+    if (x === 0) ctx.moveTo(pad, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
 
 function main() {
   const host = document.getElementById('host') as HTMLElement | null;
@@ -22,7 +69,6 @@ function main() {
 
   const pane = new Pane({ container: host, title: 'Compact Kit — Rows' });
   ensureRegistered(pane);
-  try { pane.registerPlugin(Essentials as any); } catch {}
   try { pane.registerPlugin(Essentials as any); } catch {}
 
   // Row 1: Quick peek — Multiline button + DOM side-by-side
@@ -34,10 +80,14 @@ function main() {
   const r1l = new Pane({ container: r1[0] });
   ensureRegistered(r1l);
   (r1l as any).addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 });
-  const r1r = new Pane({ container: r1[1] });
-  ensureRegistered(r1r);
-  // Use another 3u sized button as an info placeholder (no DOM edits)
-  (r1r as any).addBlade({ view: 'sized-button', title: 'Info\n(3u pane)', units: 3 });
+  mountDomUnits(r1[1], 3, (box) => {
+    const p = document.createElement('div');
+    p.textContent = 'This is a plain DOM area';
+    p.style.margin = '4px 0 0';
+    p.style.color = '#888';
+    p.style.fontSize = '11px';
+    box.appendChild(p);
+  });
 
   // Row 2: 66 / 34
   const row2: any = (pane as any).addBlade({
@@ -84,77 +134,7 @@ function main() {
     view: 'split-layout', direction: 'row', sizes: '1fr', children: ['leaf']
   });
   const r6 = row6.getSlots();
-  const r6p = new Pane({ container: r6[0] });
-  ensureRegistered(r6p);
-  // Showcase: 3 units of mixed controls (no labels)
-  r6p.addBinding({ a: 42 }, 'a', { min: 0, max: 100 });
-  r6p.addBinding({ b: true }, 'b');
-  r6p.addBinding({ c: '#22d3ee' } as any, 'c');
-
-  // Section 2: Compact sliders toggle
-  const host2 = document.getElementById('host-compact') as HTMLElement | null;
-  if (host2) {
-    const pane2 = new Pane({ container: host2, title: 'Compact vs Original' });
-    ensureRegistered(pane2);
-    try { pane2.registerPlugin(Essentials as any); } catch {}
-
-    const state = { compact: true, a: 50, b: 0.25 };
-    let api: any | null = null;
-    const render = () => {
-      if (api) { try { api.dispose(); } catch {} api = null; }
-      api = (pane2 as any).addBlade({
-        view: 'split-layout', direction: 'row', sizes: '1fr 1fr', children: ['leaf','leaf'], compactSliders: state.compact
-      });
-      const [L, R] = api.getSlots();
-      const pl = new Pane({ container: L }); ensureRegistered(pl); try { pl.registerPlugin(Essentials as any); } catch {}
-      const pr = new Pane({ container: R }); ensureRegistered(pr); try { pr.registerPlugin(Essentials as any); } catch {}
-      pl.addBinding(state, 'a', { min: 0, max: 100 });
-      pr.addBinding(state, 'b', { min: 0, max: 1 });
-    };
-    render();
-    const ctl = pane2.addBinding(state, 'compact');
-    (ctl as any).on('change', () => render());
-  }
-
-  // Section 3: Custom categories (no DOM, no rowUnits)
-  const host3 = document.getElementById('host-cats') as HTMLElement | null;
-  if (host3) {
-    const pane3 = new Pane({ container: host3, title: 'Semantic Leaves' });
-    ensureRegistered(pane3);
-    try { pane3.registerPlugin(Essentials as any); } catch {}
-
-    // Row C1: 66/34 — left 3u button; right 3 x 1u controls
-    const c1: any = (pane3 as any).addBlade({ view: 'split-layout', direction: 'row', sizes: [66,34], children: ['alpha','beta'] });
-    const [c1L, c1R] = c1.getSlots();
-    const c1pL = new Pane({ container: c1L }); ensureRegistered(c1pL);
-    (c1pL as any).addBlade({ view: 'sized-button', title: '3u\nButton', units: 3 });
-    const c1pR = new Pane({ container: c1R }); ensureRegistered(c1pR); try { c1pR.registerPlugin(Essentials as any); } catch {}
-    c1pR.addBinding({ v: 25 }, 'v', { min: 0, max: 100 });
-    c1pR.addBinding({ on: true }, 'on');
-    c1pR.addBinding({ sel: 'a' } as any, 'sel', { options: { A: 'a', B: 'b', C: 'c' } });
-
-    // Row C2: equal 3 columns — each column two controls
-    const c2: any = (pane3 as any).addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['alpha','beta','gamma'] });
-    c2.getSlots().forEach((slot: HTMLElement, i: number) => {
-      const p = new Pane({ container: slot }); ensureRegistered(p); try { p.registerPlugin(Essentials as any); } catch {}
-      if (i === 0) { p.addBinding({ s: 'hello' } as any, 's'); p.addButton({ title: 'Action' }); }
-      if (i === 1) { p.addBinding({ n: 3.14 }, 'n', { min: 0, max: 10 }); p.addBinding({ c: '#22d3ee' } as any, 'c'); }
-      if (i === 2) { (p as any).addBlade({ view: 'buttongrid', size: [2,2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y*2+x)) }) }); p.addBinding({ flag: true }, 'flag'); }
-    });
-
-    // Row C3: 1fr 2fr — both sides three controls（vec2/vec3 included）
-    const c3: any = (pane3 as any).addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['alpha','gamma'] });
-    const [c3L, c3R] = c3.getSlots();
-    const c3pL = new Pane({ container: c3L }); ensureRegistered(c3pL);
-    c3pL.addBinding({ p: { x: 0.3, y: 0.7 } } as any, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 } });
-    c3pL.addBinding({ on: false }, 'on');
-    c3pL.addBinding({ txt: 'note' } as any, 'txt');
-    const c3pR = new Pane({ container: c3R }); ensureRegistered(c3pR);
-    c3pR.addBinding({ p: { x: 0.1, y: 0.5, z: 0.9 } } as any, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 }, z: { min: 0, max: 1 } });
-    c3pR.addBinding({ v: 0.25 }, 'v', { min: 0, max: 1 });
-    try { c3pR.registerPlugin(Essentials as any); } catch {}
-    (c3pR as any).addBlade({ view: 'cubicbezier', value: [0.5, 0.2, 0.5, 1] });
-  }
+  mountDomUnits(r6[0], 3, (box) => drawWave(box, '#22d3ee', '#0f172a'));
 
   // Section 2: Compact sliders toggle
   const host2 = document.getElementById('host-compact') as HTMLElement | null;
