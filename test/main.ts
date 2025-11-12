@@ -4,7 +4,6 @@
 
 import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
-import * as Essentials from '@tweakpane/plugin-essentials';
 
 // Utilities
 function ensureRegistered(pane: Pane) {
@@ -69,7 +68,6 @@ function main() {
 
   const pane = new Pane({ container: host, title: 'Compact Kit — Rows' });
   ensureRegistered(pane);
-  try { pane.registerPlugin(Essentials as any); } catch {}
 
   // Row 1: Quick peek — Multiline button + DOM side-by-side
   const row1: any = (pane as any).addBlade({
@@ -135,106 +133,6 @@ function main() {
   });
   const r6 = row6.getSlots();
   mountDomUnits(r6[0], 3, (box) => drawWave(box, '#22d3ee', '#0f172a'));
-
-  // Section 2: Compact sliders toggle
-  const host2 = document.getElementById('host-compact') as HTMLElement | null;
-  if (host2) {
-    const pane2 = new Pane({ container: host2, title: 'Compact vs Original' });
-    ensureRegistered(pane2);
-    try { pane2.registerPlugin(Essentials as any); } catch {}
-
-    const state = { compact: true, a: 50, b: 0.25 };
-    let rowApi: any | null = null;
-
-    const render = () => {
-      if (rowApi) { try { rowApi.dispose(); } catch {} rowApi = null; }
-      const api: any = (pane2 as any).addBlade({
-        view: 'split-layout',
-        direction: 'row',
-        sizes: '1fr 1fr',
-        compactSliders: state.compact,
-        children: ['leaf', 'leaf']
-      });
-      rowApi = api;
-      const [L, R] = api.getSlots();
-      const pl = new Pane({ container: L }); ensureRegistered(pl); try { pl.registerPlugin(Essentials as any); } catch {}
-      const pr = new Pane({ container: R }); ensureRegistered(pr); try { pr.registerPlugin(Essentials as any); } catch {}
-      pl.addBinding(state, 'a', { min: 0, max: 100 });
-      pr.addBinding(state, 'b', { min: 0, max: 1 });
-    };
-
-    render();
-    const ctl = pane2.addBinding(state, 'compact');
-    (ctl as any).on('change', () => render());
-  }
-
-  // Section 3: Custom categories (dense, equal occupancy per column)
-  const host3 = document.getElementById('host-cats') as HTMLElement | null;
-  if (host3) {
-    const pane3 = new Pane({ container: host3, title: 'Semantic Leaves' });
-    ensureRegistered(pane3);
-    try { pane3.registerPlugin(Essentials as any); } catch {}
-
-    // Row C1: 66 / 34, left 3u (one leaf), right 1u+1u+1u (three leaves)
-    const c1: any = (pane3 as any).addBlade({
-      view: 'split-layout', direction: 'row', sizes: [66, 34], children: [
-        { view: 'split-layout', direction: 'column', rowUnits: [3], children: ['alpha'] },
-        { view: 'split-layout', direction: 'column', rowUnits: [1,1,1], children: ['beta','beta','beta'] },
-      ]
-    });
-
-    // Row C2: equal (3 cols), each column = 1u + 1u
-    const c2: any = (pane3 as any).addBlade({
-      view: 'split-layout', direction: 'row', sizes: 'equal', children: [
-        { view: 'split-layout', direction: 'column', rowUnits: [1,1], children: ['alpha','alpha'] },
-        { view: 'split-layout', direction: 'column', rowUnits: [1,1], children: ['beta','beta'] },
-        { view: 'split-layout', direction: 'column', rowUnits: [1,1], children: ['gamma','gamma'] },
-      ]
-    });
-
-    // Row C3: 1fr 2fr, left 1+1+1, right 1+1+1
-    const c3: any = (pane3 as any).addBlade({
-      view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: [
-        { view: 'split-layout', direction: 'column', rowUnits: [1,1,1], children: ['alpha','alpha','alpha'] },
-        // Allocate more height for heavier components (e.g., cubicbezier)
-        { view: 'split-layout', direction: 'column', rowUnits: [3,1,1], children: ['gamma','gamma','gamma'] },
-      ]
-    });
-
-    // Gather slots by category across rows
-    const alpha = [ ...c1.getSlotsByCategory('alpha'), ...c2.getSlotsByCategory('alpha'), ...c3.getSlotsByCategory('alpha') ];
-    const beta  = [ ...c1.getSlotsByCategory('beta'),  ...c2.getSlotsByCategory('beta')  ];
-    const gamma = [ ...c2.getSlotsByCategory('gamma'), ...c3.getSlotsByCategory('gamma') ];
-
-    // Fill alpha (6 slots): [3u sized-button], button, folder, tab, string, separator
-    if (alpha[0]) { const p = new Pane({ container: alpha[0] }); ensureRegistered(p); (p as any).addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 }); }
-    if (alpha[1]) { const p = new Pane({ container: alpha[1] }); ensureRegistered(p); p.addButton({ title: 'Action' }); }
-    if (alpha[2]) { const p = new Pane({ container: alpha[2] }); ensureRegistered(p); const f = (p as any).addFolder({ title: 'Folder' }); (f as any).addBinding({ x: 1 }, 'x'); }
-    if (alpha[3]) { const p = new Pane({ container: alpha[3] }); ensureRegistered(p); const t = (p as any).addTab({ pages: [{ title: 'A' }, { title: 'B' }] }); const p0 = (t as any).pages[0]; (p0 as any).addBinding({ flag: true }, 'flag'); }
-    if (alpha[4]) { const p = new Pane({ container: alpha[4] }); ensureRegistered(p); p.addBinding({ text: 'hello' } as any, 'text'); }
-    if (alpha[5]) { const p = new Pane({ container: alpha[5] }); ensureRegistered(p); (p as any).addBlade({ view: 'separator' }); }
-
-    // Fill beta (5 slots): slider, dropdown, boolean, number, color
-    if (beta[0]) { const p = new Pane({ container: beta[0] }); ensureRegistered(p); p.addBinding({ v: 42 }, 'v', { min: 0, max: 100 }); }
-    if (beta[1]) { const p = new Pane({ container: beta[1] }); ensureRegistered(p); p.addBinding({ mode: 'a' } as any, 'mode', { options: { Alpha: 'a', Beta: 'b', Gamma: 'g' } }); }
-    if (beta[2]) { const p = new Pane({ container: beta[2] }); ensureRegistered(p); p.addBinding({ on: true }, 'on'); }
-    if (beta[3]) { const p = new Pane({ container: beta[3] }); ensureRegistered(p); p.addBinding({ n: 3.14 }, 'n', { min: 0, max: 10 }); }
-    if (beta[4]) { const p = new Pane({ container: beta[4] }); ensureRegistered(p); p.addBinding({ c: '#22d3ee' } as any, 'c'); }
-
-    // Fill gamma (5+ slots): buttongrid, color, vec2, vec3, cubicbezier, fpsgraph (as many as slots allow)
-    if (gamma[0]) { const p = new Pane({ container: gamma[0] }); ensureRegistered(p); try { p.registerPlugin(Essentials as any); } catch {} (p as any).addBlade({ view: 'buttongrid', size: [2, 2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y * 2 + x)) }) }); }
-    if (gamma[1]) { const p = new Pane({ container: gamma[1] }); ensureRegistered(p); p.addBinding({ c: '#ff7b7b' } as any, 'c'); }
-    if (gamma[2]) { const p = new Pane({ container: gamma[2] }); ensureRegistered(p); p.addBinding({ p: { x: 0.3, y: 0.7 } } as any, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 } }); }
-    if (gamma[3]) { const p = new Pane({ container: gamma[3] }); ensureRegistered(p); p.addBinding({ p: { x: 0.1, y: 0.5, z: 0.9 } } as any, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 }, z: { min: 0, max: 1 } }); }
-    if (gamma[4]) { const p = new Pane({ container: gamma[4] }); ensureRegistered(p); try { p.registerPlugin(Essentials as any); } catch {} (p as any).addBlade({ view: 'cubicbezier', value: [0.5, 0.2, 0.5, 1] }); }
-    if (gamma[5]) { const p = new Pane({ container: gamma[5] }); ensureRegistered(p); try { p.registerPlugin(Essentials as any); } catch {} (p as any).addBlade({ view: 'fpsgraph' }); }
-
-    // Footer note (visual hint)
-    const note = document.createElement('div');
-    note.className = 'note';
-    note.textContent = 'Hint: With compact layout, omitting label fields often looks cleaner.';
-    host3.appendChild(note);
-  }
 }
 
 main();
