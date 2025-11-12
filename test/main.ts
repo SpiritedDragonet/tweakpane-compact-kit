@@ -140,7 +140,7 @@ function main() {
     ensureRegistered(pane2);
     try { pane2.registerPlugin(Essentials as any); } catch {}
 
-    const state = { compact: true, a: 50, b: 0.25 };
+    const state = { compact: true, a: 50 };
     let rowApi: any | null = null;
     let childPanes: Pane[] = [];
 
@@ -155,9 +155,6 @@ function main() {
       }
     };
 
-    // Toggle control (kept at a stable position)
-    const ctl = pane2.addBinding(state, 'compact', { label: '' });
-
     const render = () => {
       clearRow();
       const api: any = (pane2 as any).addBlade({
@@ -169,15 +166,19 @@ function main() {
       });
       rowApi = api;
       const [L, R] = api.getSlots();
-      const pl = new Pane({ container: L }); ensureRegistered(pl); try { pl.registerPlugin(Essentials as any); } catch {}
-      const pr = new Pane({ container: R }); ensureRegistered(pr); try { pr.registerPlugin(Essentials as any); } catch {}
-      pl.addBinding(state, 'a', { min: 0, max: 100 });
-      pr.addBinding(state, 'b', { min: 0, max: 1 });
+      const pl = new Pane({ container: L }); ensureRegistered(pl);
+      const pr = new Pane({ container: R }); ensureRegistered(pr);
+      try { pl.registerPlugin(Essentials as any); } catch {}
+      try { pr.registerPlugin(Essentials as any); } catch {}
+      // Left: checkbox with label
+      const leftCtl = pl.addBinding(state, 'compact', { label: 'Compact' });
+      (leftCtl as any).on('change', () => { requestAnimationFrame(render); });
+      // Right: a single slider to demonstrate layout
+      pr.addBinding(state, 'a', { min: 0, max: 100, label: 'Value' });
       childPanes.push(pl, pr);
     };
 
     render();
-    (ctl as any).on('change', () => render());
   }
 
   // Section 3: Custom categories (dense, equal occupancy per column)
