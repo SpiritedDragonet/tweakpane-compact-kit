@@ -818,83 +818,8 @@ export const SplitLayoutPlugin: any = {
     if (!(args.controller instanceof SplitLayoutController)) return null;
     return new SplitLayoutApi(args.controller as SplitLayoutController);
   },
-  // Auto-inject styles for tight layout (no gaps, no overflow)
-  css: `
-    /* Hide Tweakpane title bar and spacing elements to eliminate vertical gaps */
-    .tp-split-leaf .tp-rotv_b {
-      display: none !important;
-      height: 0 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-    .tp-split-leaf .tp-rotv_i {
-      display: none !important;
-      height: 0 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-
-    /* Make all containers shrink to content height */
-    .tp-split-leaf.tp-split-leaf.tp-split-leaf {
-      height: auto !important;
-    }
-    .tp-split-root-column > .tp-split-panel.tp-split-panel {
-      flex: 0 0 auto !important;
-    }
-    .tp-split-leaf .tp-rotv.tp-rotv.tp-rotv {
-      height: auto !important;
-      border-radius: 0 !important;
-      border-top-left-radius: 0 !important;
-      border-top-right-radius: 0 !important;
-      border-bottom-left-radius: 0 !important;
-      border-bottom-right-radius: 0 !important;
-      padding: 0 !important;
-      margin: 0 !important;
-    }
-    .tp-split-leaf .tp-rotv_c.tp-rotv_c.tp-rotv_c {
-      flex: 0 0 auto !important;
-      height: auto !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      gap: 0 !important;
-    }
-
-    /* Remove bottom margins/paddings to eliminate gaps */
-    .tp-split-leaf .tp-lblv, .tp-split-leaf .tp-lblv_v { margin-bottom: 0 !important; }
-    .tp-split-leaf .tp-v-fst, .tp-split-leaf .tp-v-vfst, .tp-split-leaf .tp-v-lst, .tp-split-leaf .tp-v-vlst {
-      padding-bottom: 0 !important;
-      margin-bottom: 0 !important;
-    }
-    .tp-split-leaf .tp-rotv_c > * { margin-bottom: 0 !important; }
-
-    /* Fix all control layouts - prevent value containers from overflowing parent */
-    .tp-split-leaf .tp-lblv {
-      width: 100% !important;
-      max-width: 100% !important;
-      box-sizing: border-box !important;
-      position: relative !important;
-    }
-    .tp-split-leaf .tp-lblv_v {
-      width: auto !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
-      flex-shrink: 1 !important;
-      box-sizing: border-box !important;
-    }
-    /* Exception for slider value containers */
-    .tp-split-leaf .tp-lblv:has(.tp-sldv) .tp-lblv_v,
-    .tp-split-leaf .tp-lblv:has(.tp-sldtxtv) .tp-lblv_v {
-      width: 100% !important;
-      max-width: 100% !important;
-      position: relative !important;
-    }
-    .tp-split-leaf .tp-lblv_l {
-      flex-basis: 30% !important;
-      min-width: 0 !important;
-      width: auto !important;
-      box-sizing: border-box !important;
-    }
-  `,
+  // Keep CSS minimal to avoid overriding official spacings/colors
+  css: ``,
 };
 
 // Helper to mount split layout without formal plugin registration (shim-style)
