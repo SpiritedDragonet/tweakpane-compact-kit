@@ -95,21 +95,16 @@ const pb = new Pane({ container: b }); pb.registerPlugin(CompactKitBundle);
 Size Expressions (pick what reads best for your case):
 
 ```ts
-// Percent or numeric arrays (auto-normalized)
-sizes: [66, 34]
-sizes: [40, 10]       // normalized to 80:20
+// Numeric arrays (auto-normalized ratios)
+sizes: [66, 34]       // 66:34 ratio
+sizes: [1, 2, 1]      // 1:2:1 ratio
+
+// Fractions (CSS Grid-like, recommended)
+sizes: '1fr 2fr'      // 1:2 ratio
+sizes: '1fr 1fr 1fr'  // 1:1:1 ratio
 
 // Equal split
-sizes: 'equal'        // any count, from children
-
-// Fractions
-sizes: '1fr 2fr'
-
-// Ratios
-sizes: { ratio: [1, 2, 1] }
-
-// Auto (N equal parts)
-sizes: { auto: 3 }
+sizes: 'equal'        // auto-equal from children count
 ```
 
 Other options:
@@ -161,7 +156,6 @@ All public types are exported:
 import type {
   SplitDirection,
   SizeExpression,
-  LayoutPreset,
   SizedButtonOptions
 } from 'tweakpane-compact-kit';
 ```

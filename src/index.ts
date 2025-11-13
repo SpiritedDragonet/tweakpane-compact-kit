@@ -7,7 +7,6 @@ export {
   type SplitLayoutNode,
   type SplitLayoutParams,
   type SizeExpression,
-  type LayoutPreset,
 } from './core/SplitLayoutPlugin';
 
 export {

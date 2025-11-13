@@ -3,12 +3,12 @@
 ## 安装
 
 ```bash
-npm install tweakpane-plugin-split-layout
+npm install tweakpane-compact-kit
 ```
 
 ```typescript
 import { Pane } from 'tweakpane';
-import { SplitLayoutPlugin } from 'tweakpane-plugin-split-layout';
+import { SplitLayoutPlugin } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
 pane.registerPlugin(SplitLayoutPlugin);
@@ -25,7 +25,23 @@ pane.addBlade({ view: 'split-layout', direction: 'column' });
 
 ## 尺寸表达式
 
-### 1. fr单位（推荐）
+### 1. 数字数组（最简单）
+```typescript
+// 比例分配
+pane.addBlade({
+  view: 'split-layout',
+  direction: 'row',
+  sizes: [66, 34]  // 66:34 比例
+});
+
+pane.addBlade({
+  view: 'split-layout',
+  direction: 'row',
+  sizes: [1, 2, 1]  // 1:2:1 比例
+});
+```
+
+### 2. fr单位（推荐）
 ```typescript
 // 1:1 比例
 pane.addBlade({
@@ -45,103 +61,18 @@ pane.addBlade({
 pane.addBlade({
   view: 'split-layout',
   direction: 'row',
-  sizes: '200px 1fr 30%'
+  sizes: '200px 1fr 30%'  // 200px固定 + 自适应 + 30%
 });
 ```
 
-### 2. 对象形式
+### 3. 等分布局
 ```typescript
-// 等分
+// 根据children数量自动等分
 pane.addBlade({
   view: 'split-layout',
   direction: 'row',
-  sizes: { equal: 3 }  // 3等分
-});
-
-// 比例
-pane.addBlade({
-  view: 'split-layout',
-  direction: 'row',
-  sizes: { ratio: [1, 3, 1] }  // 1:3:1
-});
-
-// 自动大小
-pane.addBlade({
-  view: 'split-layout',
-  direction: 'row',
-  sizes: { auto: 4 }  // 4个自动大小的列
-});
-```
-
-### 3. 数组形式
-```typescript
-// 数字数组
-pane.addBlade({
-  view: 'split-layout',
-  direction: 'row',
-  sizes: [1, 2, 1]  // 自动转换为比例
-});
-
-// 带单位数组
-pane.addBlade({
-  view: 'split-layout',
-  direction: 'row',
-  sizes: ['100px', '2fr', '30%']
-});
-```
-
-## 布局预设
-
-预设提供了常用的布局模式：
-
-```typescript
-// 侧边栏布局 (30% | 70%)
-pane.addBlade({
-  view: 'split-layout',
-  preset: 'sidebar',
-  direction: 'row'
-});
-
-// 三面板布局 (33% | 33% | 33%)
-pane.addBlade({
-  view: 'split-layout',
-  preset: 'panels',
-  direction: 'row'
-});
-
-// 主内容+侧边栏 (70% | 30%)
-pane.addBlade({
-  view: 'split-layout',
-  preset: 'main-sidebar',
-  direction: 'row'
-});
-
-// 头部+主内容 (20% | 80%)
-pane.addBlade({
-  view: 'split-layout',
-  preset: 'header-main',
-  direction: 'column'
-});
-
-// 三栏布局 (25% | 50% | 25%)
-pane.addBlade({
-  view: 'split-layout',
-  preset: 'triple',
-  direction: 'row'
-});
-
-// 黄金比例 (38.2% | 61.8%)
-pane.addBlade({
-  view: 'split-layout',
-  preset: 'golden',
-  direction: 'row'
-});
-
-// 自动嵌套（50% | 嵌套的50/50垂直分割）
-pane.addBlade({
-  view: 'split-layout',
-  preset: 'nested',
-  direction: 'row'
+  sizes: 'equal',
+  children: ['leaf', 'leaf', 'leaf']  // 3等分
 });
 ```
 
@@ -153,23 +84,18 @@ pane.addBlade({
   direction: 'row',
   sizes: '1fr 2fr 1fr',
 
-  // 间距（px或字符串）
-  gap: 12,              // 同 gutter
-  gutter: '12px',
+  // 间距（px）
+  gutter: 12,
 
   // 交互
   interactive: true,    // 可拖拽调整大小
 
   // 样式
   compactSliders: false, // 关闭紧凑slider样式
-  align: 'center',       // start | center | end | stretch
 
   // 约束
   minSize: 50,          // 最小尺寸
   height: 400,          // 固定高度（仅row方向）
-
-  // CSS
-  className: 'my-layout' // 添加自定义类
 });
 ```
 
@@ -184,7 +110,6 @@ pane.addBlade({
   // 每行的高度分配（支持所有尺寸表达式）
   rowUnits: 'equal',        // 每行等高
   rowUnits: '2fr 1fr 1fr',  // 比例分配
-  rowUnits: { equal: 3 },   // 3等分
 
   // 固定总高度
   height: 600
@@ -238,7 +163,7 @@ pane2.addBinding(obj, 'value2');
 
 ```typescript
 import { Pane } from 'tweakpane';
-import { SplitLayoutPlugin } from 'tweakpane-plugin-split-layout';
+import { SplitLayoutPlugin } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
 pane.registerPlugin(SplitLayoutPlugin);
@@ -248,7 +173,7 @@ const layout = pane.addBlade({
   view: 'split-layout',
   direction: 'column',
   sizes: '60px 1fr 100px',
-  gap: 8,
+  gutter: 8,
   interactive: true,
   children: [
     // 头部
@@ -257,7 +182,7 @@ const layout = pane.addBlade({
     {
       view: 'split-layout',
       direction: 'row',
-      preset: 'sidebar',
+      sizes: [30, 70],  // 30:70比例
       children: [
         // 侧边栏
         'leaf',
@@ -290,20 +215,19 @@ new Pane({ container: footerSlot }).addBinding(status, 'info');
 
 ```typescript
 type SizeExpression =
-  | number[]                           // [100, 200] - pixels
-  | string[]                          // ['100px', '2fr', '30%']
-  | string                            // '1fr 2fr 1fr'
-  | 'equal'                           // Equal distribution
-  | { equal: number }                 // Equal split into N parts
-  | { ratio: number[] }               // Ratio-based [1, 2, 1]
-  | { auto: number }                  // N auto-sized columns
+  | number[]    // [66, 34] or [1, 2, 1] - ratio-based
+  | string;     // '1fr 2fr' or 'equal'
 
-type LayoutPreset =
-  | 'sidebar'                         // 300px | 1fr
-  | 'panels'                          // 1fr | 1fr | 1fr
-  | 'main-sidebar'                    // 1fr | 250px
-  | 'header-main'                     // auto | 1fr
-  | 'triple'                          // 1fr 2fr 1fr
-  | 'golden'                          // 0.618fr | 1fr
-  | 'nested';                         // Auto-generate nested layout
+type SplitLayoutParams = {
+  view: 'split-layout';
+  direction: 'row' | 'column';
+  sizes?: SizeExpression;
+  children?: SplitLayoutNode[];
+  rowUnits?: SizeExpression;
+  height?: number | string;
+  gutter?: number | string;
+  minSize?: number;
+  interactive?: boolean;
+  compactSliders?: boolean;
+};
 ```

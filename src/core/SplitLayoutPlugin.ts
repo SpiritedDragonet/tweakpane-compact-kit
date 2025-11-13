@@ -137,34 +137,16 @@ export type SplitLayoutNode =
       height?: number | string; // only meaningful when direction === 'column'
     };
 
-// Enhanced size expressions supporting CSS Grid-like syntax
+// Size expressions - keep only the actually used formats
 export type SizeExpression =
-  | number[]                           // [100, 200] - pixels
-  | string[]                          // ['100px', '2fr', '30%']
-  | string                            // '1fr 2fr 1fr' or '100px 200px'
-  | 'equal'                           // Equal distribution
-  | { equal: number }                 // Equal split into N parts
-  | { ratio: number[] }               // Ratio-based [1, 2, 1] = 1:2:1
-  | { auto: number }                  // N auto-sized columns
-  | { min: number, max?: number }[];  // Min/max constraints
-
-// Layout presets for common patterns
-export type LayoutPreset =
-  | 'sidebar'                         // 300px | 1fr
-  | 'panels'                          // 1fr | 1fr | 1fr
-  | 'main-sidebar'                    // 1fr | 250px
-  | 'header-main'                     // auto | 1fr
-  | 'triple'                          // 1fr 2fr 1fr
-  | 'golden'                          // 0.618fr | 1fr
-  | 'nested';                         // Auto-generate nested layout
+  | number[]    // [66, 34] or [1, 2, 1] - normalized ratios
+  | string;     // '1fr 2fr' or 'equal'
 
 export type SplitLayoutParams = {
   view: 'split-layout';
   direction: SplitDirection;
-  // Unified size expression - replaces sizes/mode/count/ratio
+  // Size expression: number[] like [66, 34] or string like '1fr 2fr' or 'equal'
   sizes?: SizeExpression;
-  // Optional preset for common layouts
-  preset?: LayoutPreset;
   // Children - inferred from sizes if not provided
   children?: SplitLayoutNode[];
   // Vertical unit allocation for column layout (supports same expressions)
@@ -179,12 +161,6 @@ export type SplitLayoutParams = {
   interactive?: boolean;
   // Apply compact slider styles (default: true)
   compactSliders?: boolean;
-  // CSS Grid-like alignment
-  align?: 'start' | 'center' | 'end' | 'stretch';
-  // Gap between items (alias for gutter)
-  gap?: number | string;
-  // Additional CSS classes
-  className?: string;
 };
 
 // Params after normalization, used internally by builder/controller
@@ -199,9 +175,6 @@ type NormalizedSplitLayoutParams = {
   minSize: number;
   interactive: boolean;
   compactSliders: boolean;
-  align?: 'start' | 'center' | 'end' | 'stretch';
-  gap?: number | string; // retained for completeness
-  className?: string;
 };
 
 type BuildResult = {
@@ -211,33 +184,20 @@ type BuildResult = {
 };
 
 // Parse size expression into normalized percentages
+// Only supports: number[] arrays and string ('1fr 2fr' or 'equal')
 function parseSizeExpression(expr: SizeExpression | undefined, count: number = 2): number[] {
   if (!expr) {
     // Default to equal split
     return Array.from({ length: count }, () => 100 / count);
   }
 
-  // Handle preset strings
-  if (expr === 'equal' || (typeof expr === 'object' && 'equal' in expr)) {
-    const n = typeof expr === 'object' ? expr.equal : count;
-    return Array.from({ length: Math.max(1, n) }, () => 100 / Math.max(1, n));
+  // Handle 'equal' keyword
+  if (expr === 'equal') {
+    return Array.from({ length: count }, () => 100 / count);
   }
 
-  // Handle auto
-  if (typeof expr === 'object' && 'auto' in expr) {
-    return Array.from({ length: Math.max(1, expr.auto) }, () => 100 / Math.max(1, expr.auto));
-  }
-
-  // Handle ratio
-  if (typeof expr === 'object' && 'ratio' in expr) {
-    const ratios = expr.ratio;
-    const sum = ratios.reduce((a, b) => a + b, 0);
-    return ratios.map(r => (r / sum) * 100);
-  }
-
-  // Handle string expressions
+  // Handle string expressions: '1fr 2fr 1fr' or '100px 200px 30%'
   if (typeof expr === 'string') {
-    // Parse '1fr 2fr 1fr' or '100px 200px 30%'
     const parts = expr.trim().split(/\s+/).filter(p => p);
     if (parts.length === 0) return Array.from({ length: count }, () => 100 / count);
 
@@ -269,81 +229,14 @@ function parseSizeExpression(expr: SizeExpression | undefined, count: number = 2
     return total > 0 ? values.map(v => (v / total) * 100) : Array.from({ length: count }, () => 100 / count);
   }
 
-  // Handle array of numbers or strings
+  // Handle number[] arrays: [66, 34] or [1, 2, 1]
   if (Array.isArray(expr)) {
     if (expr.length === 0) return Array.from({ length: count }, () => 100 / count);
-
-    // Check if string array with units
-    if (typeof expr[0] === 'string') {
-      return parseSizeExpression((expr as string[]).join(' '), expr.length);
-    }
-
-    // Check if min/max constraints
-    if (typeof expr[0] === 'object' && expr[0] !== null && 'min' in expr[0]) {
-      return Array.from({ length: expr.length }, () => 100 / expr.length);
-    }
-
-    // Pure number array
-    const numbers = expr as number[];
-    const total = numbers.reduce((a, b) => a + b, 0);
-    return total > 0 ? numbers.map(v => (v / total) * 100) : Array.from({ length: numbers.length }, () => 100 / numbers.length);
+    const total = expr.reduce((a, b) => a + b, 0);
+    return total > 0 ? expr.map(v => (v / total) * 100) : Array.from({ length: expr.length }, () => 100 / expr.length);
   }
 
   return Array.from({ length: count }, () => 100 / count);
-}
-
-// Apply layout presets
-function applyPreset(preset: LayoutPreset, direction: SplitDirection): { sizes: number[], children: SplitLayoutNode[] } {
-  switch (preset) {
-    case 'sidebar':
-      return {
-        sizes: direction === 'row' ? [30, 70] : [20, 80],
-        children: ['leaf', 'leaf']
-      };
-    case 'panels':
-      return {
-        sizes: [33.33, 33.33, 33.34],
-        children: ['leaf', 'leaf', 'leaf']
-      };
-    case 'main-sidebar':
-      return {
-        sizes: direction === 'row' ? [70, 30] : [80, 20],
-        children: ['leaf', 'leaf']
-      };
-    case 'header-main':
-      return {
-        sizes: [20, 80],
-        children: ['leaf', 'leaf']
-      };
-    case 'triple':
-      return {
-        sizes: [25, 50, 25],
-        children: ['leaf', 'leaf', 'leaf']
-      };
-    case 'golden':
-      return {
-        sizes: [38.2, 61.8],
-        children: ['leaf', 'leaf']
-      };
-    case 'nested':
-      return {
-        sizes: [50, 50],
-        children: [
-          'leaf',
-          {
-            view: 'split-layout',
-            direction: direction === 'row' ? 'column' : 'row',
-            sizes: 'equal',
-            children: ['leaf', 'leaf']
-          }
-        ]
-      };
-    default:
-      return {
-        sizes: [50, 50],
-        children: ['leaf', 'leaf']
-      };
-  }
 }
 
 function normalizeSplitParams(input: any): NormalizedSplitLayoutParams {
@@ -351,26 +244,17 @@ function normalizeSplitParams(input: any): NormalizedSplitLayoutParams {
   const p: any = { ...input };
   const dir: SplitDirection = p.direction === 'column' ? 'column' : 'row';
 
-  // Handle presets first
-  if (p.preset) {
-    const preset = applyPreset(p.preset, dir);
-    p.sizes = preset.sizes;
-    p.children = p.children || preset.children;
-  }
-
   // Parse children
   const children: SplitLayoutNode[] = Array.isArray(p.children) ? p.children.slice() : [];
 
-  // Determine panel count
-  const panelCount = Math.max(
-    children.length || 2,
-    Array.isArray(p.sizes) ? p.sizes.length :
-    typeof p.sizes === 'string' ? p.sizes.trim().split(/\s+/).filter((x: string) => x).length :
-    typeof p.sizes === 'object' && 'equal' in p.sizes ? p.sizes.equal :
-    typeof p.sizes === 'object' && 'auto' in p.sizes ? p.sizes.auto :
-    typeof p.sizes === 'object' && 'ratio' in p.sizes ? p.sizes.ratio.length :
-    2
-  );
+  // Determine panel count from sizes or children
+  let panelCount = children.length || 2;
+  if (Array.isArray(p.sizes)) {
+    panelCount = Math.max(panelCount, p.sizes.length);
+  } else if (typeof p.sizes === 'string' && p.sizes !== 'equal') {
+    const parts = p.sizes.trim().split(/\s+/).filter((x: string) => x);
+    if (parts.length > 0) panelCount = Math.max(panelCount, parts.length);
+  }
 
   // Ensure we have enough children
   while (children.length < panelCount) {
@@ -399,8 +283,6 @@ function normalizeSplitParams(input: any): NormalizedSplitLayoutParams {
     minSize: typeof p.minSize === 'number' ? p.minSize : 20,
     interactive: !!p.interactive,
     compactSliders: p.compactSliders !== false,
-    align: p.align || 'stretch',
-    className: p.className
   };
 }
 

@@ -48,27 +48,117 @@ function mountDomUnits(slot: HTMLElement, units: number, inner?: (box: HTMLEleme
 
 function drawWave(container: HTMLElement, stroke = '#22d3ee', bg = '#0f172a') {
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(100, container.clientWidth - 16);
-  canvas.height = Math.max(50, container.clientHeight - 16);
-  canvas.style.maxWidth = '100%';
-  const pad = 8;
+  const rect = container.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.display = 'block';
   container.appendChild(canvas);
+
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  // Dark background
+
+  // Scale for retina displays
+  ctx.scale(dpr, dpr);
+
+  // Clear background
   ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  // Bright line
-  ctx.strokeStyle = stroke;
-  ctx.lineWidth = 2;
+  ctx.fillRect(0, 0, rect.width, rect.height);
+
+  // Calculate wave parameters
+  const centerY = rect.height / 2;
+  const amplitude = rect.height * 0.25;
+  const frequency = 0.02;
+  const points = 150;
+  const lineWidth = 2.5;
+
+  // Create wave data
+  const wavePoints: Array<{x: number, y: number}> = [];
+  for (let i = 0; i <= points; i++) {
+    const x = (i / points) * rect.width;
+    const angle = i * frequency * Math.PI * 2;
+
+    // Complex wave with multiple layers
+    let y = centerY;
+    y += Math.sin(angle) * amplitude * 0.8;
+    y += Math.sin(angle * 2.1) * amplitude * 0.3;
+    y += Math.sin(angle * 3.7) * amplitude * 0.15;
+
+    wavePoints.push({x, y});
+  }
+
+  // Draw subtle grid
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  for (let x = 0; x < canvas.width; x++) {
-    const t = x / canvas.width * Math.PI * 4;
-    const y = canvas.height / 2 + Math.sin(t) * (canvas.height / 3);
-    if (x === 0) ctx.moveTo(pad, y);
-    else ctx.lineTo(x, y);
+  for (let i = 0; i <= 4; i++) {
+    const y = (rect.height / 4) * i;
+    ctx.moveTo(0, y);
+    ctx.lineTo(rect.width, y);
   }
   ctx.stroke();
+
+  // Create filled area under the wave
+  const gradient = ctx.createLinearGradient(0, 0, 0, rect.height);
+  gradient.addColorStop(0, stroke + '00');
+  gradient.addColorStop(0.3, stroke + '10');
+  gradient.addColorStop(0.5, stroke + '20');
+  gradient.addColorStop(0.7, stroke + '10');
+  gradient.addColorStop(1, stroke + '00');
+
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.moveTo(wavePoints[0].x, centerY);
+  wavePoints.forEach(point => ctx.lineTo(point.x, point.y));
+  ctx.lineTo(wavePoints[wavePoints.length - 1].x, centerY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Draw the main wave line
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Add subtle glow
+  ctx.shadowColor = stroke;
+  ctx.shadowBlur = 15;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+
+  ctx.beginPath();
+  ctx.moveTo(wavePoints[0].x, wavePoints[0].y);
+  for (let i = 1; i < wavePoints.length; i++) {
+    const cp1x = wavePoints[i - 1].x + (wavePoints[i].x - wavePoints[i - 1].x) / 2;
+    const cp1y = wavePoints[i - 1].y;
+    const cp2x = wavePoints[i - 1].x + (wavePoints[i].x - wavePoints[i - 1].x) / 2;
+    const cp2y = wavePoints[i].y;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, wavePoints[i].x, wavePoints[i].y);
+  }
+  ctx.stroke();
+
+  // Remove shadow for dots
+  ctx.shadowBlur = 0;
+
+  // Draw peak dots
+  const dotSize = 3;
+  ctx.fillStyle = stroke;
+  for (let i = 0; i < wavePoints.length; i += 15) {
+    ctx.beginPath();
+    ctx.arc(wavePoints[i].x, wavePoints[i].y, dotSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw start and end dots
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.beginPath();
+  ctx.arc(wavePoints[0].x, wavePoints[0].y, dotSize + 1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(wavePoints[wavePoints.length - 1].x, wavePoints[wavePoints.length - 1].y, dotSize + 1, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function main() {
@@ -79,7 +169,7 @@ function main() {
   ensureRegistered(pane);
   try { pane.registerPlugin(Essentials); } catch {}
 
-  // Row 1: Quick peek — Multiline button + a 3u placeholder (no direct DOM)
+  // Row 1: Quick peek — Multiline button + custom DOM text
   const row1 = pane.addBlade({
     view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6,
     children: ['leaf', 'leaf']
@@ -88,9 +178,16 @@ function main() {
   const r1l = new Pane({ container: r1[0] });
   ensureRegistered(r1l);
   r1l.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 });
-  const r1r = new Pane({ container: r1[1] });
-  ensureRegistered(r1r);
-  r1r.addBlade({ view: 'sized-button', title: 'Placeholder', units: 3 });
+
+  // Custom DOM on the right
+  const textContainer = document.createElement('div');
+  textContainer.style.padding = '8px';
+  textContainer.style.color = '#888';
+  textContainer.style.fontSize = '10px';
+  textContainer.style.lineHeight = '1.5';
+  textContainer.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  textContainer.innerHTML = 'Left: Multi-height button (3u)<br>Right: Custom DOM with controllable height';
+  r1[1].appendChild(textContainer);
 
   // Row 2: 66 / 34
   const row2 = pane.addBlade({
@@ -137,15 +234,16 @@ function main() {
     p.addBlade({ view: 'sized-button', title: `Normalized`, units: 2 });
   });
 
-  // Row 6: 3u placeholder (avoid custom DOM to prevent layout races)
+  // Row 6: 3u waveform (using drawWave)
   const row6 = pane.addBlade({
     view: 'split-layout', direction: 'row', sizes: '1fr', children: ['leaf']
   }) as unknown as SplitApi;
   const r6 = row6.getSlots();
-  const r6p = new Pane({ container: r6[0] });
-  if ((row6 as any).wrapPane) { (row6 as any).wrapPane(r6p); }
-  ensureRegistered(r6p);
-  r6p.addBlade({ view: 'sized-button', title: 'Three\nUnits', units: 3 });
+
+  // Use mountDomUnits to create a 3-unit container for the wave
+  mountDomUnits(r6[0], 3, (container) => {
+    drawWave(container, '#22d3ee', '#0f172a');
+  });
 
   // Section 2: Compact sliders toggle
   const host2 = document.getElementById('host-compact') as HTMLElement | null;
@@ -210,7 +308,21 @@ function main() {
     const c2 = pane3.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['alpha', 'beta', 'gamma'] }) as unknown as SplitApi;
 
     // Row C3: 1fr 2fr — fill each side with three controls
-    const c3 = pane3.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['alpha', 'gamma'] }) as unknown as SplitApi;
+    const c3 = pane3.addBlade({
+      view: 'split-layout',
+      direction: 'row',
+      sizes: '1fr 2fr',
+      children: [
+        {
+          view: 'split-layout',
+          direction: 'column',
+          rowUnits: '1 1 1',  // Use rowUnits to auto-calculate height
+          compactSliders: false,  // Non-compact for left side
+          children: ['alpha', 'alpha', 'alpha']
+        },
+        'gamma'
+      ]
+    }) as unknown as SplitApi;
 
     // Fill on the next frame to avoid any initial measurement race
     requestAnimationFrame(() => {
@@ -231,23 +343,115 @@ function main() {
         const [a, b, g] = c2.getSlots();
         if (a) { const p = new Pane({ container: a }); if ((c2 as any).wrapPane) { (c2 as any).wrapPane(p); } ensureRegistered(p); p.addButton({ title: 'Action' }); p.addBinding({ text: 'hello' }, 'text'); }
         if (b) { const p = new Pane({ container: b }); if ((c2 as any).wrapPane) { (c2 as any).wrapPane(p); } ensureRegistered(p); p.addBinding({ n: 3.14 }, 'n', { min: 0, max: 10 }); p.addBinding({ c: '#22d3ee' }, 'c'); }
-        if (g) { const p = new Pane({ container: g }); if ((c2 as any).wrapPane) { (c2 as any).wrapPane(p); } ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {} p.addBlade({ view: 'buttongrid', size: [2, 2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y * 2 + x)) }) }); p.addBinding({ flag: true }, 'flag', { label: 'Flag' }); }
+        if (g) { const p = new Pane({ container: g }); if ((c2 as any).wrapPane) { (c2 as any).wrapPane(p); } ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {} p.addBlade({ view: 'buttongrid', size: [2, 2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y * 2 + x)) }) }); }
       }
 
       // C3 fill (three per side)
       {
-        const [l, r] = c3.getSlots();
-        if (l) {
-          const p = new Pane({ container: l }); if ((c3 as any).wrapPane) { (c3 as any).wrapPane(p); } ensureRegistered(p);
-          p.addBinding({ p: { x: 0.3, y: 0.7 } }, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 } });
-          p.addBinding({ on: false }, 'on', { label: 'Enabled' });
-          p.addBinding({ txt: 'note' }, 'txt');
+        const leftSlots = (c3 as any).getSlotsByCategory ? (c3 as any).getSlotsByCategory('alpha') : [];
+        const rightSlots = (c3 as any).getSlotsByCategory ? (c3 as any).getSlotsByCategory('gamma') : [];
+
+        // Fill left side (non-compact)
+        if (leftSlots[0]) {
+          const p = new Pane({ container: leftSlots[0] });
+          ensureRegistered(p);
+          const api = p.addBinding({ p: { x: 0.3, y: 0.7 } }, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 } });
+          // Manually remove label since we're not using wrapPane
+          try {
+            const el = (api as any)?.controller?.view?.element as HTMLElement | undefined;
+            const lbl = el?.querySelector('.tp-lblv_l') as HTMLElement | null;
+            if (lbl) { lbl.remove(); el?.classList.add('tp-lblv-nol'); }
+          } catch {}
         }
-        if (r) {
-          const p = new Pane({ container: r }); if ((c3 as any).wrapPane) { (c3 as any).wrapPane(p); } ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {}
+        if (leftSlots[1]) {
+          const p = new Pane({ container: leftSlots[1] });
+          ensureRegistered(p);
+          p.addBinding({ on: false }, 'on', { label: 'Enabled' });
+        }
+        if (leftSlots[2]) {
+          const p = new Pane({ container: leftSlots[2] });
+          ensureRegistered(p);
+          p.addBinding({ volume: 50 }, 'volume', { min: 0, max: 100, label: 'Volume' });
+          const api2 = p.addBinding({ txt: 'note' }, 'txt');
+          // Manually remove label since we're not using wrapPane
+          try {
+            const el = (api2 as any)?.controller?.view?.element as HTMLElement | undefined;
+            const lbl = el?.querySelector('.tp-lblv_l') as HTMLElement | null;
+            if (lbl) { lbl.remove(); el?.classList.add('tp-lblv-nol'); }
+          } catch {}
+        }
+
+        // Fill right side (compact)
+        if (rightSlots[0]) {
+          const p = new Pane({ container: rightSlots[0] });
+          if ((c3 as any).wrapPane) { (c3 as any).wrapPane(p); }
+          ensureRegistered(p);
+          try { p.registerPlugin(Essentials); } catch {}
           p.addBinding({ p: { x: 0.1, y: 0.5, z: 0.9 } }, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 }, z: { min: 0, max: 1 } });
           p.addBlade({ view: 'cubicbezier', value: [0.5, 0.2, 0.5, 1] });
-          p.addBlade({ view: 'fpsgraph' });
+
+          // Replace fpsgraph with a sub-split
+          const subSplit = p.addBlade({
+            view: 'split-layout',
+            direction: 'row',
+            sizes: '80px 1fr',
+            children: ['left', 'right']
+          }) as any;
+
+          const [btnSlot, graphSlot] = subSplit.getSlots();
+
+          // Left: 2-unit high button
+          if (btnSlot) {
+            const btnPane = new Pane({ container: btnSlot });
+            if ((c3 as any).wrapPane) { (c3 as any).wrapPane(btnPane); }
+            ensureRegistered(btnPane);
+            btnPane.addBlade({ view: 'sized-button', title: 'Monitor\nGraph', units: 2 });
+          }
+
+          // Right: graph blade (native tweakpane)
+          if (graphSlot) {
+            const graphPane = new Pane({ container: graphSlot });
+            if ((c3 as any).wrapPane) { (c3 as any).wrapPane(graphPane); }
+            ensureRegistered(graphPane);
+            // Note: DO NOT register essentials for native graph
+
+            // Create a parameter object for monitoring
+            const graphParams = {
+              wave: 0  // Initial value
+            };
+
+            // Create the graph binding
+            const graphBinding = graphPane.addBinding(
+              graphParams,
+              'wave',
+              {
+                view: 'graph',
+                readonly: true,
+                min: -1,
+                max: 1,
+              }
+            );
+
+            // Update the value periodically to show animation
+            let time = 0;
+            const updateGraph = () => {
+              time += 0.1;
+              graphParams.wave = Math.sin(time);
+              // graphBinding.refresh();  // May need to call refresh
+            };
+
+            // Set up interval to update graph
+            const interval = setInterval(updateGraph, 50);
+
+            // Clean up on disposal
+            if (graphSlot.dispose) {
+              const originalDispose = graphSlot.dispose;
+              graphSlot.dispose = () => {
+                clearInterval(interval);
+                originalDispose();
+              };
+            }
+          }
         }
       }
     });
