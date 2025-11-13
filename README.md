@@ -9,10 +9,10 @@ Compact layout toolkit for Tweakpane v4 — build dense, tidy panels in ~320px.
 ## Install
 
 ```bash
-npm install tweakpane-compact-kit
+npm install tweakpane tweakpane-compact-kit
 ```
 
-Peer dependency: tweakpane v4
+Peer dependency: tweakpane v4 (installed above)
 
 ## Basics
 
