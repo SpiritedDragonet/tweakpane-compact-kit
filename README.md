@@ -16,8 +16,10 @@ Peer dependency: tweakpane v4
 
 ## Quick Start — First Split
 
-<table style="width:100%;table-layout:fixed;"><tr><td style="width:50%;vertical-align:top;padding-right:12px;">
-<pre style="margin:0;max-width:100%;overflow:auto;"><code class="language-ts">import { Pane } from 'tweakpane';
+<img src="docs/images/basics-1.svg" style="width:100%;height:auto;" alt="Basics 1/3" />
+
+```ts
+import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
@@ -41,19 +43,14 @@ box.style.display = 'grid';
 box.style.placeItems = 'center';
 box.textContent = '3u DOM';
 R.appendChild(box);
-</code></pre>
-
-</td><td style="width:50%;vertical-align:top;">
-
-<img src="docs/images/basics-1.svg" style="width:100%;height:auto;" alt="Basics 1/3" />
-
-</td></tr></table>
+```
 
 ## Size Expressions
 
-<table style="width:100%;table-layout:fixed;"><tr><td style="width:50%;vertical-align:top;padding-right:12px;">
+<img src="docs/images/basics-2.svg" style="width:100%;height:auto;" alt="Basics 2/3" />
 
-<pre style="margin:0;max-width:100%;overflow:auto;"><code class="language-ts">import { Pane } from 'tweakpane';
+```ts
+import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
@@ -90,19 +87,14 @@ rD.getSlots().forEach((slot) => {
   p.registerPlugin(CompactKitBundle);
   p.addBlade({ view: 'sized-button', title: 'Normalized', units: 2 });
 });
-</code></pre>
-
-</td><td style="width:50%;vertical-align:top;">
-
-<img src="docs/images/basics-2.svg" style="width:100%;height:auto;" alt="Basics 2/3" />
-
-</td></tr></table>
+```
 
 ## Mixed DOM — Donut Gauge
 
-<table style="width:100%;table-layout:fixed;"><tr><td style="width:50%;vertical-align:top;padding-right:12px;">
+<img src="docs/images/basics-3.svg" style="width:100%;height:auto;" alt="Basics 3/3" />
 
-<pre style="margin:0;max-width:100%;overflow:auto;"><code class="language-ts">import { Pane } from 'tweakpane';
+```ts
+import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
@@ -149,19 +141,15 @@ function drawGauge(root: HTMLElement) {
 }
 
 drawGauge(host);
-</code></pre>
-
-</td><td style="width:50%;vertical-align:top;">
-
-<img src="docs/images/basics-3.svg" style="width:100%;height:auto;" alt="Basics 3/3" />
-
-</td></tr></table>
+```
 
 ## Compact Sliders Toggle
 
-<table style="width:100%;table-layout:fixed;"><tr><td style="width:50%;vertical-align:top;padding-right:12px;">
+<img src="docs/images/compact-toggle (original).svg" style="width:100%;height:auto;display:block;margin-bottom:8px;" alt="Original" />
+<img src="docs/images/compact-toggle(compact).svg" style="width:100%;height:auto;" alt="Compact" />
 
-<pre style="margin:0;max-width:100%;overflow:auto;"><code class="language-ts">import { Pane } from 'tweakpane';
+```ts
+import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
@@ -172,20 +160,14 @@ pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compac
 
 // compact (bottom)
 pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: true, children: ['leaf','leaf'] });
-</code></pre>
-
-</td><td style="width:50%;vertical-align:top;">
-
-<img src="docs/images/compact-toggle (original).svg" style="width:100%;height:auto;display:block;margin-bottom:8px;" alt="Original" />
-<img src="docs/images/compact-toggle(compact).svg" style="width:100%;height:auto;" alt="Compact" />
-
-</td></tr></table>
+```
 
 ## Custom Categories
 
-<table style="width:100%;table-layout:fixed;"><tr><td style="width:50%;vertical-align:top;padding-right:12px;">
+<img src="docs/images/categories.svg" style="width:100%;height:auto;" alt="Custom Categories" />
 
-<pre style="margin:0;max-width:100%;overflow:auto;"><code class="language-ts">import { Pane } from 'tweakpane';
+```ts
+import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
@@ -196,13 +178,7 @@ const [A,B,C] = api.getSlots();
 new Pane({ container: A }).addButton({ title: 'Action' });
 new Pane({ container: B }).addBinding({ level: 50 }, 'level', { min: 0, max: 100 });
 new Pane({ container: C }).addBinding({ on: true }, 'on');
-</code></pre>
-
-</td><td style="width:50%;vertical-align:top;">
-
-<img src="docs/images/categories.svg" style="width:100%;height:auto;" alt="Custom Categories" />
-
-</td></tr></table>
+```
 
 ## API Quick Reference
 
@@ -223,42 +199,6 @@ pane.addBlade({ view: 'split-layout', compactSliders: true, children: ['leaf'] }
 // sized button
 pane.addBlade({ view: 'sized-button', title: 'Multi-line\nButton', units: 3 });
 ```
-
-Size Expressions (pick what reads best for your case):
-
-```ts
-// Numeric arrays (auto-normalized ratios)
-sizes: [66, 34]       // 66:34 ratio
-sizes: [1, 2, 1]      // 1:2:1 ratio
-
-// Fractions (CSS Grid-like, recommended)
-sizes: '1fr 2fr'      // 1:2 ratio
-sizes: '1fr 1fr 1fr'  // 1:1:1 ratio
-
-// Equal split
-sizes: 'equal'        // auto-equal from children count
-```
-
-Other options:
-
-```ts
-gutter?: number | string // default 6
-minSize?: number         // default 20 (min % per panel)
-height?: number | string // for column splits
-interactive?: boolean    // enable dragging
-compactSliders?: boolean // compact slider/value layout (default true)
-```
-
-Imperative API:
-
-```ts
-api.getSlots(): HTMLElement[]
-api.getSlotsByCategory(name: string): HTMLElement[]
-api.getSlotsByCategoryMap(): Map<string, HTMLElement[]>
-api.getCategories(): string[]
-```
-
-Children can be strings (categories) or nested split nodes. Strings are user-defined categories (e.g. `'leaf'`, `'alpha'`, `'preview'`).
 
 (See demo/ for more recipes)
 
