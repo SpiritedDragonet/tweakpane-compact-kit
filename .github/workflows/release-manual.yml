@@ -46,12 +46,31 @@ jobs:
       - name: Build library
         run: npm run build
 
+      - name: Validate tag equals package.json version
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG="${{ github.event.inputs.tag }}"
+          TAG_STRIPPED="${TAG#v}"
+          echo "package.json version: $PKG_VERSION"
+          echo "input tag: $TAG (stripped: $TAG_STRIPPED)"
+          if [ "$PKG_VERSION" != "$TAG_STRIPPED" ]; then
+            echo "::error::Tag $TAG does not match package.json version $PKG_VERSION" && exit 1
+          fi
+
       - name: Zip dist artifacts
         run: |
           TAG=${{ github.event.inputs.tag }}
           ZIP_NAME="tweakpane-compact-kit-${TAG}-dist.zip"
           zip -r "$ZIP_NAME" dist/
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+
+      - name: Zip JS-only artifacts (ES/UMD)
+        run: |
+          TAG=${{ github.event.inputs.tag }}
+          JS_ZIP_NAME="tweakpane-compact-kit-${TAG}-js.zip"
+          # Include only .js files from dist
+          (cd dist && zip -r "../$JS_ZIP_NAME" . -i '*.js')
+          echo "JS_ZIP_NAME=$JS_ZIP_NAME" >> $GITHUB_ENV
 
       - name: Create or update GitHub Release and upload assets
         uses: softprops/action-gh-release@v1
@@ -62,6 +81,8 @@ jobs:
           name: ${{ github.event.inputs.name || format('tweakpane-compact-kit {0}', github.event.inputs.tag) }}
           draft: ${{ github.event.inputs.draft }}
           prerelease: ${{ github.event.inputs.prerelease }}
+          generate_release_notes: true
+          target_commitish: ${{ github.sha }}
           files: |
             ${{ env.ZIP_NAME }}
-
+            ${{ env.JS_ZIP_NAME }}

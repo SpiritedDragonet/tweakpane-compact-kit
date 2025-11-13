@@ -8,7 +8,7 @@ dist-demo/
 *.tar.gz
 .claude/
 CLAUDE.md
-AGENTS.md 
+AGENTS.md
 nul
 *.timestamp-*.mjs
 
