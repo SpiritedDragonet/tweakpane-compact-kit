@@ -175,6 +175,65 @@ pane.addBlade({
 });
 ```
 
+## Complete Syntax (Concise Reference)
+
+This section summarizes all supported options and expressions designed by this plugin.
+
+- SplitLayoutParams
+  - `view: 'split-layout'`
+  - `direction: 'row' | 'column'`
+  - `sizes?: SizeExpression` — panel size expression (row or column)
+  - `children?: SplitLayoutNode[]` — one slot per child; strings are categories; objects are nested splits
+  - `rowUnits?: SizeExpression` — for `direction: 'column'`; per-row “unit” allocation (overrides `sizes` and also determines container height)
+  - `height?: number | string` — explicit height for column layout when not using `rowUnits`
+  - `gutter?: number | string` — gap between panels in px (default `6`)
+  - `minSize?: number` — min panel size in percentage units for interactive mode (default `20`)
+  - `interactive?: boolean` — enable draggable gutters (default `false`)
+  - `compactSliders?: boolean` — compact slider/value layout inside leaves (default `true`)
+
+- SplitLayoutNode
+  - `string` — category name (e.g., `'leaf'`, `'alpha'`, `'preview'`)
+  - `{ view: 'split-layout', direction, sizes?, rowUnits?, children, minSize?, gutter?, height? }` — nested split node
+
+- SizeExpression
+  - `number[]` — ratios, auto-normalized (e.g., `[66,34]`, `[1,2,1]`)
+  - `string` — whitespace-separated tokens:
+    - `'equal'` — equal split from child count
+    - `'1fr 2fr 1fr'` — CSS-Grid-like fractions
+    - `'200px 1fr 30%'` — mix of px/fr/%; tokens are normalized to percentages
+
+- Imperative API
+  - `getSlots(): HTMLElement[]`
+  - `getSlotsByCategory(name: string): HTMLElement[]`
+  - `getSlotsByCategoryMap(): Map<string, HTMLElement[]>`
+  - `getCategories(): string[]`
+  - `wrapPane(pane)` — redefines `addBinding()` to hide label only when `label` is omitted或`''`
+
+- SizedButtonOptions
+  - `{ view: 'sized-button', title?: string, units?: number, onClick?: () => void }`
+  - `units` is an integer ≥ 1. The label supports `\n` for multiline.
+
+Example — nested layout with categories and fractions:
+
+```ts
+pane.addBlade({
+  view: 'split-layout', direction: 'row', sizes: '1fr 2fr',
+  children: [
+    'leaf',
+    { view: 'split-layout', direction: 'column', rowUnits: '1 1 2', children: ['alpha','beta','gamma'] }
+  ]
+});
+```
+
+Helper — mount without registering the plugin (shim):
+
+```ts
+import { addSplitLayout } from 'tweakpane-compact-kit';
+const folder = pane.addFolder({ title: 'Host' });
+const split = addSplitLayout(folder, { view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf','leaf'] });
+// split.getSlots(), split.dispose()
+```
+
 ## Run the Demo
 
 ```bash
