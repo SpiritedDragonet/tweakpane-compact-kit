@@ -38,9 +38,13 @@ Build one row with two slots: a 3u button (left) and a 3u DOM box (right).
 <summary>View code</summary>
 
 ```ts
-// 1fr | 1fr
+// 1fr | 1fr with a small gutter
 const row = pane.addBlade({
-  view: 'split-layout', direction: 'row', sizes: '1fr 1fr', children: ['leaf', 'leaf']
+  view: 'split-layout',
+  direction: 'row',
+  sizes: '1fr 1fr',
+  gutter: 6,
+  children: ['leaf', 'leaf'],
 });
 const [L, R] = (row as any).getSlots();
 
@@ -49,13 +53,14 @@ const pL = new Pane({ container: L });
 pL.registerPlugin(CompactKitBundle);
 pL.addBlade({ view: 'sized-button', title: 'button (3u)', units: 3 });
 
-// Right: 3u DOM
-const box = document.createElement('div');
-box.style.height = 'calc(3 * var(--cnt-usz) + 2 * 4px)';
-box.style.display = 'grid';
-box.style.placeItems = 'center';
-box.textContent = '3u DOM';
-R.appendChild(box);
+// Right: explanatory text with controllable height (3u)
+const text = document.createElement('div');
+text.style.padding = '8px';
+text.style.color = '#888';
+text.style.fontSize = '10px';
+text.style.lineHeight = '1.5';
+text.textContent = 'Left: button (3u) — Right: Custom DOM with controllable height (3u)';
+R.appendChild(text);
 ```
 
 </details>
@@ -82,7 +87,7 @@ const rB = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal
 rB.getSlots().forEach((slot, i) => {
   const p = new Pane({ container: slot });
   p.registerPlugin(CompactKitBundle);
-  p.addBlade({ view: 'sized-button', title: `Equal`, units: 2 });
+  p.addBlade({ view: 'sized-button', title: `Equal\n${i + 1}`, units: 2 });
 });
 
 // 1fr 2fr
@@ -104,8 +109,8 @@ rD.getSlots().forEach((slot) => {
 
 </details>
 
-## Mixed DOM — Donut Gauge
-Controls on the left, a 4u donut gauge canvas on the right.
+## Mixed DOM — Custom Content
+Show that you can place arbitrary DOM (canvas, charts, etc.) into any slot. Here we render a custom canvas on the right (4u) next to controls on the left.
 
 <img src="docs/images/basics-3.svg" style="width:50%;height:auto;" alt="Basics 3/3" />
 
@@ -113,19 +118,20 @@ Controls on the left, a 4u donut gauge canvas on the right.
 <summary>View code</summary>
 
 ```ts
-// Row: controls | gauge canvas
+// Row: controls | custom canvas
 const gRow = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6, children: ['leaf','leaf'] }) as any;
 const [gL, gR] = gRow.getSlots();
 const state = { value: 64, thickness: 10, rounded: true, color: '#22d3ee' };
 
 // left controls
 const pL = new Pane({ container: gL });
+pL.registerPlugin(CompactKitBundle);
 pL.addBinding(state, 'value', { min: 0, max: 100, label: 'Value' });
 pL.addBinding(state, 'thickness', { min: 4, max: 20, step: 1, label: 'Thickness' });
 pL.addBinding(state, 'rounded', { label: 'Rounded' });
 pL.addBinding(state, 'color', { label: '' });
 
-// right gauge (4u)
+// right custom canvas (4u)
 const host = document.createElement('div');
 host.style.height = 'calc(4 * var(--cnt-usz) + 3 * 4px)';
 host.style.display = 'grid';
@@ -168,17 +174,38 @@ Compare original (top) vs compact (bottom) slider layout.
 <summary>View code</summary>
 
 ```ts
+// Build two rows to match the screenshots
+const S = { a: 50 };
+
 // original (top)
-pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: false, children: ['leaf','leaf'] });
+const rTop = pane.addBlade({
+  view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: false, children: ['leaf','leaf']
+}) as any;
+{
+  const [L, R] = rTop.getSlots();
+  const pl = new Pane({ container: L });
+  const pr = new Pane({ container: R });
+  pl.addBinding({ compact: false }, 'compact', { label: 'Compact' });
+  pr.addBinding(S, 'a', { min: 0, max: 100, label: 'Value' });
+}
 
 // compact (bottom)
-pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: true, children: ['leaf','leaf'] });
+const rBottom = pane.addBlade({
+  view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: true, children: ['leaf','leaf']
+}) as any;
+{
+  const [L, R] = rBottom.getSlots();
+  const pl = new Pane({ container: L });
+  const pr = new Pane({ container: R });
+  pl.addBinding({ compact: true }, 'compact', { label: 'Compact' });
+  pr.addBinding(S, 'a', { min: 0, max: 100, label: 'Value' });
+}
 ```
 
 </details>
 
 ## Custom Categories
-Use semantic slot names (alpha/beta/gamma) and fill each with different controls.
+Use semantic leaf names (alpha/beta/gamma) and fill each slot with different controls. Below are two rows to match the screenshot.
 
 <img src="docs/images/categories.svg" style="width:50%;height:auto;" alt="Custom Categories" />
 
@@ -186,11 +213,46 @@ Use semantic slot names (alpha/beta/gamma) and fill each with different controls
 <summary>View code</summary>
 
 ```ts
-const api = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['alpha','beta','gamma'] }) as any;
-const [A,B,C] = api.getSlots();
-new Pane({ container: A }).addButton({ title: 'Action' });
-new Pane({ container: B }).addBinding({ level: 50 }, 'level', { min: 0, max: 100 });
-new Pane({ container: C }).addBinding({ on: true }, 'on');
+// Row 1: 66/34 — alpha | beta
+const row1 = pane.addBlade({
+  view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['alpha','beta']
+}) as any;
+const [a1, b1] = row1.getSlots();
+// alpha: 3u action button
+if (a1) {
+  const p = new Pane({ container: a1 });
+  p.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 });
+}
+// beta: slider + checkbox + dropdown
+if (b1) {
+  const p = new Pane({ container: b1 });
+  p.addBinding({ v: 42 }, 'v', { min: 0, max: 100, label: 'Level' });
+  p.addBinding({ on: true }, 'on', { label: 'Enabled' });
+  p.addBinding({ mode: 'a' }, 'mode', { options: { Alpha: 'a', Beta: 'b', Gamma: 'g' } });
+}
+
+// Row 2: equal — alpha | beta | gamma
+const row2 = pane.addBlade({
+  view: 'split-layout', direction: 'row', sizes: 'equal', children: ['alpha','beta','gamma']
+}) as any;
+const [a2, b2, g2] = row2.getSlots();
+// alpha: button + text
+if (a2) {
+  const p = new Pane({ container: a2 });
+  p.addButton({ title: 'Action' });
+  p.addBinding({ text: 'hello' }, 'text');
+}
+// beta: number + color
+if (b2) {
+  const p = new Pane({ container: b2 });
+  p.addBinding({ n: 3.14 }, 'n', { min: 0, max: 10 });
+  p.addBinding({ c: '#22d3ee' }, 'c');
+}
+// gamma: simple toggle
+if (g2) {
+  const p = new Pane({ container: g2 });
+  p.addBinding({ on: true }, 'on', { label: 'Enabled' });
+}
 ```
 
 </details>
@@ -203,14 +265,18 @@ Short, common calls you’ll use most:
 
 ```ts
 // split layout
-pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf','leaf'] });
+const api = pane.addBlade({
+  view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf','leaf']
+}) as any;
 
 // slots
 api.getSlots();
 api.getSlotsByCategory?.('alpha');
 
 // vertical units
-pane.addBlade({ view: 'split-layout', direction: 'column', rowUnits: '1 1 2', children: ['leaf','leaf','leaf'] });
+pane.addBlade({
+  view: 'split-layout', direction: 'column', rowUnits: '1 1 2', children: ['leaf','leaf','leaf']
+});
 
 // compact sliders
 pane.addBlade({ view: 'split-layout', compactSliders: true, children: ['leaf'] });
