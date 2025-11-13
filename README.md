@@ -16,9 +16,8 @@ Peer dependency: tweakpane v4
 
 ## Quick Start — First Split
 
-<table><tr><td>
-
-<pre><code class="language-ts">import { Pane } from 'tweakpane';
+<table style="width:100%;table-layout:fixed;"><tr><td style="width:50%;vertical-align:top;padding-right:12px;">
+<pre style="margin:0;max-width:100%;overflow:auto;"><code class="language-ts">import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
@@ -44,17 +43,17 @@ box.textContent = '3u DOM';
 R.appendChild(box);
 </code></pre>
 
-</td><td style="width:50%;" valign="top">
+</td><td style="width:50%;vertical-align:top;">
 
-<img src="docs/images/basics-1.svg" style="width:100%;" alt="Basics 1/3" />
+<img src="docs/images/basics-1.svg" style="width:100%;height:auto;" alt="Basics 1/3" />
 
 </td></tr></table>
 
 ## Size Expressions
 
-<table><tr><td>
+<table style="width:100%;table-layout:fixed;"><tr><td style="width:50%;vertical-align:top;padding-right:12px;">
 
-<pre><code class="language-ts">import { Pane } from 'tweakpane';
+<pre style="margin:0;max-width:100%;overflow:auto;"><code class="language-ts">import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
@@ -93,17 +92,17 @@ rD.getSlots().forEach((slot) => {
 });
 </code></pre>
 
-</td><td style="width:50%;" valign="top">
+</td><td style="width:50%;vertical-align:top;">
 
-<img src="docs/images/basics-2.svg" style="width:100%;" alt="Basics 2/3" />
+<img src="docs/images/basics-2.svg" style="width:100%;height:auto;" alt="Basics 2/3" />
 
 </td></tr></table>
 
 ## Mixed DOM — Donut Gauge
 
-<table><tr><td>
+<table style="width:100%;table-layout:fixed;"><tr><td style="width:50%;vertical-align:top;padding-right:12px;">
 
-<pre><code class="language-ts">import { Pane } from 'tweakpane';
+<pre style="margin:0;max-width:100%;overflow:auto;"><code class="language-ts">import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
@@ -152,17 +151,17 @@ function drawGauge(root: HTMLElement) {
 drawGauge(host);
 </code></pre>
 
-</td><td style="width:50%;" valign="top">
+</td><td style="width:50%;vertical-align:top;">
 
-<img src="docs/images/basics-3.svg" style="width:100%;" alt="Basics 3/3" />
+<img src="docs/images/basics-3.svg" style="width:100%;height:auto;" alt="Basics 3/3" />
 
 </td></tr></table>
 
 ## Compact Sliders Toggle
 
-<table><tr><td>
+<table style="width:100%;table-layout:fixed;"><tr><td style="width:50%;vertical-align:top;padding-right:12px;">
 
-<pre><code class="language-ts">import { Pane } from 'tweakpane';
+<pre style="margin:0;max-width:100%;overflow:auto;"><code class="language-ts">import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
@@ -175,18 +174,18 @@ pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compac
 pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: true, children: ['leaf','leaf'] });
 </code></pre>
 
-</td><td style="width:50%;" valign="top">
+</td><td style="width:50%;vertical-align:top;">
 
-<img src="docs/images/compact-toggle (original).svg" style="width:100%; display:block; margin-bottom:8px;" alt="Original" />
-<img src="docs/images/compact-toggle(compact).svg" style="width:100%;" alt="Compact" />
+<img src="docs/images/compact-toggle (original).svg" style="width:100%;height:auto;display:block;margin-bottom:8px;" alt="Original" />
+<img src="docs/images/compact-toggle(compact).svg" style="width:100%;height:auto;" alt="Compact" />
 
 </td></tr></table>
 
 ## Custom Categories
 
-<table><tr><td>
+<table style="width:100%;table-layout:fixed;"><tr><td style="width:50%;vertical-align:top;padding-right:12px;">
 
-<pre><code class="language-ts">import { Pane } from 'tweakpane';
+<pre style="margin:0;max-width:100%;overflow:auto;"><code class="language-ts">import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
@@ -199,9 +198,9 @@ new Pane({ container: B }).addBinding({ level: 50 }, 'level', { min: 0, max: 100
 new Pane({ container: C }).addBinding({ on: true }, 'on');
 </code></pre>
 
-</td><td style="width:50%;" valign="top">
+</td><td style="width:50%;vertical-align:top;">
 
-<img src="docs/images/categories.svg" style="width:100%;" alt="Custom Categories" />
+<img src="docs/images/categories.svg" style="width:100%;height:auto;" alt="Custom Categories" />
 
 </td></tr></table>
 
