@@ -109,116 +109,107 @@ function drawDonutGauge(
 }
 
 function main() {
-  const host = document.getElementById('host') as HTMLElement | null;
-  if (!host) return;
+  // Basics 1/3 — First Split
+  const hostA = document.getElementById('host-a') as HTMLElement | null;
+  if (hostA) {
+    const paneA = new Pane({ container: hostA, title: 'Basics 1/3 — First Split' });
+    ensureRegistered(paneA);
+    try { paneA.registerPlugin(Essentials); } catch {}
 
-  const pane = new Pane({ container: host, title: 'Compact Kit — Rows' });
-  ensureRegistered(pane);
-  try { pane.registerPlugin(Essentials); } catch {}
-
-  // Row 1: Quick peek — Multiline button + custom DOM text
-  const row1 = pane.addBlade({
-    view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6,
-    children: ['leaf', 'leaf']
-  }) as unknown as SplitApi;
-  const r1 = row1.getSlots();
-  const r1l = new Pane({ container: r1[0] });
-  ensureRegistered(r1l);
-  r1l.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 });
-
-  // Custom DOM on the right
-  const textContainer = document.createElement('div');
-  textContainer.style.padding = '8px';
-  textContainer.style.color = '#888';
-  textContainer.style.fontSize = '10px';
-  textContainer.style.lineHeight = '1.5';
-  textContainer.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
-  textContainer.innerHTML = 'Left: Multi-height button (3u)<br>Right: Custom DOM with controllable height';
-  r1[1].appendChild(textContainer);
-
-  // Row 2: 66 / 34
-  const row2 = pane.addBlade({
-    view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['leaf', 'leaf']
-  }) as unknown as SplitApi;
-  row2.getSlots().forEach((slot: HTMLElement, i: number) => {
-    const p = new Pane({ container: slot });
-    // Hide default auto-labels for bindings in this leaf unless explicitly provided
-    if ((row2 as any).wrapPane) { (row2 as any).wrapPane(p); }
-    ensureRegistered(p);
-    p.addBlade({ view: 'sized-button', title: `Button\n${i + 1}`, units: 2 });
-  });
-
-  // Row 3: equal — 3 columns
-  const row3 = pane.addBlade({
-    view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf', 'leaf', 'leaf']
-  }) as unknown as SplitApi;
-  row3.getSlots().forEach((slot: HTMLElement, i: number) => {
-    const p = new Pane({ container: slot });
-    if ((row3 as any).wrapPane) { (row3 as any).wrapPane(p); }
-    ensureRegistered(p);
-    p.addBlade({ view: 'sized-button', title: `Equal\n${i + 1}`, units: 2 });
-  });
-
-  // Row 4: 1fr 2fr
-  const row4 = pane.addBlade({
-    view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf', 'leaf']
-  }) as unknown as SplitApi;
-  row4.getSlots().forEach((slot: HTMLElement, i: number) => {
-    const p = new Pane({ container: slot });
-    if ((row4 as any).wrapPane) { (row4 as any).wrapPane(p); }
-    ensureRegistered(p);
-    p.addBlade({ view: 'sized-button', title: i === 0 ? '1fr' : '2fr', units: 2 });
-  });
-
-  // Row 5: 40 10 (normalized)
-  const row5 = pane.addBlade({
-    view: 'split-layout', direction: 'row', sizes: [40, 10], children: ['leaf', 'leaf']
-  }) as unknown as SplitApi;
-  row5.getSlots().forEach((slot: HTMLElement, i: number) => {
-    const p = new Pane({ container: slot });
-    if ((row5 as any).wrapPane) { (row5 as any).wrapPane(p); }
-    ensureRegistered(p);
-    p.addBlade({ view: 'sized-button', title: `Normalized`, units: 2 });
-  });
-
-  // Row 6 removed (was sparkline)
-
-  // Row 7: gauge + controls (show flexible mixed UI)
-  const row7 = pane.addBlade({
-    view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6, interactive: true,
-    children: ['leaf', 'leaf']
-  }) as unknown as SplitApi;
-  const [gL, gR] = row7.getSlots();
-  const gaugeState = { value: 64, thickness: 10, rounded: true, color: '#22d3ee' };
-  // Left controls
-  let leftPaneForGauge: Pane | null = null;
-  if (gL) {
-    leftPaneForGauge = new Pane({ container: gL });
-    // Hide label only when label is empty string; keep others
-    if ((row7 as any).wrapPane) { (row7 as any).wrapPane(leftPaneForGauge); }
-    ensureRegistered(leftPaneForGauge);
-    try { leftPaneForGauge.registerPlugin(Essentials); } catch {}
-    leftPaneForGauge.addBinding(gaugeState, 'value', { min: 0, max: 100, label: 'Value' });
-    leftPaneForGauge.addBinding(gaugeState, 'thickness', { min: 4, max: 20, step: 1, label: 'Thickness' });
-    leftPaneForGauge.addBinding(gaugeState, 'rounded', { label: 'Rounded' });
-    // No label for color to remove tp-lblv_l
-    leftPaneForGauge.addBinding(gaugeState, 'color', { label: '' });
+    const row = paneA.addBlade({
+      view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6,
+      children: ['leaf', 'leaf']
+    }) as unknown as SplitApi;
+    const [L, R] = row.getSlots();
+    const pL = new Pane({ container: L });
+    ensureRegistered(pL);
+    pL.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 });
+    const text = document.createElement('div');
+    text.style.padding = '8px';
+    text.style.color = '#888';
+    text.style.fontSize = '10px';
+    text.style.lineHeight = '1.5';
+    text.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+    text.innerHTML = 'Left: Multi-height button (3u)<br>Right: Custom DOM with controllable height';
+    R.appendChild(text);
   }
-  // Right gauge view (4 units tall)
-  let gaugeBox: HTMLElement | null = null;
-  if (gR) {
-    mountDomUnits(gR, 4, (box) => { gaugeBox = box; });
-  }
-  const renderGauge = () => {
-    if (gaugeBox) drawDonutGauge(gaugeBox, gaugeState.value, {
-      color: gaugeState.color,
-      thickness: gaugeState.thickness,
-      rounded: gaugeState.rounded,
+
+  // Basics 2/3 — Size Expressions
+  const hostB = document.getElementById('host-b') as HTMLElement | null;
+  if (hostB) {
+    const paneB = new Pane({ container: hostB, title: 'Basics 2/3 — Size Expressions' });
+    ensureRegistered(paneB);
+    try { paneB.registerPlugin(Essentials); } catch {}
+
+    // 66 / 34
+    const rA = paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['leaf', 'leaf'] }) as unknown as SplitApi;
+    rA.getSlots().forEach((slot: HTMLElement, i: number) => {
+      const p = new Pane({ container: slot });
+      if ((rA as any).wrapPane) { (rA as any).wrapPane(p); }
+      ensureRegistered(p);
+      p.addBlade({ view: 'sized-button', title: `Button\n${i + 1}`, units: 2 });
     });
-  };
-  renderGauge();
-  // Re-render on changes
-  try { leftPaneForGauge?.on('change', renderGauge); } catch {}
+
+    // equal — 3 columns
+    const rB = paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf', 'leaf', 'leaf'] }) as unknown as SplitApi;
+    rB.getSlots().forEach((slot: HTMLElement, i: number) => {
+      const p = new Pane({ container: slot });
+      if ((rB as any).wrapPane) { (rB as any).wrapPane(p); }
+      ensureRegistered(p);
+      p.addBlade({ view: 'sized-button', title: `Equal\n${i + 1}`, units: 2 });
+    });
+
+    // 1fr 2fr
+    const rC = paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf', 'leaf'] }) as unknown as SplitApi;
+    rC.getSlots().forEach((slot: HTMLElement, i: number) => {
+      const p = new Pane({ container: slot });
+      if ((rC as any).wrapPane) { (rC as any).wrapPane(p); }
+      ensureRegistered(p);
+      p.addBlade({ view: 'sized-button', title: i === 0 ? '1fr' : '2fr', units: 2 });
+    });
+  }
+
+  // Basics 3/3 — Normalized + Mixed DOM
+  const hostC = document.getElementById('host-c') as HTMLElement | null;
+  if (hostC) {
+    const paneC = new Pane({ container: hostC, title: 'Basics 3/3 — Normalized + Mixed DOM' });
+    ensureRegistered(paneC);
+    try { paneC.registerPlugin(Essentials); } catch {}
+
+    // 40 10 (normalized)
+    const rN = paneC.addBlade({ view: 'split-layout', direction: 'row', sizes: [40, 10], children: ['leaf', 'leaf'] }) as unknown as SplitApi;
+    rN.getSlots().forEach((slot: HTMLElement) => {
+      const p = new Pane({ container: slot });
+      if ((rN as any).wrapPane) { (rN as any).wrapPane(p); }
+      ensureRegistered(p);
+      p.addBlade({ view: 'sized-button', title: `Normalized`, units: 2 });
+    });
+
+    // Donut gauge + controls
+    const rG = paneC.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6, interactive: true, children: ['leaf', 'leaf'] }) as unknown as SplitApi;
+    const [gL, gR] = rG.getSlots();
+    const gaugeState = { value: 64, thickness: 10, rounded: true, color: '#22d3ee' };
+    let leftPaneForGauge: Pane | null = null;
+    if (gL) {
+      leftPaneForGauge = new Pane({ container: gL });
+      if ((rG as any).wrapPane) { (rG as any).wrapPane(leftPaneForGauge); }
+      ensureRegistered(leftPaneForGauge);
+      try { leftPaneForGauge.registerPlugin(Essentials); } catch {}
+      leftPaneForGauge.addBinding(gaugeState, 'value', { min: 0, max: 100, label: 'Value' });
+      leftPaneForGauge.addBinding(gaugeState, 'thickness', { min: 4, max: 20, step: 1, label: 'Thickness' });
+      leftPaneForGauge.addBinding(gaugeState, 'rounded', { label: 'Rounded' });
+      leftPaneForGauge.addBinding(gaugeState, 'color', { label: '' }); // hide this label only
+    }
+    let gaugeBox: HTMLElement | null = null;
+    if (gR) { mountDomUnits(gR, 4, (box) => { gaugeBox = box; }); }
+    const renderGauge = () => {
+      if (gaugeBox) drawDonutGauge(gaugeBox, gaugeState.value, {
+        color: gaugeState.color, thickness: gaugeState.thickness, rounded: gaugeState.rounded,
+      });
+    };
+    renderGauge();
+    try { leftPaneForGauge?.on('change', renderGauge); } catch {}
+  }
 
   // Section 2: Compact sliders toggle
   const host2 = document.getElementById('host-compact') as HTMLElement | null;

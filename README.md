@@ -49,30 +49,21 @@ Tip: use `CompactKitBundle` on nested panes too.
 
 ## Demo Overview
 
-The demo page shows a compact column (~320px). Each row is its own `split-layout` blade.
+The demo page is split for progressive teaching. Each block hosts its own `split-layout` rows.
 
-1) Row 1 — simplest split: 1fr | 1fr
-- Left: 3u `sized-button` “Run↵Action”
-- Right: 3u DOM text
+- Basics 1/3 — First Split
+  - 1fr | 1fr: left 3u `sized-button`, right 3u DOM
 
-2) Row 2 — 66 / 34
-- Two 2u buttons
+- Basics 2/3 — Size Expressions
+  - 66 / 34: two 2u buttons
+  - equal (3 cols): three 2u buttons
+  - 1fr 2fr: left button title `1fr`, right `2fr`
 
-3) Row 3 — equal (3 columns)
-- Three 2u buttons
+- Basics 3/3 — Normalized + Mixed DOM
+  - 40 10 (normalized) — two 2u buttons（40:10 → 80:20）
+  - Donut Gauge + Controls — left: Value/Thickness/Rounded/Color；right：4u donut gauge（Color 的 label 设为 '' 以隐藏仅这一项标签）
 
-4) Row 4 — 1fr 2fr
-- Left button title: `1fr`; Right button title: `2fr`
-
-5) Row 5 — 40 10 (normalized)
-- Two 2u buttons (40:10 → normalized to 80:20)
-
-7) Row 7 — Donut Gauge + Controls
-- Left: four controls (Value, Thickness, Rounded, Color)
-- Right: 4u donut gauge (pure DOM canvas)
-- Hint: the Color control intentionally hides its label by passing `label: ''` so the label view is removed for that binding only.
-
-The demo source in `demo/` builds these rows plus extra sections below.
+The demo source in `demo/` builds these blocks plus extra sections below.
 
 ### Compact Sliders Toggle
 - Compare compact vs. original slider layout side by side.
