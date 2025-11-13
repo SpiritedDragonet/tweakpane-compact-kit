@@ -15,8 +15,12 @@ npm install tweakpane-compact-kit
 Peer dependency: tweakpane v4
 
 ## Quick Start — First Split
+Build a single row with two slots: a 3u button on the left and a 3u DOM box on the right.
 
 <img src="docs/images/basics-1.svg" style="width:50%;height:auto;" alt="Basics 1/3" />
+
+<details>
+<summary>View code</summary>
 
 ```ts
 import { Pane } from 'tweakpane';
@@ -45,9 +49,15 @@ box.textContent = '3u DOM';
 R.appendChild(box);
 ```
 
+</details>
+
 ## Size Expressions
+Four presets in one pane: 66/34, equal (3 columns), 1fr 2fr, and normalization (40:10 → 80:20).
 
 <img src="docs/images/basics-2.svg" style="width:50%;height:auto;" alt="Basics 2/3" />
+
+<details>
+<summary>View code</summary>
 
 ```ts
 import { Pane } from 'tweakpane';
@@ -89,9 +99,15 @@ rD.getSlots().forEach((slot) => {
 });
 ```
 
+</details>
+
 ## Mixed DOM — Donut Gauge
+Controls on the left, a 4u donut gauge canvas on the right.
 
 <img src="docs/images/basics-3.svg" style="width:50%;height:auto;" alt="Basics 3/3" />
+
+<details>
+<summary>View code</summary>
 
 ```ts
 import { Pane } from 'tweakpane';
@@ -143,10 +159,16 @@ function drawGauge(root: HTMLElement) {
 drawGauge(host);
 ```
 
+</details>
+
 ## Compact Sliders Toggle
+Compare original (top) vs compact (bottom) slider layout.
 
 <img src="docs/images/compact-toggle (original).svg" style="width:50%;height:auto;display:block;margin-bottom:8px;" alt="Original" />
 <img src="docs/images/compact-toggle(compact).svg" style="width:50%;height:auto;" alt="Compact" />
+
+<details>
+<summary>View code</summary>
 
 ```ts
 import { Pane } from 'tweakpane';
@@ -162,9 +184,15 @@ pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compac
 pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: true, children: ['leaf','leaf'] });
 ```
 
+</details>
+
 ## Custom Categories
+Use semantic slot names (alpha/beta/gamma) and fill each with different controls.
 
 <img src="docs/images/categories.svg" style="width:50%;height:auto;" alt="Custom Categories" />
+
+<details>
+<summary>View code</summary>
 
 ```ts
 import { Pane } from 'tweakpane';
@@ -180,7 +208,13 @@ new Pane({ container: B }).addBinding({ level: 50 }, 'level', { min: 0, max: 100
 new Pane({ container: C }).addBinding({ on: true }, 'on');
 ```
 
+</details>
+
 ## API Quick Reference
+Short, common calls you’ll use most:
+
+<details>
+<summary>View code</summary>
 
 ```ts
 // split layout
@@ -199,6 +233,8 @@ pane.addBlade({ view: 'split-layout', compactSliders: true, children: ['leaf'] }
 // sized button
 pane.addBlade({ view: 'sized-button', title: 'Multi-line\nButton', units: 3 });
 ```
+
+</details>
 
 (See demo/ for more recipes)
 
