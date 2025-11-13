@@ -1,12 +1,12 @@
 # Tweakpane Compact Kit
 
-Compact layout primitives for Tweakpane v4. Ship dense, clean UIs in a ~320px pane without hacks.
+Compact layout primitives for Tweakpane v4. Build dense, clean UIs in ~320px without hacks.
 
-- SplitLayout — build rows/columns with gutters, then mount child panes into slots
-- SizedButton — multi‑line buttons sized by “units” to align with other blades
-- Smart compaction — trims visual gaps; scales slider/value UI so content fits nicely
+- SplitLayout — build rows/columns with gutters; mount child panes or DOM per slot.
+- SizedButton — multi‑line buttons sized by “units” aligned with Tweakpane blade grid.
+- Smart compaction — trims visual gaps; optionally compacts slider/value UI.
 
-Works with the official v4 plugin API only. No fallbacks, no logs.
+Works with the official v4 plugin API only.
 
 ## Install
 
@@ -14,47 +14,46 @@ Works with the official v4 plugin API only. No fallbacks, no logs.
 npm install tweakpane-compact-kit
 ```
 
-## Quick Peek
+## Getting Started
 
-Register the bundle (contains both SplitLayout and SizedButton) and put a multi‑line button next to a plain DOM box.
+Register the bundle (includes both SplitLayout and SizedButton) for every Pane you create.
 
 ```ts
 import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
 const pane = new Pane();
-pane.registerPlugin(CompactKitBundle);
+pane.registerPlugin(CompactKitBundle); // register per Pane
 
-// Row: 1fr | 1fr
+// 1) A simple row: 1fr | 1fr
 const row = pane.addBlade({
   view: 'split-layout', direction: 'row', sizes: '1fr 1fr', children: ['leaf', 'leaf']
 });
 
-const [left, right] = row.getSlots();
+const [L, R] = row.getSlots();
 
-// Left: 3u multi-line button
-const lp = new Pane({ container: left });
-lp.registerPlugin(CompactKitBundle);
-lp.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 });
+// Left: 3-unit button
+const pL = new Pane({ container: L }); pL.registerPlugin(CompactKitBundle);
+pL.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 });
 
-// Right: 3u plain DOM (not a Tweakpane control)
+// Right: 3-unit DOM box (plain HTML)
 const box = document.createElement('div');
 box.style.height = 'calc(3 * var(--cnt-usz) + 2 * 4px)';
 box.style.display = 'grid';
 box.style.placeItems = 'center';
 box.textContent = '3u DOM';
-right.appendChild(box);
+R.appendChild(box);
 ```
 
-Note: register the bundle for every Pane you create (plugin pools are per Pane).
+Tip: use `CompactKitBundle` on nested panes too.
 
-## The Demo Layout (Rows)
+## Demo Overview
 
-The demo page is a white background with a compact column (~320px wide). Each row is an independent `split-layout` blade.
+The demo page shows a compact column (~320px). Each row is its own `split-layout` blade.
 
 1) Row 1 — simplest split: 1fr | 1fr
-- Left: 3u multi‑line button “Run↵Action”
-- Right: 3u DOM box explaining it’s plain HTML
+- Left: 3u `sized-button` “Run↵Action”
+- Right: 3u DOM text
 
 2) Row 2 — 66 / 34
 - Two 2u buttons
@@ -63,19 +62,29 @@ The demo page is a white background with a compact column (~320px wide). Each ro
 - Three 2u buttons
 
 4) Row 4 — 1fr 2fr
-- Two 2u buttons
+- Left button title: `1fr`; Right button title: `2fr`
 
 5) Row 5 — 40 10 (normalized)
 - Two 2u buttons (40:10 → normalized to 80:20)
 
-6) Row 6 — 3u DOM waveform
-- A tiny canvas sine wave to show you can place any HTML
+7) Row 7 — Donut Gauge + Controls
+- Left: four controls (Value, Thickness, Rounded, Color)
+- Right: 4u donut gauge (pure DOM canvas)
+- Hint: the Color control intentionally hides its label by passing `label: ''` so the label view is removed for that binding only.
 
-The demo source in `test/` builds exactly these rows.
+The demo source in `demo/` builds these rows plus extra sections below.
+
+### Compact Sliders Toggle
+- Compare compact vs. original slider layout side by side.
+- Toggle `compactSliders` to scale slider surface and reposition numeric inputs without breaking value editing.
+
+### Custom Categories (Semantic Leaves)
+- Use your own strings instead of `'leaf'` in `children` (e.g., `'alpha'`, `'beta'`).
+- Fill slots by category using the API (`getSlotsByCategory`, `getSlotsByCategoryMap`).
 
 ## SplitLayout
 
-Create flexible splits and then mount child panes into slots returned by the API.
+Create flexible splits and mount child panes into returned slots.
 
 ```ts
 const api = pane.addBlade({
@@ -88,8 +97,6 @@ const api = pane.addBlade({
 });
 
 const [a, b] = api.getSlots();
-const pa = new Pane({ container: a }); pa.registerPlugin(CompactKitBundle);
-const pb = new Pane({ container: b }); pb.registerPlugin(CompactKitBundle);
 ```
 
 Size Expressions (pick what reads best for your case):
@@ -114,9 +121,10 @@ gutter?: number | string // default 6
 minSize?: number         // default 20 (min % per panel)
 height?: number | string // for column splits
 interactive?: boolean    // enable dragging
+compactSliders?: boolean // compact slider/value layout (default true)
 ```
 
-API helpers:
+Imperative API:
 
 ```ts
 api.getSlots(): HTMLElement[]
@@ -125,11 +133,38 @@ api.getSlotsByCategoryMap(): Map<string, HTMLElement[]>
 api.getCategories(): string[]
 ```
 
-Each child in `children` can be any string category (e.g. 'leaf', 'audio', 'preview'). Use categories to programmatically fill slots.
+Children can be strings (categories) or nested split nodes. Strings are user-defined categories (e.g. `'leaf'`, `'alpha'`, `'preview'`).
+
+### Column Splits with Row Units
+
+For vertical layouts, you can allocate per-row “units” aligned to Tweakpane’s blade unit size. The container height is computed automatically.
+
+```ts
+pane.addBlade({
+  view: 'split-layout',
+  direction: 'column',
+  rowUnits: '1 1 2',   // top=1u, mid=1u, bottom=2u
+  gutter: 6,
+  children: ['leaf', 'leaf', 'leaf']
+});
+```
+
+### Label Policy for Compact UIs
+
+When using `SplitLayout`, you can wrap a Pane instance so `addBinding()` hides the label when a label is not provided or is an empty string:
+
+```ts
+const api = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr', children: ['leaf'] }) as any;
+const [slot] = api.getSlots();
+const p = new Pane({ container: slot });
+(api as any).wrapPane?.(p);
+// This binding will hide the label because label is empty:
+p.addBinding({ color: '#22d3ee' }, 'color', { label: '' });
+```
 
 ## SizedButton
 
-Buttons that span multiple blade rows. The height is computed from Tweakpane’s unit size (`--cnt-usz`) plus gutter compensation so alignment stays tidy.
+Buttons that span multiple blade rows. Height is computed from Tweakpane’s unit size (`--cnt-usz`) with gutter compensation so alignment stays tidy.
 
 ```ts
 pane.addBlade({
@@ -140,17 +175,21 @@ pane.addBlade({
 });
 ```
 
-The button inherits the default Tweakpane theme by using the built-in button classes.
+## Run the Demo
 
-## Usage Notes
+```bash
+# build the library first
+npm run build
 
-- Tweakpane v4 only; bundle `core.major = 2` for compatibility
-- Register `CompactKitBundle` for every Pane you create (nested panes too)
-- Keep your pane around ~300–340px wide for clean, compact visuals (the demo uses ~320px)
+# start the demo dev server (aliases src to local source)
+npm run demo
+```
+
+Open the shown URL. Try the “Compact vs Original” section, drag gutters, and adjust the Donut Gauge.
 
 ## TypeScript
 
-All public types are exported:
+Public types are exported:
 
 ```ts
 import type {
@@ -159,6 +198,12 @@ import type {
   SizedButtonOptions
 } from 'tweakpane-compact-kit';
 ```
+
+## Notes
+
+- Tweakpane v4 only; bundle `core.major = 2` for compatibility.
+- Register `CompactKitBundle` for every Pane you create (nested panes too).
+- Keep your Pane around ~300–340px wide for compact visuals (the demo uses ~320px).
 
 ## License
 

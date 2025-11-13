@@ -46,12 +46,26 @@ function mountDomUnits(slot: HTMLElement, units: number, inner?: (box: HTMLEleme
   else box.textContent = `${units}u DOM (not a Tweakpane control)`;
 }
 
-function drawWave(container: HTMLElement, stroke = '#22d3ee', bg = '#0f172a') {
+// (sparkline demo removed)
+
+// Donut gauge (value 0..100) to showcase mixed DOM + controls
+function drawDonutGauge(
+  container: HTMLElement,
+  value: number,
+  options?: { color?: string; thickness?: number; rounded?: boolean }
+) {
+  const color = options?.color ?? '#22d3ee';
+  const thickness = Math.max(2, Math.min(24, Math.floor(options?.thickness ?? 10)));
+  const rounded = !!options?.rounded;
+
+  // Clear previous content
+  container.innerHTML = '';
+
   const canvas = document.createElement('canvas');
   const rect = container.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
+  canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+  canvas.height = Math.max(1, Math.floor(rect.height * dpr));
   canvas.style.width = '100%';
   canvas.style.height = '100%';
   canvas.style.display = 'block';
@@ -59,106 +73,39 @@ function drawWave(container: HTMLElement, stroke = '#22d3ee', bg = '#0f172a') {
 
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-
-  // Scale for retina displays
   ctx.scale(dpr, dpr);
 
-  // Clear background
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, rect.width, rect.height);
+  const W = rect.width;
+  const H = rect.height;
+  const cx = W / 2;
+  const cy = H / 2;
+  const R = Math.max(8, Math.min(cx, cy) - thickness);
+  const start = -Math.PI / 2; // top
+  const end = start + (Math.max(0, Math.min(100, value)) / 100) * Math.PI * 2;
 
-  // Calculate wave parameters
-  const centerY = rect.height / 2;
-  const amplitude = rect.height * 0.25;
-  const frequency = 0.02;
-  const points = 150;
-  const lineWidth = 2.5;
-
-  // Create wave data
-  const wavePoints: Array<{x: number, y: number}> = [];
-  for (let i = 0; i <= points; i++) {
-    const x = (i / points) * rect.width;
-    const angle = i * frequency * Math.PI * 2;
-
-    // Complex wave with multiple layers
-    let y = centerY;
-    y += Math.sin(angle) * amplitude * 0.8;
-    y += Math.sin(angle * 2.1) * amplitude * 0.3;
-    y += Math.sin(angle * 3.7) * amplitude * 0.15;
-
-    wavePoints.push({x, y});
-  }
-
-  // Draw subtle grid
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-  ctx.lineWidth = 1;
+  // Track
   ctx.beginPath();
-  for (let i = 0; i <= 4; i++) {
-    const y = (rect.height / 4) * i;
-    ctx.moveTo(0, y);
-    ctx.lineTo(rect.width, y);
-  }
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = thickness;
+  ctx.lineCap = rounded ? 'round' : 'butt';
   ctx.stroke();
 
-  // Create filled area under the wave
-  const gradient = ctx.createLinearGradient(0, 0, 0, rect.height);
-  gradient.addColorStop(0, stroke + '00');
-  gradient.addColorStop(0.3, stroke + '10');
-  gradient.addColorStop(0.5, stroke + '20');
-  gradient.addColorStop(0.7, stroke + '10');
-  gradient.addColorStop(1, stroke + '00');
-
-  ctx.fillStyle = gradient;
+  // Value arc
   ctx.beginPath();
-  ctx.moveTo(wavePoints[0].x, centerY);
-  wavePoints.forEach(point => ctx.lineTo(point.x, point.y));
-  ctx.lineTo(wavePoints[wavePoints.length - 1].x, centerY);
-  ctx.closePath();
-  ctx.fill();
-
-  // Draw the main wave line
-  ctx.strokeStyle = stroke;
-  ctx.lineWidth = lineWidth;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // Add subtle glow
-  ctx.shadowColor = stroke;
-  ctx.shadowBlur = 15;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 0;
-
-  ctx.beginPath();
-  ctx.moveTo(wavePoints[0].x, wavePoints[0].y);
-  for (let i = 1; i < wavePoints.length; i++) {
-    const cp1x = wavePoints[i - 1].x + (wavePoints[i].x - wavePoints[i - 1].x) / 2;
-    const cp1y = wavePoints[i - 1].y;
-    const cp2x = wavePoints[i - 1].x + (wavePoints[i].x - wavePoints[i - 1].x) / 2;
-    const cp2y = wavePoints[i].y;
-    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, wavePoints[i].x, wavePoints[i].y);
-  }
+  ctx.arc(cx, cy, R, start, end);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = thickness;
+  ctx.lineCap = rounded ? 'round' : 'butt';
   ctx.stroke();
 
-  // Remove shadow for dots
-  ctx.shadowBlur = 0;
-
-  // Draw peak dots
-  const dotSize = 3;
-  ctx.fillStyle = stroke;
-  for (let i = 0; i < wavePoints.length; i += 15) {
-    ctx.beginPath();
-    ctx.arc(wavePoints[i].x, wavePoints[i].y, dotSize, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Draw start and end dots
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-  ctx.beginPath();
-  ctx.arc(wavePoints[0].x, wavePoints[0].y, dotSize + 1, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(wavePoints[wavePoints.length - 1].x, wavePoints[wavePoints.length - 1].y, dotSize + 1, 0, Math.PI * 2);
-  ctx.fill();
+  // Center text
+  const pct = Math.round(Math.max(0, Math.min(100, value)));
+  ctx.fillStyle = '#e5e7eb';
+  ctx.font = `${Math.floor(Math.min(W, H) * 0.28)}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${pct}%`, cx, cy);
 }
 
 function main() {
@@ -220,7 +167,7 @@ function main() {
     const p = new Pane({ container: slot });
     if ((row4 as any).wrapPane) { (row4 as any).wrapPane(p); }
     ensureRegistered(p);
-    p.addBlade({ view: 'sized-button', title: `1fr\n2fr`, units: 2 });
+    p.addBlade({ view: 'sized-button', title: i === 0 ? '1fr' : '2fr', units: 2 });
   });
 
   // Row 5: 40 10 (normalized)
@@ -234,16 +181,44 @@ function main() {
     p.addBlade({ view: 'sized-button', title: `Normalized`, units: 2 });
   });
 
-  // Row 6: 3u waveform (using drawWave)
-  const row6 = pane.addBlade({
-    view: 'split-layout', direction: 'row', sizes: '1fr', children: ['leaf']
-  }) as unknown as SplitApi;
-  const r6 = row6.getSlots();
+  // Row 6 removed (was sparkline)
 
-  // Use mountDomUnits to create a 3-unit container for the wave
-  mountDomUnits(r6[0], 3, (container) => {
-    drawWave(container, '#22d3ee', '#0f172a');
-  });
+  // Row 7: gauge + controls (show flexible mixed UI)
+  const row7 = pane.addBlade({
+    view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6, interactive: true,
+    children: ['leaf', 'leaf']
+  }) as unknown as SplitApi;
+  const [gL, gR] = row7.getSlots();
+  const gaugeState = { value: 64, thickness: 10, rounded: true, color: '#22d3ee' };
+  // Left controls
+  let leftPaneForGauge: Pane | null = null;
+  if (gL) {
+    leftPaneForGauge = new Pane({ container: gL });
+    // Hide label only when label is empty string; keep others
+    if ((row7 as any).wrapPane) { (row7 as any).wrapPane(leftPaneForGauge); }
+    ensureRegistered(leftPaneForGauge);
+    try { leftPaneForGauge.registerPlugin(Essentials); } catch {}
+    leftPaneForGauge.addBinding(gaugeState, 'value', { min: 0, max: 100, label: 'Value' });
+    leftPaneForGauge.addBinding(gaugeState, 'thickness', { min: 4, max: 20, step: 1, label: 'Thickness' });
+    leftPaneForGauge.addBinding(gaugeState, 'rounded', { label: 'Rounded' });
+    // No label for color to remove tp-lblv_l
+    leftPaneForGauge.addBinding(gaugeState, 'color', { label: '' });
+  }
+  // Right gauge view (4 units tall)
+  let gaugeBox: HTMLElement | null = null;
+  if (gR) {
+    mountDomUnits(gR, 4, (box) => { gaugeBox = box; });
+  }
+  const renderGauge = () => {
+    if (gaugeBox) drawDonutGauge(gaugeBox, gaugeState.value, {
+      color: gaugeState.color,
+      thickness: gaugeState.thickness,
+      rounded: gaugeState.rounded,
+    });
+  };
+  renderGauge();
+  // Re-render on changes
+  try { leftPaneForGauge?.on('change', renderGauge); } catch {}
 
   // Section 2: Compact sliders toggle
   const host2 = document.getElementById('host-compact') as HTMLElement | null;
