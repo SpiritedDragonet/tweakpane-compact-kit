@@ -123,14 +123,14 @@ function main() {
     const [L, R] = row.getSlots();
     const pL = new Pane({ container: L });
     ensureRegistered(pL);
-    pL.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 });
+    pL.addBlade({ view: 'sized-button', title: 'button (3u)', units: 3 });
     const text = document.createElement('div');
     text.style.padding = '8px';
     text.style.color = '#888';
     text.style.fontSize = '10px';
     text.style.lineHeight = '1.5';
     text.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
-    text.innerHTML = 'Left: Multi-height button (3u)<br>Right: Custom DOM with controllable height';
+    text.innerHTML = 'Left: button (3u)<br>Right: Custom DOM with controllable height (3u)';
     R.appendChild(text);
   }
 
@@ -147,7 +147,7 @@ function main() {
       const p = new Pane({ container: slot });
       if ((rA as any).wrapPane) { (rA as any).wrapPane(p); }
       ensureRegistered(p);
-      p.addBlade({ view: 'sized-button', title: `Button\n${i + 1}`, units: 2 });
+      p.addBlade({ view: 'sized-button', title: i === 0 ? '66%' : '34%', units: 2 });
     });
 
     // equal — 3 columns
