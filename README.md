@@ -14,8 +14,23 @@ npm install tweakpane-compact-kit
 
 Peer dependency: tweakpane v4
 
-## Quick Start — First Split
-Build a single row with two slots: a 3u button on the left and a 3u DOM box on the right.
+## Basics
+
+Minimal setup and common patterns you’ll use to build compact panes.
+
+### Basics — Setup
+Import once, create a Pane, and register the bundle (per Pane). All examples below assume this setup.
+
+```ts
+import { Pane } from 'tweakpane';
+import { CompactKitBundle } from 'tweakpane-compact-kit';
+
+const pane = new Pane();
+pane.registerPlugin(CompactKitBundle);
+```
+
+### Quick Start — First Split
+Build one row with two slots: a 3u button (left) and a 3u DOM box (right).
 
 <img src="docs/images/basics-1.svg" style="width:50%;height:auto;" alt="Basics 1/3" />
 
@@ -23,12 +38,6 @@ Build a single row with two slots: a 3u button on the left and a 3u DOM box on t
 <summary>View code</summary>
 
 ```ts
-import { Pane } from 'tweakpane';
-import { CompactKitBundle } from 'tweakpane-compact-kit';
-
-const pane = new Pane();
-pane.registerPlugin(CompactKitBundle); // per Pane
-
 // 1fr | 1fr
 const row = pane.addBlade({
   view: 'split-layout', direction: 'row', sizes: '1fr 1fr', children: ['leaf', 'leaf']
@@ -51,7 +60,7 @@ R.appendChild(box);
 
 </details>
 
-## Size Expressions
+### Basics — Size Expressions
 Four presets in one pane: 66/34, equal (3 columns), 1fr 2fr, and normalization (40:10 → 80:20).
 
 <img src="docs/images/basics-2.svg" style="width:50%;height:auto;" alt="Basics 2/3" />
@@ -60,12 +69,6 @@ Four presets in one pane: 66/34, equal (3 columns), 1fr 2fr, and normalization (
 <summary>View code</summary>
 
 ```ts
-import { Pane } from 'tweakpane';
-import { CompactKitBundle } from 'tweakpane-compact-kit';
-
-const pane = new Pane();
-pane.registerPlugin(CompactKitBundle);
-
 // 66 / 34
 const rA = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['leaf','leaf'] }) as any;
 rA.getSlots().forEach((slot, i) => {
@@ -110,12 +113,6 @@ Controls on the left, a 4u donut gauge canvas on the right.
 <summary>View code</summary>
 
 ```ts
-import { Pane } from 'tweakpane';
-import { CompactKitBundle } from 'tweakpane-compact-kit';
-
-const pane = new Pane();
-pane.registerPlugin(CompactKitBundle);
-
 // Row: controls | gauge canvas
 const gRow = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6, children: ['leaf','leaf'] }) as any;
 const [gL, gR] = gRow.getSlots();
@@ -171,12 +168,6 @@ Compare original (top) vs compact (bottom) slider layout.
 <summary>View code</summary>
 
 ```ts
-import { Pane } from 'tweakpane';
-import { CompactKitBundle } from 'tweakpane-compact-kit';
-
-const pane = new Pane();
-pane.registerPlugin(CompactKitBundle);
-
 // original (top)
 pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: false, children: ['leaf','leaf'] });
 
@@ -195,12 +186,6 @@ Use semantic slot names (alpha/beta/gamma) and fill each with different controls
 <summary>View code</summary>
 
 ```ts
-import { Pane } from 'tweakpane';
-import { CompactKitBundle } from 'tweakpane-compact-kit';
-
-const pane = new Pane();
-pane.registerPlugin(CompactKitBundle);
-
 const api = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['alpha','beta','gamma'] }) as any;
 const [A,B,C] = api.getSlots();
 new Pane({ container: A }).addButton({ title: 'Action' });
