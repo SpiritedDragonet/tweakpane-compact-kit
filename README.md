@@ -58,9 +58,9 @@ The demo page is split for progressive teaching. Each block hosts its own `split
   - 66 / 34: two 2u buttons
   - equal (3 cols): three 2u buttons
   - 1fr 2fr: left button title `1fr`, right `2fr`
+  - 40 10 (normalized): two 2u buttons（40:10 → 80:20）
 
-- Basics 3/3 — Normalized + Mixed DOM
-  - 40 10 (normalized) — two 2u buttons（40:10 → 80:20）
+- Basics 3/3 — Mixed DOM
   - Donut Gauge + Controls — left: Value/Thickness/Rounded/Color；right：4u donut gauge（Color 的 label 设为 '' 以隐藏仅这一项标签）
 
 The demo source in `demo/` builds these blocks plus extra sections below.

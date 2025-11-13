@@ -167,23 +167,23 @@ function main() {
       ensureRegistered(p);
       p.addBlade({ view: 'sized-button', title: i === 0 ? '1fr' : '2fr', units: 2 });
     });
-  }
-
-  // Basics 3/3 — Normalized + Mixed DOM
-  const hostC = document.getElementById('host-c') as HTMLElement | null;
-  if (hostC) {
-    const paneC = new Pane({ container: hostC, title: 'Basics 3/3 — Normalized + Mixed DOM' });
-    ensureRegistered(paneC);
-    try { paneC.registerPlugin(Essentials); } catch {}
 
     // 40 10 (normalized)
-    const rN = paneC.addBlade({ view: 'split-layout', direction: 'row', sizes: [40, 10], children: ['leaf', 'leaf'] }) as unknown as SplitApi;
+    const rN = paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: [40, 10], children: ['leaf', 'leaf'] }) as unknown as SplitApi;
     rN.getSlots().forEach((slot: HTMLElement) => {
       const p = new Pane({ container: slot });
       if ((rN as any).wrapPane) { (rN as any).wrapPane(p); }
       ensureRegistered(p);
       p.addBlade({ view: 'sized-button', title: `Normalized`, units: 2 });
     });
+  }
+
+  // Basics 3/3 — Mixed DOM
+  const hostC = document.getElementById('host-c') as HTMLElement | null;
+  if (hostC) {
+    const paneC = new Pane({ container: hostC, title: 'Basics 3/3 — Mixed DOM' });
+    ensureRegistered(paneC);
+    try { paneC.registerPlugin(Essentials); } catch {}
 
     // Donut gauge + controls
     const rG = paneC.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6, interactive: true, children: ['leaf', 'leaf'] }) as unknown as SplitApi;
