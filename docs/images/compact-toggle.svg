@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#0b1220"/>
+  <rect x="40" y="40" width="880" height="460" fill="#111827" stroke="#334155" stroke-width="2" rx="12"/>
+  <text x="60" y="100" fill="#94a3b8" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="28">PLACEHOLDER — Compact vs Original</text>
+  <text x="60" y="150" fill="#64748b" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="18">Toggle compactSliders and compare</text>
+</svg>

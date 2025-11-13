@@ -1,17 +1,40 @@
 # Tweakpane Compact Kit
 
-Compact layout primitives for Tweakpane v4. Build dense, clean UIs in ~320px without hacks.
+Compact layout toolkit for Tweakpane v4. Ship dense, tidy panels in ~320px without hacks.
 
 - SplitLayout — build rows/columns with gutters; mount child panes or DOM per slot.
-- SizedButton — multi‑line buttons sized by “units” aligned with Tweakpane blade grid.
-- Smart compaction — trims visual gaps; optionally compacts slider/value UI.
+- SizedButton — multi‑line buttons sized by “units” aligned with the blade grid.
+- Smart compaction — trims visual gaps; optional compact slider/value layout.
 
-Works with the official v4 plugin API only.
+Works with the official v4 plugin API only (core.major = 2).
+
+## Links
+
+- Website (Tweakpane): https://tweakpane.github.io/
+- Docs (Plugin Dev): https://tweakpane.github.io/docs/plugins/dev/
+- NPM (Package): https://www.npmjs.com/package/tweakpane-compact-kit
+- Demo (Repo): demo/ (run `npm run demo`)
+- Demo (Pages): https://spiriteddragonet.github.io/tweakpane-compact-kit/ (if enabled)
 
 ## Install
 
 ```bash
 npm install tweakpane-compact-kit
+```
+
+CDN (UMD) example:
+
+```html
+<script src="https://unpkg.com/tweakpane@4/dist/tweakpane.min.js"></script>
+<script src="https://unpkg.com/tweakpane-compact-kit/dist/tweakpane-compact-kit.umd.js"></script>
+<script>
+  const pane = new Tweakpane.Pane();
+  pane.registerPlugin(TweakpaneCompactKit.CompactKitBundle);
+  // ...
+  // pane.addBlade({ view: 'split-layout', ... });
+  // pane.addBlade({ view: 'sized-button', ... });
+  // ...
+</script>
 ```
 
 ## Getting Started
@@ -47,21 +70,30 @@ R.appendChild(box);
 
 Tip: use `CompactKitBundle` on nested panes too.
 
+Screenshot (Basics 1/3):
+
+![Basics 1/3](docs/images/basics-1.svg)
+
 ## Demo Overview
 
-The demo page is split for progressive teaching. Each block hosts its own `split-layout` rows.
+The demo is split for progressive teaching. Each block hosts its own `split-layout` rows.
 
-- Basics 1/3 — First Split
-  - 1fr | 1fr: left 3u `sized-button`, right 3u DOM
+- Basics 1/3 — First Split (1fr | 1fr): left 3u `sized-button`, right 3u DOM
+  
+  ![Basics 1/3](docs/images/basics-1.svg)
 
 - Basics 2/3 — Size Expressions
-  - 66 / 34: two 2u buttons
-  - equal (3 cols): three 2u buttons
-  - 1fr 2fr: left button title `1fr`, right `2fr`
-  - 40 10 (normalized): two 2u buttons（40:10 → 80:20）
+  - 66 / 34 → two 2u buttons（66%/34%）
+  - equal (3 cols) → three 2u buttons
+  - 1fr 2fr → left title `1fr`, right `2fr`
+  - 40 10 (normalized) → two 2u buttons（40:10 → 80:20）
+  
+  ![Basics 2/3](docs/images/basics-2.svg)
 
 - Basics 3/3 — Mixed DOM
   - Donut Gauge + Controls — left: Value/Thickness/Rounded/Color；right：4u donut gauge（Color 的 label 设为 '' 以隐藏仅这一项标签）
+  
+  ![Basics 3/3](docs/images/basics-3.svg)
 
 The demo source in `demo/` builds these blocks plus extra sections below.
 
@@ -69,9 +101,13 @@ The demo source in `demo/` builds these blocks plus extra sections below.
 - Compare compact vs. original slider layout side by side.
 - Toggle `compactSliders` to scale slider surface and reposition numeric inputs without breaking value editing.
 
+![Compact Toggle](docs/images/compact-toggle.svg)
+
 ### Custom Categories (Semantic Leaves)
 - Use your own strings instead of `'leaf'` in `children` (e.g., `'alpha'`, `'beta'`).
 - Fill slots by category using the API (`getSlotsByCategory`, `getSlotsByCategoryMap`).
+
+![Custom Categories](docs/images/categories.svg)
 
 ## SplitLayout
 
@@ -166,6 +202,8 @@ pane.addBlade({
 });
 ```
 
+![Donut Gauge](docs/images/gauge.svg)
+
 ## Complete Syntax (Concise Reference)
 
 This section summarizes all supported options and expressions designed by this plugin.
@@ -237,6 +275,8 @@ npm run demo
 
 Open the shown URL. Try the “Compact vs Original” section, drag gutters, and adjust the Donut Gauge.
 
+If you use GitHub Pages, publish `demo/` or a simple index that loads it.
+
 ## TypeScript
 
 Public types are exported:
@@ -254,6 +294,18 @@ import type {
 - Tweakpane v4 only; bundle `core.major = 2` for compatibility.
 - Register `CompactKitBundle` for every Pane you create (nested panes too).
 - Keep your Pane around ~300–340px wide for compact visuals (the demo uses ~320px).
+
+## Release (Manual)
+
+We provide a manual GitHub Actions workflow to build and publish a release with zipped artifacts (dist.zip, js-only.zip):
+
+1) Create a tag that matches `package.json` version (or just use the input form):
+   - Example: `v0.1.0` for version `0.1.0`
+2) Go to Actions → “Release (manual)” → Run workflow
+   - Inputs: `tag` (required), optional `name`/`draft`/`prerelease`
+3) The job will:
+   - Install deps → build → validate tag/version → zip dist → upload assets
+   - Auto-generate release notes; GitHub appends source code zip/tar.gz automatically
 
 ## License
 
