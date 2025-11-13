@@ -1,6 +1,6 @@
 {
   "name": "tweakpane-compact-kit",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A compact layout toolkit for Tweakpane with split-layout, grid, and auto-optimized styles",
   "type": "module",
   "main": "./dist/tweakpane-compact-kit.umd.js",
