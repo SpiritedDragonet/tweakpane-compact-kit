@@ -332,7 +332,14 @@ function main() {
         if (leftSlots[1]) {
           const p = new Pane({ container: leftSlots[1] });
           ensureRegistered(p);
-          p.addBinding({ on: false }, 'on', { label: 'Enabled' });
+          try { p.registerPlugin(Essentials); } catch {}
+          // Replace checkbox with a collapsed folder containing three elements
+          const folder = (p as any).addFolder?.({ title: 'Details', expanded: false }) as any;
+          if (folder) {
+            try { (folder as any).addBinding({ level: 0.5 }, 'level', { min: 0, max: 1, label: 'Level' }); } catch {}
+            try { (folder as any).addBinding({ mode: 'A' }, 'mode', { options: { A: 'A', B: 'B', C: 'C' }, label: 'Mode' }); } catch {}
+            try { (folder as any).addButton?.({ title: 'Apply' }); } catch {}
+          }
         }
         if (leftSlots[2]) {
           const p = new Pane({ container: leftSlots[2] });
