@@ -21,7 +21,7 @@ Minimal setup and common patterns you’ll use to build compact panes.
 ### Basics — Setup
 Import once, create a Pane, and register the bundle (per Pane). All examples below assume this setup.
 
-```ts
+```js
 import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
@@ -37,7 +37,7 @@ Build one row with two slots: a 3u button (left) and a 3u DOM box (right).
 <details>
 <summary>View code</summary>
 
-```ts
+```js
 // 1fr | 1fr with a small gutter
 const row = pane.addBlade({
   view: 'split-layout',
@@ -46,7 +46,7 @@ const row = pane.addBlade({
   gutter: 6,
   children: ['leaf', 'leaf'],
 });
-const [L, R] = (row as any).getSlots();
+const [L, R] = row.getSlots();
 
 // Left: 3u button
 const pL = new Pane({ container: L });
@@ -73,9 +73,9 @@ Four presets in one pane: 66/34, equal (3 columns), 1fr 2fr, and normalization (
 <details>
 <summary>View code</summary>
 
-```ts
+```js
 // 66 / 34
-const rA = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['leaf','leaf'] }) as any;
+const rA = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['leaf','leaf'] });
 rA.getSlots().forEach((slot, i) => {
   const p = new Pane({ container: slot });
   p.registerPlugin(CompactKitBundle);
@@ -83,7 +83,7 @@ rA.getSlots().forEach((slot, i) => {
 });
 
 // equal (3 cols)
-const rB = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf','leaf','leaf'] }) as any;
+const rB = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf','leaf','leaf'] });
 rB.getSlots().forEach((slot, i) => {
   const p = new Pane({ container: slot });
   p.registerPlugin(CompactKitBundle);
@@ -91,7 +91,7 @@ rB.getSlots().forEach((slot, i) => {
 });
 
 // 1fr 2fr
-const rC = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf','leaf'] }) as any;
+const rC = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf','leaf'] });
 rC.getSlots().forEach((slot, i) => {
   const p = new Pane({ container: slot });
   p.registerPlugin(CompactKitBundle);
@@ -99,7 +99,7 @@ rC.getSlots().forEach((slot, i) => {
 });
 
 // 40 10 (normalized: 40:10 → 80:20)
-const rD = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: [40, 10], children: ['leaf','leaf'] }) as any;
+const rD = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: [40, 10], children: ['leaf','leaf'] });
 rD.getSlots().forEach((slot) => {
   const p = new Pane({ container: slot });
   p.registerPlugin(CompactKitBundle);
@@ -117,9 +117,9 @@ Show that you can place arbitrary DOM (canvas, charts, etc.) into any slot. Here
 <details>
 <summary>View code</summary>
 
-```ts
+```js
 // Row: controls | custom canvas
-const gRow = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6, children: ['leaf','leaf'] }) as any;
+const gRow = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6, children: ['leaf','leaf'] });
 const [gL, gR] = gRow.getSlots();
 const state = { value: 64, thickness: 10, rounded: true, color: '#22d3ee' };
 
@@ -173,14 +173,14 @@ Compare original (top) vs compact (bottom) slider layout.
 <details>
 <summary>View code</summary>
 
-```ts
+```js
 // Build two rows to match the screenshots
 const S = { a: 50 };
 
 // original (top)
 const rTop = pane.addBlade({
   view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: false, children: ['leaf','leaf']
-}) as any;
+});
 {
   const [L, R] = rTop.getSlots();
   const pl = new Pane({ container: L });
@@ -192,7 +192,7 @@ const rTop = pane.addBlade({
 // compact (bottom)
 const rBottom = pane.addBlade({
   view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: true, children: ['leaf','leaf']
-}) as any;
+});
 {
   const [L, R] = rBottom.getSlots();
   const pl = new Pane({ container: L });
@@ -212,11 +212,11 @@ Use semantic leaf names (alpha/beta/gamma) and fill each slot with different con
 <details>
 <summary>View code</summary>
 
-```ts
+```js
 // Row 1: 66/34 — alpha | beta
 const row1 = pane.addBlade({
   view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['alpha','beta']
-}) as any;
+});
 const [a1, b1] = row1.getSlots();
 // alpha: 3u action button
 if (a1) {
@@ -234,7 +234,7 @@ if (b1) {
 // Row 2: equal — alpha | beta | gamma
 const row2 = pane.addBlade({
   view: 'split-layout', direction: 'row', sizes: 'equal', children: ['alpha','beta','gamma']
-}) as any;
+});
 const [a2, b2, g2] = row2.getSlots();
 // alpha: button + text
 if (a2) {
@@ -267,7 +267,7 @@ Short, common calls you’ll use most:
 // split layout
 const api = pane.addBlade({
   view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf','leaf']
-}) as any;
+});
 
 // slots
 api.getSlots();
