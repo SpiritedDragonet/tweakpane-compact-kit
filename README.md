@@ -16,7 +16,7 @@ Peer dependency: tweakpane v4
 
 ## Quick Start — First Split
 
-<img src="docs/images/basics-1.svg" style="width:100%;height:auto;" alt="Basics 1/3" />
+<img src="docs/images/basics-1.svg" style="width:50%;height:auto;" alt="Basics 1/3" />
 
 ```ts
 import { Pane } from 'tweakpane';
@@ -47,7 +47,7 @@ R.appendChild(box);
 
 ## Size Expressions
 
-<img src="docs/images/basics-2.svg" style="width:100%;height:auto;" alt="Basics 2/3" />
+<img src="docs/images/basics-2.svg" style="width:50%;height:auto;" alt="Basics 2/3" />
 
 ```ts
 import { Pane } from 'tweakpane';
@@ -91,7 +91,7 @@ rD.getSlots().forEach((slot) => {
 
 ## Mixed DOM — Donut Gauge
 
-<img src="docs/images/basics-3.svg" style="width:100%;height:auto;" alt="Basics 3/3" />
+<img src="docs/images/basics-3.svg" style="width:50%;height:auto;" alt="Basics 3/3" />
 
 ```ts
 import { Pane } from 'tweakpane';
@@ -145,8 +145,8 @@ drawGauge(host);
 
 ## Compact Sliders Toggle
 
-<img src="docs/images/compact-toggle (original).svg" style="width:100%;height:auto;display:block;margin-bottom:8px;" alt="Original" />
-<img src="docs/images/compact-toggle(compact).svg" style="width:100%;height:auto;" alt="Compact" />
+<img src="docs/images/compact-toggle (original).svg" style="width:50%;height:auto;display:block;margin-bottom:8px;" alt="Original" />
+<img src="docs/images/compact-toggle(compact).svg" style="width:50%;height:auto;" alt="Compact" />
 
 ```ts
 import { Pane } from 'tweakpane';
@@ -164,7 +164,7 @@ pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compac
 
 ## Custom Categories
 
-<img src="docs/images/categories.svg" style="width:100%;height:auto;" alt="Custom Categories" />
+<img src="docs/images/categories.svg" style="width:50%;height:auto;" alt="Custom Categories" />
 
 ```ts
 import { Pane } from 'tweakpane';
