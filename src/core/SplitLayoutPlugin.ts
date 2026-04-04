@@ -1,113 +1,7 @@
 import { normalizeSplitParams, type NormalizedSplitLayoutParams } from './split/params';
 import { buildSplitLayout } from './split/layoutBuilder';
 import { attachInteractiveGutters } from './split/interactiveGutters';
-
-// Auto-tweak slider labels to prevent overflow and truncate long text
-function installSliderLabelAutoTweak(
-  container: HTMLElement,
-  compactSliders: boolean = true,
-  hideLabels: boolean = false,
-): () => void {
-  const observers: MutationObserver[] = [];
-  const tweakedSet = new WeakSet<HTMLElement>();
-  const tweakSliderLabel = (labeledView: HTMLElement) => {
-    try {
-      if (!labeledView.classList?.contains('tp-lblv')) return;
-      if (tweakedSet.has(labeledView)) return; // Skip already tweaked
-      const valueBox = labeledView.querySelector('.tp-lblv_v') as HTMLElement | null;
-      if (!valueBox) return;
-      const hasSlider = !!(valueBox.querySelector('.tp-sldv') || valueBox.querySelector('.tp-sldtxtv'));
-
-      // Find label box (may not exist if already removed)
-      const labelBox = labeledView.querySelector('.tp-lblv_l') as HTMLElement | null;
-
-      // Since we cannot reliably know if label was passed, we don't modify labels here.
-
-      // Mark as tweaked before modifying DOM
-      tweakedSet.add(labeledView);
-
-      // Apply slider scaling styles only if compactSliders is enabled and target has slider UI
-      if (compactSliders && hasSlider) {
-      const sldSurface = valueBox.querySelector('.tp-sldtxtv_s') as HTMLElement | null
-        || valueBox.querySelector('.tp-sldv_s') as HTMLElement | null;
-      if (sldSurface) {
-        // Keep the slider visually anchored to the bottom; shrink height by 50%
-        sldSurface.style.transformOrigin = 'bottom left';
-        sldSurface.style.transform = 'scaleY(0.5)';
-        (sldSurface.style as any).willChange = 'transform';
-        // Hide a potential draggable handle/knob within the slider surface
-        const handle = sldSurface.querySelector('.tp-sldv_h')
-          || sldSurface.querySelector('[class*="sldv_h"]')
-          || sldSurface.querySelector('[class*="knob"]')
-          || sldSurface.querySelector('[class*="handle"]')
-          || sldSurface.querySelector('[class*="thumb"]') as HTMLElement | null;
-        if (handle) {
-          (handle as HTMLElement).style.display = 'none';
-        }
-      }
-
-      // Place the entire text area (.tp-sldtxtv_t) at the top-right, unscaled by slider surface
-      const sldTextArea = valueBox.querySelector('.tp-sldtxtv_t') as HTMLElement | null;
-      if (sldTextArea) {
-        // Ensure value container is positioning root, then mount here
-        try { valueBox.appendChild(sldTextArea); } catch {}
-        sldTextArea.style.position = 'absolute';
-        sldTextArea.style.right = '6px';
-        sldTextArea.style.top = '2px';
-        sldTextArea.style.transformOrigin = 'top right';
-        sldTextArea.style.transform = 'scale(0.3333, 0.5)';
-        (sldTextArea.style as any).willChange = 'transform';
-        sldTextArea.style.zIndex = '1';
-        // Enlarge numeric text for readability (pre-scale), and bold
-        const inputEl = sldTextArea.querySelector('input') as HTMLElement | null;
-        if (inputEl) {
-          // Pre-scale font so post-scale ~12px (scaleY=0.5)
-          inputEl.style.fontSize = '24px';
-          inputEl.style.fontWeight = '';
-          inputEl.style.lineHeight = '1';
-          // Use Tweakpane default font (inherit)
-          inputEl.style.fontFamily = '';
-          inputEl.style.letterSpacing = '0.01em';
-        }
-      }
-      }
-
-      // Handle label if it exists
-      // Overlay label only if it remains visible
-      const labelStillVisible = !!(labelBox && (!hideLabels || (hideLabels && labelBox.isConnected)));
-      if (labelBox && compactSliders && labelStillVisible && hasSlider) {
-        // Move label into value box as overlay
-        labelBox.style.position = 'absolute';
-        labelBox.style.left = '6px';
-        labelBox.style.top = '4px';
-        labelBox.style.fontSize = '10px';
-        labelBox.style.lineHeight = '1';
-        labelBox.style.margin = '0';
-        labelBox.style.padding = '0';
-        // Limit width to 60% and truncate with ellipsis
-        labelBox.style.maxWidth = '60%';
-        labelBox.style.overflow = 'hidden';
-        labelBox.style.textOverflow = 'ellipsis';
-        labelBox.style.whiteSpace = 'nowrap';
-        // Make background transparent and place behind slider
-        labelBox.style.paddingRight = '4px';
-        labelBox.style.background = 'transparent';
-        labelBox.style.zIndex = '1';
-        // Insert label into value box
-        try { valueBox.insertBefore(labelBox, valueBox.firstChild); } catch {}
-      }
-    } catch {}
-  };
-  const patchAll = (root: HTMLElement) => {
-    const labeled = root.querySelectorAll('.tp-lblv');
-    labeled.forEach((lv) => tweakSliderLabel(lv as HTMLElement));
-  };
-  patchAll(container);
-  const mo = new MutationObserver(() => patchAll(container));
-  mo.observe(container, { childList: true, subtree: true });
-  observers.push(mo);
-  return () => { observers.forEach((o) => { try { o.disconnect(); } catch {} }); };
-}
+import { installCompactSliderPatch } from './hacks/compactSliderPatch';
 
 export type SplitDirection = 'row' | 'column';
 
@@ -168,7 +62,10 @@ function mountSplitLayout(
   const built = buildSplitLayout(doc, params, {
     ...options,
     installLeafPatch: (container) =>
-      installSliderLabelAutoTweak(container, params.compactSliders, false),
+      installCompactSliderPatch(container, {
+        enabled: params.compactSliders,
+        hideLabels: false,
+      }),
   });
 
   let cleanupGutters = () => {};
