@@ -79,7 +79,7 @@
 - Create: `src/test/smoke.test.ts`
 - Modify: `package.json`
 
-- [ ] **Step 1: Add Vitest and JSDOM to `package.json`**
+- [x] **Step 1: Add Vitest and JSDOM to `package.json`**
 
 ```json
 {
@@ -94,7 +94,7 @@
 }
 ```
 
-- [ ] **Step 2: Create `vitest.config.ts`**
+- [x] **Step 2: Create `vitest.config.ts`**
 
 ```ts
 import { defineConfig } from 'vitest/config';
@@ -108,7 +108,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 3: Create `src/test/setup.ts` with DOM shims used by Tweakpane**
+- [x] **Step 3: Create `src/test/setup.ts` with DOM shims used by Tweakpane**
 
 ```ts
 import { vi } from 'vitest';
@@ -122,7 +122,7 @@ class ResizeObserverStub {
 vi.stubGlobal('ResizeObserver', ResizeObserverStub);
 ```
 
-- [ ] **Step 4: Create `src/test/smoke.test.ts`**
+- [x] **Step 4: Create `src/test/smoke.test.ts`**
 
 ```ts
 import { expect, it } from 'vitest';
@@ -132,19 +132,19 @@ it('boots the test harness', () => {
 });
 ```
 
-- [ ] **Step 5: Run a harness smoke check**
+- [x] **Step 5: Run a harness smoke check**
 
 Run: `npm.cmd install`
 
 Expected: lockfile updates with `vitest` and `jsdom`, install exits `0`
 
-- [ ] **Step 6: Run the test suite once**
+- [x] **Step 6: Run the test suite once**
 
 Run: `npm.cmd test`
 
 Expected: Vitest starts successfully and reports `1 passed`
 
-- [ ] **Step 7: Commit the harness setup**
+- [x] **Step 7: Commit the harness setup**
 
 ```bash
 git add package.json package-lock.json vitest.config.ts src/test/setup.ts src/test/smoke.test.ts
@@ -160,7 +160,7 @@ git commit -m "test: add vitest harness"
 - Modify: `src/core/SizedButtonPlugin.ts`
 - Modify: `src/core/SplitLayoutPlugin.ts`
 
-- [ ] **Step 1: Write the failing measurement tests**
+- [x] **Step 1: Write the failing measurement tests**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -182,13 +182,13 @@ describe('readUnitPx', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npm.cmd exec vitest run src/core/shared/measure.test.ts`
 
 Expected: FAIL with `Cannot find module './measure'`
 
-- [ ] **Step 3: Create `src/core/shared/measure.ts`**
+- [x] **Step 3: Create `src/core/shared/measure.ts`**
 
 ```ts
 export function readUnitPx(root: HTMLElement, fallback = 18): number {
@@ -212,25 +212,25 @@ export function measureCssUnit(root: HTMLElement, cssVar: string, fallback = 18)
 }
 ```
 
-- [ ] **Step 4: Replace duplicated unit probing in `src/core/SizedButtonPlugin.ts` and `src/core/SplitLayoutPlugin.ts`**
+- [x] **Step 4: Replace duplicated unit probing in `src/core/SizedButtonPlugin.ts` and `src/core/SplitLayoutPlugin.ts`**
 
 ```ts
 import { measureCssUnit, readUnitPx } from './shared/measure';
 ```
 
-- [ ] **Step 5: Re-run the measurement test**
+- [x] **Step 5: Re-run the measurement test**
 
 Run: `npm.cmd exec vitest run src/core/shared/measure.test.ts`
 
 Expected: PASS
 
-- [ ] **Step 6: Run the build to make sure imports still bundle**
+- [x] **Step 6: Run the build to make sure imports still bundle**
 
 Run: `npm.cmd run build`
 
 Expected: Vite build completes successfully
 
-- [ ] **Step 7: Commit the measurement extraction**
+- [x] **Step 7: Commit the measurement extraction**
 
 ```bash
 git add src/core/shared/measure.ts src/core/shared/measure.test.ts src/core/SizedButtonPlugin.ts src/core/SplitLayoutPlugin.ts
@@ -245,7 +245,7 @@ git commit -m "refactor: extract shared measurement helpers"
 - Create: `src/core/split/sizeExpressions.test.ts`
 - Modify: `src/core/SplitLayoutPlugin.ts`
 
-- [ ] **Step 1: Write failing parser tests for documented `sizes` syntax**
+- [x] **Step 1: Write failing parser tests for documented `sizes` syntax**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -270,13 +270,13 @@ describe('parseSizeExpression', () => {
 });
 ```
 
-- [ ] **Step 2: Run the parser test to verify it fails**
+- [x] **Step 2: Run the parser test to verify it fails**
 
 Run: `npm.cmd exec vitest run src/core/split/sizeExpressions.test.ts`
 
 Expected: FAIL with `Cannot find module './sizeExpressions'`
 
-- [ ] **Step 3: Implement `src/core/split/sizeExpressions.ts` using token parsing**
+- [x] **Step 3: Implement `src/core/split/sizeExpressions.ts` using token parsing**
 
 ```ts
 export type SizeToken =
@@ -294,26 +294,26 @@ export function resolveSizeTokens(tokens: SizeToken[], containerPx: number): num
 }
 ```
 
-- [ ] **Step 4: Replace the old approximation-based size logic in `src/core/SplitLayoutPlugin.ts`**
+- [x] **Step 4: Replace the old approximation-based size logic in `src/core/SplitLayoutPlugin.ts`**
 
 ```ts
 const sizeTokens = parseSizeExpression(params.sizes, panelCount);
 const pxSizes = resolveSizeTokens(sizeTokens, availablePx);
 ```
 
-- [ ] **Step 5: Re-run the parser tests**
+- [x] **Step 5: Re-run the parser tests**
 
 Run: `npm.cmd exec vitest run src/core/split/sizeExpressions.test.ts`
 
 Expected: PASS
 
-- [ ] **Step 6: Run the build**
+- [x] **Step 6: Run the build**
 
 Run: `npm.cmd run build`
 
 Expected: PASS
 
-- [ ] **Step 7: Commit the `sizes` parser**
+- [x] **Step 7: Commit the `sizes` parser**
 
 ```bash
 git add src/core/split/sizeExpressions.ts src/core/split/sizeExpressions.test.ts src/core/SplitLayoutPlugin.ts
@@ -329,7 +329,7 @@ git commit -m "refactor: add explicit size expression parser"
 - Create: `src/core/split/params.ts`
 - Modify: `src/core/SplitLayoutPlugin.ts`
 
-- [ ] **Step 1: Write failing tests for `rowUnits` and rejected hidden inputs**
+- [x] **Step 1: Write failing tests for `rowUnits` and rejected hidden inputs**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -358,13 +358,13 @@ describe('normalizeSplitParams', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npm.cmd exec vitest run src/core/split/rowUnits.test.ts`
 
 Expected: FAIL with missing module errors
 
-- [ ] **Step 3: Implement `rowUnits.ts` and `params.ts`**
+- [x] **Step 3: Implement `rowUnits.ts` and `params.ts`**
 
 ```ts
 export function parseRowUnits(input: number[] | string | undefined, count = 0): number[] {
@@ -377,13 +377,13 @@ export function normalizeSplitParams(input: SplitLayoutParams): NormalizedSplitL
 }
 ```
 
-- [ ] **Step 4: Update `src/core/SplitLayoutPlugin.ts` to use the new semantics**
+- [x] **Step 4: Update `src/core/SplitLayoutPlugin.ts` to use the new semantics**
 
 ```ts
 const normalized = normalizeSplitParams(args.params);
 ```
 
-- [ ] **Step 5: Add or update plugin-level tests for `height` semantics**
+- [x] **Step 5: Add or update plugin-level tests for `height` semantics**
 
 ```ts
 it('derives column height from rowUnits when height is omitted', () => {
@@ -395,13 +395,13 @@ it('uses fixed column height when rowUnits and height are both present', () => {
 });
 ```
 
-- [ ] **Step 6: Re-run the parser and semantic tests**
+- [x] **Step 6: Re-run the parser and semantic tests**
 
 Run: `npm.cmd exec vitest run src/core/split/rowUnits.test.ts src/core/SplitLayoutPlugin.test.ts`
 
 Expected: PASS
 
-- [ ] **Step 7: Commit the semantic cleanup**
+- [x] **Step 7: Commit the semantic cleanup**
 
 ```bash
 git add src/core/split/rowUnits.ts src/core/split/rowUnits.test.ts src/core/split/params.ts src/core/SplitLayoutPlugin.ts src/core/SplitLayoutPlugin.test.ts
@@ -417,7 +417,7 @@ git commit -m "refactor: clarify row units and split params"
 - Modify: `src/core/SplitLayoutPlugin.ts`
 - Modify: `src/core/SplitLayoutPlugin.test.ts`
 
-- [ ] **Step 1: Write failing integration tests for slots, categories, and disposal**
+- [x] **Step 1: Write failing integration tests for slots, categories, and disposal**
 
 ```ts
 import { Pane } from 'tweakpane';
@@ -437,13 +437,13 @@ it('returns slots in document order', () => {
 });
 ```
 
-- [ ] **Step 2: Run the integration test to capture current behavior**
+- [x] **Step 2: Run the integration test to capture current behavior**
 
 Run: `npm.cmd exec vitest run src/core/SplitLayoutPlugin.test.ts`
 
 Expected: FAIL until the test file and extracted helpers exist
 
-- [ ] **Step 3: Move DOM creation into `layoutBuilder.ts`**
+- [x] **Step 3: Move DOM creation into `layoutBuilder.ts`**
 
 ```ts
 export function buildSplitLayout(doc: Document, params: NormalizedSplitLayoutParams, envEl?: HTMLElement): BuildResult {
@@ -451,7 +451,7 @@ export function buildSplitLayout(doc: Document, params: NormalizedSplitLayoutPar
 }
 ```
 
-- [ ] **Step 4: Move gutter logic into `interactiveGutters.ts`**
+- [x] **Step 4: Move gutter logic into `interactiveGutters.ts`**
 
 ```ts
 export function attachInteractiveGutters(root: HTMLElement, panelWrappers: HTMLElement[], options: GutterOptions): () => void {
@@ -459,26 +459,26 @@ export function attachInteractiveGutters(root: HTMLElement, panelWrappers: HTMLE
 }
 ```
 
-- [ ] **Step 5: Reduce `src/core/SplitLayoutPlugin.ts` to composition and API exposure**
+- [x] **Step 5: Reduce `src/core/SplitLayoutPlugin.ts` to composition and API exposure**
 
 ```ts
 const built = buildSplitLayout(doc, normalized, hostEl);
 const cleanupGutters = normalized.interactive ? attachInteractiveGutters(...) : () => {};
 ```
 
-- [ ] **Step 6: Re-run integration tests and full test suite**
+- [x] **Step 6: Re-run integration tests and full test suite**
 
 Run: `npm.cmd test`
 
 Expected: PASS
 
-- [ ] **Step 7: Run the build**
+- [x] **Step 7: Run the build**
 
 Run: `npm.cmd run build`
 
 Expected: PASS
 
-- [ ] **Step 8: Commit the layout extraction**
+- [x] **Step 8: Commit the layout extraction**
 
 ```bash
 git add src/core/split/layoutBuilder.ts src/core/split/interactiveGutters.ts src/core/SplitLayoutPlugin.ts src/core/SplitLayoutPlugin.test.ts
@@ -494,7 +494,7 @@ git commit -m "refactor: split layout builder and gutter logic"
 - Create: `src/core/hacks/compactSliderPatch.test.ts`
 - Modify: `src/core/SplitLayoutPlugin.ts`
 
-- [ ] **Step 1: Write failing sanity tests for slider/value/title positioning**
+- [x] **Step 1: Write failing sanity tests for slider/value/title positioning**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -513,7 +513,7 @@ it('keeps title, value text, and slider track in sane relative bounds', () => {
 });
 ```
 
-- [ ] **Step 2: Add one failing case to prove overlap detection**
+- [x] **Step 2: Add one failing case to prove overlap detection**
 
 ```ts
 it('rejects value text that spills outside the value box', () => {
@@ -529,13 +529,13 @@ it('rejects value text that spills outside the value box', () => {
 });
 ```
 
-- [ ] **Step 3: Run the compact-slider sanity test to verify it fails**
+- [x] **Step 3: Run the compact-slider sanity test to verify it fails**
 
 Run: `npm.cmd exec vitest run src/core/hacks/compactSliderPatch.test.ts`
 
 Expected: FAIL with missing module errors
 
-- [ ] **Step 4: Implement `compactSliderSanity.ts` and `compactSliderPatch.ts`**
+- [x] **Step 4: Implement `compactSliderSanity.ts` and `compactSliderPatch.ts`**
 
 ```ts
 export function assertCompactLayoutSane(metrics: CompactLayoutMetrics): void {
@@ -549,7 +549,7 @@ export function installCompactSliderPatch(root: HTMLElement, options: CompactSli
 }
 ```
 
-- [ ] **Step 5: Replace inline compact-slider code in `src/core/SplitLayoutPlugin.ts`**
+- [x] **Step 5: Replace inline compact-slider code in `src/core/SplitLayoutPlugin.ts`**
 
 ```ts
 const cleanupCompact = installCompactSliderPatch(container, {
@@ -558,13 +558,13 @@ const cleanupCompact = installCompactSliderPatch(container, {
 });
 ```
 
-- [ ] **Step 6: Re-run the compact-slider test**
+- [x] **Step 6: Re-run the compact-slider test**
 
 Run: `npm.cmd exec vitest run src/core/hacks/compactSliderPatch.test.ts`
 
 Expected: PASS
 
-- [ ] **Step 7: Re-run the full test suite and build**
+- [x] **Step 7: Re-run the full test suite and build**
 
 Run: `npm.cmd test`
 Expected: PASS
@@ -572,7 +572,7 @@ Expected: PASS
 Run: `npm.cmd run build`
 Expected: PASS
 
-- [ ] **Step 8: Commit the hack isolation**
+- [x] **Step 8: Commit the hack isolation**
 
 ```bash
 git add src/core/hacks/compactSliderPatch.ts src/core/hacks/compactSliderSanity.ts src/core/hacks/compactSliderPatch.test.ts src/core/SplitLayoutPlugin.ts
@@ -589,14 +589,14 @@ git commit -m "refactor: isolate compact slider hacks"
 - Modify: `API.md`
 - Modify: `demo/main.ts`
 
-- [ ] **Step 1: Remove undocumented exports and hidden behaviors**
+- [x] **Step 1: Remove undocumented exports and hidden behaviors**
 
 ```ts
 // delete addSplitLayout shim export
 // reject hidden aliases and ghost params instead of silently accepting them
 ```
 
-- [ ] **Step 2: Update README and API docs to match the final semantics**
+- [x] **Step 2: Update README and API docs to match the final semantics**
 
 ```md
 - `rowUnits` accepts unit-like inputs only
@@ -604,7 +604,7 @@ git commit -m "refactor: isolate compact slider hacks"
 - `gutter` is the only supported spacing key
 ```
 
-- [ ] **Step 3: Clean `demo/main.ts` so it uses only the supported public surface**
+- [x] **Step 3: Clean `demo/main.ts` so it uses only the supported public surface**
 
 ```ts
 const api = pane.addBlade({
@@ -616,13 +616,13 @@ const api = pane.addBlade({
 });
 ```
 
-- [ ] **Step 4: Run the targeted tests**
+- [x] **Step 4: Run the targeted tests**
 
 Run: `npm.cmd test`
 
 Expected: PASS
 
-- [ ] **Step 5: Run the build and then the demo once**
+- [x] **Step 5: Run the build and then the demo once**
 
 Run: `npm.cmd run build`
 
@@ -632,7 +632,7 @@ Run: `npm.cmd run demo`
 
 Expected: local dev server starts, compact slider demo still renders, and the slider/value/title layout looks sane by eye
 
-- [ ] **Step 6: Commit the public-surface cleanup**
+- [x] **Step 6: Commit the public-surface cleanup**
 
 ```bash
 git add src/core/SplitLayoutPlugin.ts src/index.ts README.md API.md demo/main.ts
@@ -645,7 +645,7 @@ git commit -m "docs: align compact kit public surface"
 
 - Modify: `docs/superpowers/plans/2026-04-04-compact-kit-maintainability-cleanup.md`
 
-- [ ] **Step 1: Run the full verification sequence**
+- [x] **Step 1: Run the full verification sequence**
 
 Run: `npm.cmd test`
 Expected: PASS
@@ -653,7 +653,7 @@ Expected: PASS
 Run: `npm.cmd run build`
 Expected: PASS
 
-- [ ] **Step 2: Capture any remaining manual checks**
+- [x] **Step 2: Capture any remaining manual checks**
 
 ```md
 - compact slider title stays in upper-left region
@@ -661,13 +661,20 @@ Expected: PASS
 - slider track does not visually collide with the numeric value
 ```
 
-- [ ] **Step 3: Mark completed steps in this plan document**
+Completed manual checks on 2026-04-05:
+
+- [x] compact slider title stays in upper-left region
+- [x] right-side numeric value stays inside the value box
+- [x] slider track does not visually collide with the numeric value
+- [x] demo page served successfully after switching to a free local port because 5173 was already occupied
+
+- [x] **Step 3: Mark completed steps in this plan document**
 
 ```md
 - [x] Step complete
 ```
 
-- [ ] **Step 4: Commit the final verification state**
+- [x] **Step 4: Commit the final verification state**
 
 ```bash
 git add docs/superpowers/plans/2026-04-04-compact-kit-maintainability-cleanup.md

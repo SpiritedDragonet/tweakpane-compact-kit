@@ -258,6 +258,14 @@ if (g2) {
 </details>
 
 ## API Quick Reference
+
+Supported public split-layout syntax:
+
+- `sizes`: `number[]`, `'equal'`, pure `fr` strings, and mixed strings such as `200px 1fr 30%`
+- `rowUnits`: `number[]`, `'equal'`, bare numeric strings such as `'1 1 2'`, and `fr` strings such as `'2fr 1fr 1fr'`
+- `height`: row height for `direction: 'row'`; total column height for `direction: 'column'`, or derived from `rowUnits` when omitted
+- `gutter`, `interactive`, `compactSliders`, and semantic `children` categories are supported
+
 Short, common calls you’ll use most:
 
 <details>
@@ -279,7 +287,7 @@ pane.addBlade({
 });
 
 // compact sliders
-pane.addBlade({ view: 'split-layout', compactSliders: true, children: ['leaf'] });
+pane.addBlade({ view: 'split-layout', direction: 'row', compactSliders: true, children: ['leaf'] });
 
 // sized button
 pane.addBlade({ view: 'sized-button', title: 'Multi-line\nButton', units: 3 });
