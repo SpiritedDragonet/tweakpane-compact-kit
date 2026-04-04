@@ -4,6 +4,7 @@ node_modules/
 # Production build output
 dist/
 dist-demo/
+.worktrees/
 .release/
 *.tar.gz
 .claude/
