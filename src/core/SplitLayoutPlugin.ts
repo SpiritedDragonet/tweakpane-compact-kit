@@ -11,6 +11,8 @@
 //   const api = folder.addBlade({ view: 'split-layout', ... }) as any
 //   const slots: HTMLElement[] = api.getSlots()
 
+import { measureCssUnit, readUnitPx } from './shared/measure';
+
 // Auto-tweak slider labels to prevent overflow and truncate long text
 function installSliderLabelAutoTweak(
   container: HTMLElement,
@@ -318,15 +320,7 @@ function buildSplit(
   const rowUnits = direction === 'column' ? params.rowUnits : undefined;
   const computeUnitPx = (fallbackEl: HTMLElement): number => {
     const anchor = envEl || fallbackEl || doc.body;
-    const probe = doc.createElement('div');
-    probe.style.position = 'absolute';
-    probe.style.visibility = 'hidden';
-    probe.style.height = 'var(--cnt-usz)';
-    probe.style.width = '1px';
-    try { anchor.appendChild(probe); } catch { try { fallbackEl.appendChild(probe); } catch {} }
-    const px = probe.getBoundingClientRect().height || (probe as any).offsetHeight || 0;
-    try { probe.remove(); } catch {}
-    return Math.max(1, Math.round(px || 0));
+    return readUnitPx(anchor, 0) || measureCssUnit(anchor, '--cnt-usz', 1, fallbackEl);
   };
 
   // Root container

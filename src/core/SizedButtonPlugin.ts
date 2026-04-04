@@ -7,6 +7,8 @@
 // import type { BladeApi } from 'tweakpane';
 // Using any to avoid coupling to Tweakpane's internal types
 
+import { measureCssUnit, readUnitPx } from './shared/measure';
+
 // Controller for the sized button blade
 class SizedButtonController {
   public blade: any;
@@ -66,7 +68,6 @@ class SizedButtonController {
 
     // Compute 1 blade unit (px)
     const computeUnitPx = (): number => {
-      const doc = this.view.element.ownerDocument;
       const findContainer = (el: HTMLElement | null): HTMLElement | null => {
         let cur: HTMLElement | null = el;
         while (cur) {
@@ -76,28 +77,7 @@ class SizedButtonController {
         return el;
       };
       const cont = findContainer(this.view.element) || this.view.element;
-      try {
-        const cs = (cont && (cont.ownerDocument?.defaultView || window).getComputedStyle(cont)) as CSSStyleDeclaration;
-        const v = cs.getPropertyValue('--cnt-usz')?.trim();
-        if (v) {
-          const m = v.match(/([0-9]+\.?[0-9]*)\s*px/i);
-          if (m) return Math.max(1, Math.round(parseFloat(m[1])));
-          const f = parseFloat(v);
-          if (Number.isFinite(f) && f > 0) return Math.round(f);
-        }
-      } catch {}
-      try {
-        const probe = doc.createElement('div');
-        probe.style.position = 'absolute';
-        probe.style.visibility = 'hidden';
-        probe.style.height = 'var(--cnt-usz)';
-        probe.style.width = '1px';
-        (cont || this.view.element).appendChild(probe);
-        const px = probe.getBoundingClientRect().height || probe.offsetHeight || 0;
-        probe.remove();
-        if (px) return Math.max(1, Math.round(px));
-      } catch {}
-      return 0;
+      return readUnitPx(cont, 0) || measureCssUnit(cont, '--cnt-usz', 0);
     };
 
     const unitPx = computeUnitPx();
