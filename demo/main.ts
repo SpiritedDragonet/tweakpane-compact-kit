@@ -17,9 +17,31 @@ function ensureRegistered(pane: Pane) {
 type SplitApi = {
   getSlots(): HTMLElement[];
   getSlotsByCategory?: (category: string) => HTMLElement[];
+  wrapPane?: (pane: Pane) => void;
   dispose?: () => void;
 };
-type FolderLike = { addBinding: (obj: Record<string, unknown>, key: string, params?: Record<string, unknown>) => unknown; addBlade?: (p: Record<string, unknown>) => unknown };
+
+type FolderLike = {
+  addBinding: (
+    obj: Record<string, unknown>,
+    key: string,
+    params?: Record<string, unknown>
+  ) => unknown;
+  addBlade?: (params: Record<string, unknown>) => unknown;
+  addButton?: (params: { title: string }) => unknown;
+};
+
+type PaneWithFolder = Pane & {
+  addFolder?: (params: { title: string; expanded?: boolean }) => FolderLike | undefined;
+};
+
+function toSplitApi(v: unknown): SplitApi {
+  return v as SplitApi;
+}
+
+function tryWrapPane(split: SplitApi, pane: Pane): void {
+  try { split.wrapPane?.(pane); } catch {}
+}
 
 function unitPx(el: HTMLElement): number {
   try {
@@ -116,10 +138,10 @@ function main() {
     ensureRegistered(paneA);
     try { paneA.registerPlugin(Essentials); } catch {}
 
-    const row = paneA.addBlade({
+    const row = toSplitApi(paneA.addBlade({
       view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6,
       children: ['leaf', 'leaf']
-    }) as unknown as SplitApi;
+    }));
     const [L, R] = row.getSlots();
     const pL = new Pane({ container: L });
     ensureRegistered(pL);
@@ -142,37 +164,37 @@ function main() {
     try { paneB.registerPlugin(Essentials); } catch {}
 
     // 66 / 34
-    const rA = paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['leaf', 'leaf'] }) as unknown as SplitApi;
+    const rA = toSplitApi(paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['leaf', 'leaf'] }));
     rA.getSlots().forEach((slot: HTMLElement, i: number) => {
       const p = new Pane({ container: slot });
-      if ((rA as any).wrapPane) { (rA as any).wrapPane(p); }
+      tryWrapPane(rA, p);
       ensureRegistered(p);
       p.addBlade({ view: 'sized-button', title: i === 0 ? '66%' : '34%', units: 2 });
     });
 
     // equal — 3 columns
-    const rB = paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf', 'leaf', 'leaf'] }) as unknown as SplitApi;
+    const rB = toSplitApi(paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf', 'leaf', 'leaf'] }));
     rB.getSlots().forEach((slot: HTMLElement, i: number) => {
       const p = new Pane({ container: slot });
-      if ((rB as any).wrapPane) { (rB as any).wrapPane(p); }
+      tryWrapPane(rB, p);
       ensureRegistered(p);
       p.addBlade({ view: 'sized-button', title: `Equal\n${i + 1}`, units: 2 });
     });
 
     // 1fr 2fr
-    const rC = paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf', 'leaf'] }) as unknown as SplitApi;
+    const rC = toSplitApi(paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf', 'leaf'] }));
     rC.getSlots().forEach((slot: HTMLElement, i: number) => {
       const p = new Pane({ container: slot });
-      if ((rC as any).wrapPane) { (rC as any).wrapPane(p); }
+      tryWrapPane(rC, p);
       ensureRegistered(p);
       p.addBlade({ view: 'sized-button', title: i === 0 ? '1fr' : '2fr', units: 2 });
     });
 
     // 40 10 (normalized)
-    const rN = paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: [40, 10], children: ['leaf', 'leaf'] }) as unknown as SplitApi;
+    const rN = toSplitApi(paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: [40, 10], children: ['leaf', 'leaf'] }));
     rN.getSlots().forEach((slot: HTMLElement) => {
       const p = new Pane({ container: slot });
-      if ((rN as any).wrapPane) { (rN as any).wrapPane(p); }
+      tryWrapPane(rN, p);
       ensureRegistered(p);
       p.addBlade({ view: 'sized-button', title: `Normalized`, units: 2 });
     });
@@ -186,13 +208,13 @@ function main() {
     try { paneC.registerPlugin(Essentials); } catch {}
 
     // Donut gauge + controls
-    const rG = paneC.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6, interactive: true, children: ['leaf', 'leaf'] }) as unknown as SplitApi;
+    const rG = toSplitApi(paneC.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6, interactive: true, children: ['leaf', 'leaf'] }));
     const [gL, gR] = rG.getSlots();
     const gaugeState = { value: 64, thickness: 10, rounded: true, color: '#22d3ee' };
     let leftPaneForGauge: Pane | null = null;
     if (gL) {
       leftPaneForGauge = new Pane({ container: gL });
-      if ((rG as any).wrapPane) { (rG as any).wrapPane(leftPaneForGauge); }
+      tryWrapPane(rG, leftPaneForGauge);
       ensureRegistered(leftPaneForGauge);
       try { leftPaneForGauge.registerPlugin(Essentials); } catch {}
       leftPaneForGauge.addBinding(gaugeState, 'value', { min: 0, max: 100, label: 'Value' });
@@ -235,18 +257,17 @@ function main() {
 
     const render = () => {
       clearRow();
-      const api = pane2.addBlade({
+      const api = toSplitApi(pane2.addBlade({
         view: 'split-layout',
         direction: 'row',
         sizes: '1fr 1fr',
         compactSliders: state.compact,
-        preserveLabels: true,
         children: ['leaf', 'leaf']
-      }) as unknown as SplitApi;
+      }));
       rowApi = api;
       const [L, R] = api.getSlots();
-      const pl = new Pane({ container: L }); if ((api as any).wrapPane) { (api as any).wrapPane(pl); } ensureRegistered(pl);
-      const pr = new Pane({ container: R }); if ((api as any).wrapPane) { (api as any).wrapPane(pr); } ensureRegistered(pr);
+      const pl = new Pane({ container: L }); tryWrapPane(api, pl); ensureRegistered(pl);
+      const pr = new Pane({ container: R }); tryWrapPane(api, pr); ensureRegistered(pr);
       try { pl.registerPlugin(Essentials); } catch {}
       try { pr.registerPlugin(Essentials); } catch {}
       // Left: checkbox with label
@@ -268,13 +289,13 @@ function main() {
     try { pane3.registerPlugin(Essentials); } catch {}
 
     // Row C1: 66 / 34 — no nested columns (avoid rowUnits), fill with controls
-    const c1 = pane3.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['alpha', 'beta'] }) as unknown as SplitApi;
+    const c1 = toSplitApi(pane3.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['alpha', 'beta'] }));
 
     // Row C2: equal — three columns, fill each with two controls
-    const c2 = pane3.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['alpha', 'beta', 'gamma'] }) as unknown as SplitApi;
+    const c2 = toSplitApi(pane3.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['alpha', 'beta', 'gamma'] }));
 
     // Row C3: 1fr 2fr — fill each side with three controls
-    const c3 = pane3.addBlade({
+    const c3 = toSplitApi(pane3.addBlade({
       view: 'split-layout',
       direction: 'row',
       sizes: '1fr 2fr',
@@ -288,16 +309,16 @@ function main() {
         },
         'gamma'
       ]
-    }) as unknown as SplitApi;
+    }));
 
     // Fill on the next frame to avoid any initial measurement race
     requestAnimationFrame(() => {
       // C1 fill
       {
         const [l, r] = c1.getSlots();
-        if (l) { const p = new Pane({ container: l }); if ((c1 as any).wrapPane) { (c1 as any).wrapPane(p); } ensureRegistered(p); p.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 }); }
+        if (l) { const p = new Pane({ container: l }); tryWrapPane(c1, p); ensureRegistered(p); p.addBlade({ view: 'sized-button', title: 'Run\nAction', units: 3 }); }
         if (r) {
-          const p = new Pane({ container: r }); if ((c1 as any).wrapPane) { (c1 as any).wrapPane(p); } ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {}
+          const p = new Pane({ container: r }); tryWrapPane(c1, p); ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {}
           p.addBinding({ v: 42 }, 'v', { min: 0, max: 100, label: 'Level' });
           p.addBinding({ on: true }, 'on', { label: 'Enabled' });
           p.addBinding({ mode: 'a' }, 'mode', { options: { Alpha: 'a', Beta: 'b', Gamma: 'g' } });
@@ -307,76 +328,62 @@ function main() {
       // C2 fill (two controls per column, no labels to keep compact)
       {
         const [a, b, g] = c2.getSlots();
-        if (a) { const p = new Pane({ container: a }); if ((c2 as any).wrapPane) { (c2 as any).wrapPane(p); } ensureRegistered(p); p.addButton({ title: 'Action' }); p.addBinding({ text: 'hello' }, 'text'); }
-        if (b) { const p = new Pane({ container: b }); if ((c2 as any).wrapPane) { (c2 as any).wrapPane(p); } ensureRegistered(p); p.addBinding({ n: 3.14 }, 'n', { min: 0, max: 10 }); p.addBinding({ c: '#22d3ee' }, 'c'); }
-        if (g) { const p = new Pane({ container: g }); if ((c2 as any).wrapPane) { (c2 as any).wrapPane(p); } ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {} p.addBlade({ view: 'buttongrid', size: [2, 2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y * 2 + x)) }) }); }
+        if (a) { const p = new Pane({ container: a }); tryWrapPane(c2, p); ensureRegistered(p); p.addButton({ title: 'Action' }); p.addBinding({ text: 'hello' }, 'text'); }
+        if (b) { const p = new Pane({ container: b }); tryWrapPane(c2, p); ensureRegistered(p); p.addBinding({ n: 3.14 }, 'n', { min: 0, max: 10 }); p.addBinding({ c: '#22d3ee' }, 'c'); }
+        if (g) { const p = new Pane({ container: g }); tryWrapPane(c2, p); ensureRegistered(p); try { p.registerPlugin(Essentials); } catch {} p.addBlade({ view: 'buttongrid', size: [2, 2], cells: (x: number, y: number) => ({ title: String.fromCharCode('A'.charCodeAt(0) + (y * 2 + x)) }) }); }
       }
 
       // C3 fill (three per side)
       {
-        const leftSlots = (c3 as any).getSlotsByCategory ? (c3 as any).getSlotsByCategory('alpha') : [];
-        const rightSlots = (c3 as any).getSlotsByCategory ? (c3 as any).getSlotsByCategory('gamma') : [];
+        const leftSlots = c3.getSlotsByCategory?.('alpha') ?? [];
+        const rightSlots = c3.getSlotsByCategory?.('gamma') ?? [];
 
         // Fill left side (non-compact)
         if (leftSlots[0]) {
           const p = new Pane({ container: leftSlots[0] });
           ensureRegistered(p);
-          const api = p.addBinding({ p: { x: 0.3, y: 0.7 } }, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 } });
-          // Manually remove label since we're not using wrapPane
-          try {
-            const el = (api as any)?.controller?.view?.element as HTMLElement | undefined;
-            const lbl = el?.querySelector('.tp-lblv_l') as HTMLElement | null;
-            if (lbl) { lbl.remove(); el?.classList.add('tp-lblv-nol'); }
-          } catch {}
+          p.addBinding({ p: { x: 0.3, y: 0.7 } }, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 }, label: '' });
         }
         if (leftSlots[1]) {
           const p = new Pane({ container: leftSlots[1] });
           ensureRegistered(p);
           try { p.registerPlugin(Essentials); } catch {}
-          // Replace checkbox with a collapsed folder containing three elements
-          const folder = (p as any).addFolder?.({ title: 'Details', expanded: false }) as any;
-          if (folder) {
-            try { (folder as any).addBinding({ level: 0.5 }, 'level', { min: 0, max: 1, label: 'Level' }); } catch {}
-            try { (folder as any).addBinding({ mode: 'A' }, 'mode', { options: { A: 'A', B: 'B', C: 'C' }, label: 'Mode' }); } catch {}
-            try { (folder as any).addButton?.({ title: 'Apply' }); } catch {}
-          }
+          // Collapsed folder with three elements
+          const folder = (p as unknown as PaneWithFolder).addFolder?.({ title: 'Details', expanded: false });
+          folder?.addBinding({ level: 0.5 } as Record<string, unknown>, 'level', { min: 0, max: 1, label: 'Level' });
+          folder?.addBinding({ mode: 'A' } as Record<string, unknown>, 'mode', { options: { A: 'A', B: 'B', C: 'C' }, label: 'Mode' });
+          folder?.addButton?.({ title: 'Apply' });
         }
         if (leftSlots[2]) {
           const p = new Pane({ container: leftSlots[2] });
           ensureRegistered(p);
           p.addBinding({ volume: 50 }, 'volume', { min: 0, max: 100, label: 'Volume' });
-          const api2 = p.addBinding({ txt: 'note' }, 'txt');
-          // Manually remove label since we're not using wrapPane
-          try {
-            const el = (api2 as any)?.controller?.view?.element as HTMLElement | undefined;
-            const lbl = el?.querySelector('.tp-lblv_l') as HTMLElement | null;
-            if (lbl) { lbl.remove(); el?.classList.add('tp-lblv-nol'); }
-          } catch {}
+          p.addBinding({ txt: 'note' }, 'txt', { label: '' });
         }
 
         // Fill right side (compact)
         if (rightSlots[0]) {
           const p = new Pane({ container: rightSlots[0] });
-          if ((c3 as any).wrapPane) { (c3 as any).wrapPane(p); }
+          tryWrapPane(c3, p);
           ensureRegistered(p);
           try { p.registerPlugin(Essentials); } catch {}
           p.addBinding({ p: { x: 0.1, y: 0.5, z: 0.9 } }, 'p', { x: { min: 0, max: 1 }, y: { min: 0, max: 1 }, z: { min: 0, max: 1 } });
           p.addBlade({ view: 'cubicbezier', value: [0.5, 0.2, 0.5, 1] });
 
           // Replace fpsgraph with a sub-split
-          const subSplit = p.addBlade({
+          const subSplit = toSplitApi(p.addBlade({
             view: 'split-layout',
             direction: 'row',
             sizes: '80px 1fr',
             children: ['left', 'right']
-          }) as any;
+          }));
 
           const [btnSlot, graphSlot] = subSplit.getSlots();
 
           // Left: 2-unit high button
           if (btnSlot) {
             const btnPane = new Pane({ container: btnSlot });
-            if ((c3 as any).wrapPane) { (c3 as any).wrapPane(btnPane); }
+            tryWrapPane(c3, btnPane);
             ensureRegistered(btnPane);
             btnPane.addBlade({ view: 'sized-button', title: 'Monitor\nGraph', units: 2 });
           }
@@ -384,7 +391,7 @@ function main() {
           // Right: graph blade (native tweakpane)
           if (graphSlot) {
             const graphPane = new Pane({ container: graphSlot });
-            if ((c3 as any).wrapPane) { (c3 as any).wrapPane(graphPane); }
+            tryWrapPane(c3, graphPane);
             ensureRegistered(graphPane);
             // Note: DO NOT register essentials for native graph
 
@@ -416,14 +423,8 @@ function main() {
             // Set up interval to update graph
             const interval = setInterval(updateGraph, 50);
 
-            // Clean up on disposal
-            if (graphSlot.dispose) {
-              const originalDispose = graphSlot.dispose;
-              graphSlot.dispose = () => {
-                clearInterval(interval);
-                originalDispose();
-              };
-            }
+            // Simple cleanup on page unload
+            window.addEventListener('beforeunload', () => clearInterval(interval), { once: true });
           }
         }
       }

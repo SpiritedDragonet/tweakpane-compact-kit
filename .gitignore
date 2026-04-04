@@ -5,6 +5,7 @@ node_modules/
 dist/
 dist-demo/
 .worktrees/
+.npm-cache/
 .release/
 *.tar.gz
 .claude/
