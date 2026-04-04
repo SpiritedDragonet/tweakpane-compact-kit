@@ -12,6 +12,7 @@
 //   const slots: HTMLElement[] = api.getSlots()
 
 import { measureCssUnit, readUnitPx } from './shared/measure';
+import { normalizeSplitParams, type NormalizedSplitLayoutParams } from './split/params';
 import {
   countSizeParts,
   parseSizeExpression as parseSizeTokens,
@@ -172,126 +173,12 @@ export type SplitLayoutParams = {
   compactSliders?: boolean;
 };
 
-// Params after normalization, used internally by builder/controller
-type NormalizedSplitLayoutParams = {
-  view: 'split-layout';
-  direction: SplitDirection;
-  sizes: SizeToken[];
-  children: SplitLayoutNode[];
-  rowUnits?: number[]; // normalized when direction === 'column'
-  height?: number | string;
-  gutter: number; // px
-  minSize: number;
-  interactive: boolean;
-  compactSliders: boolean;
-};
-
 type BuildResult = {
   element: HTMLElement;
   leaves: HTMLElement[]; // in DFS order
   cleanup: () => void;
 };
 
-// Parse relative expressions into normalized percentages.
-// Used temporarily for rowUnits until row-units semantics are split out.
-function parseRelativeExpression(expr: SizeExpression | undefined, count: number = 2): number[] {
-  if (!expr) {
-    // Default to equal split
-    return Array.from({ length: count }, () => 100 / count);
-  }
-
-  // Handle 'equal' keyword
-  if (expr === 'equal') {
-    return Array.from({ length: count }, () => 100 / count);
-  }
-
-  // Handle string expressions: '1fr 2fr 1fr' or '100px 200px 30%'
-  if (typeof expr === 'string') {
-    const parts = expr.trim().split(/\s+/).filter(p => p);
-    if (parts.length === 0) return Array.from({ length: count }, () => 100 / count);
-
-    const values = parts.map(part => {
-      if (part.endsWith('fr')) {
-        return parseFloat(part);
-      } else if (part.endsWith('px')) {
-        return parseFloat(part);
-      } else if (part.endsWith('%')) {
-        return parseFloat(part) / 100;
-      }
-      return parseFloat(part) || 1;
-    });
-
-    const hasFr = parts.some(p => p.endsWith('fr'));
-    if (hasFr) {
-      const totalFr = parts.filter(p => p.endsWith('fr')).reduce((sum, p) => sum + parseFloat(p), 0);
-      return values.map((v, i) => {
-        if (parts[i].endsWith('fr')) {
-          return (v / totalFr) * 100;
-        }
-        // Convert px/% to approximate fr equivalent (assuming 1000px total)
-        return Math.min(v * 10, 100); // Rough conversion
-      });
-    }
-
-    // All px/% values
-    const total = values.reduce((a, b) => a + b, 0);
-    return total > 0 ? values.map(v => (v / total) * 100) : Array.from({ length: count }, () => 100 / count);
-  }
-
-  // Handle number[] arrays: [66, 34] or [1, 2, 1]
-  if (Array.isArray(expr)) {
-    if (expr.length === 0) return Array.from({ length: count }, () => 100 / count);
-    const total = expr.reduce((a, b) => a + b, 0);
-    return total > 0 ? expr.map(v => (v / total) * 100) : Array.from({ length: expr.length }, () => 100 / expr.length);
-  }
-
-  return Array.from({ length: count }, () => 100 / count);
-}
-
-function normalizeSplitParams(input: any): NormalizedSplitLayoutParams {
-  // Clone to avoid mutating caller object
-  const p: any = { ...input };
-  const dir: SplitDirection = p.direction === 'column' ? 'column' : 'row';
-
-  // Parse children
-  const children: SplitLayoutNode[] = Array.isArray(p.children) ? p.children.slice() : [];
-
-  // Determine panel count from sizes or children
-  const sizeCount = countSizeParts(p.sizes, 2);
-  let panelCount = Math.max(children.length || 0, sizeCount);
-  if (panelCount <= 0) {
-    panelCount = 2;
-  }
-
-  // Ensure we have enough children
-  while (children.length < panelCount) {
-    children.push('leaf');
-  }
-
-  // Parse sizes
-  const sizes = parseSizeTokens(p.sizes, panelCount);
-
-  // Normalize gutter/gap
-  const gutter = p.gap !== undefined ? (typeof p.gap === 'string' ? parseInt(p.gap) || 6 : p.gap) :
-                 typeof p.gutter === 'string' ? parseInt(p.gutter) || 6 :
-                 typeof p.gutter === 'number' ? p.gutter : 6;
-
-  // Parse rowUnits if present
-  const rowUnits = p.rowUnits ? parseRelativeExpression(p.rowUnits, children.length) : undefined;
-
-  return {
-    view: 'split-layout',
-    direction: dir,
-    sizes,
-    children,
-    rowUnits,
-    height: p.height,
-    gutter,
-    minSize: typeof p.minSize === 'number' ? p.minSize : 20,
-    interactive: !!p.interactive,
-    compactSliders: p.compactSliders !== false,
-  };
-}
 
 function clamp(n: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, n));
@@ -303,6 +190,16 @@ function normalizeSizes(count: number, sizes?: number[]): number[] {
   }
   const sum = sizes.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0) || 1;
   return sizes.map((s) => (Number.isFinite(s) ? (s / sum) * 100 : 0));
+}
+
+function toCssLength(value: number | string | undefined, fallbackPx: number): string {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `${value}px`;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    return value;
+  }
+  return `${fallbackPx}px`;
 }
 
 function buildSplit(
@@ -329,8 +226,13 @@ function buildSplit(
   // rowUnits is already normalized to number[] by normalizeSplitParams
   const rowUnits = direction === 'column' ? params.rowUnits : undefined;
   const computeUnitPx = (fallbackEl: HTMLElement): number => {
-    const anchor = envEl || fallbackEl || doc.body;
-    return readUnitPx(anchor, 0) || measureCssUnit(anchor, '--cnt-usz', 1, fallbackEl);
+    const anchor = envEl || doc.body || fallbackEl;
+    return (
+      readUnitPx(anchor, 0)
+      || readUnitPx(fallbackEl, 0)
+      || measureCssUnit(anchor, '--cnt-usz', 1, fallbackEl)
+      || measureCssUnit(fallbackEl, '--cnt-usz', 1, anchor)
+    );
   };
 
   // Root container
@@ -346,16 +248,23 @@ function buildSplit(
   if (direction === 'column') {
     // Height is required for vertical split to make gutters meaningful
     if (rowUnits && rowUnits.length === n) {
-      unitPxForColumn = computeUnitPx(root);
-      currentUnits = rowUnits.map((u) => Math.max(1, Math.floor(u || 0)));
-      const totalUnits = currentUnits.reduce((a, b) => a + b, 0) || n;
-      sizes = currentUnits.map((u) => (u / totalUnits) * 100);
-      const gapPx = (n > 1 ? (n - 1) * gutter : 0);
-      const hPx = totalUnits * unitPxForColumn + gapPx;
-      root.style.height = `${hPx}px`;
+      if (params.height !== undefined) {
+        root.style.height = toCssLength(params.height, 160);
+        sizes = normalizeSizes(n, rowUnits);
+      } else {
+        unitPxForColumn = computeUnitPx(root);
+        currentUnits = rowUnits.map((u) => Math.max(1, Math.floor(u || 0)));
+        const totalUnits = currentUnits.reduce((a, b) => a + b, 0) || n;
+        sizes = currentUnits.map((u) => (u / totalUnits) * 100);
+        const gapPx = (n > 1 ? (n - 1) * gutter : 0);
+        const hPx = totalUnits * unitPxForColumn + gapPx;
+        root.style.height = `${hPx}px`;
+      }
     } else {
-      root.style.height = (params.height ?? 160) + 'px';
+      root.style.height = toCssLength(params.height, 160);
     }
+  } else if (params.height !== undefined) {
+    root.style.height = toCssLength(params.height, 160);
   }
   // Controlled spacing between panes; flex-gap aware sizing below avoids overflow
   root.style.gap = gutter + 'px';
@@ -380,9 +289,8 @@ function buildSplit(
       panel.style.height = '100%';
     } else {
       if (rowUnits && rowUnits.length === n) {
-        // rowUnits is now percentage-based (0-100), convert to actual pixels
-        const percentage = Math.max(0.0001, rowUnits[i]);
-        panel.style.flexGrow = String(percentage);
+        const weight = currentUnits ? sizes[i] : rowUnits[i];
+        panel.style.flexGrow = String(Math.max(0.0001, weight));
         panel.style.flexShrink = '0';
         panel.style.flexBasis = '0px';
       } else {
@@ -439,7 +347,7 @@ function buildSplit(
         disposers.push(cleanupSlider);
       } catch {}
       // Live adjust height when content changes for column+rowUnits mode
-      if (direction === 'column' && rowUnits && rowUnits.length === n) {
+      if (direction === 'column' && currentUnits && rowUnits && rowUnits.length === n) {
         try {
           const ro = new ResizeObserver(() => {
             try {
@@ -530,8 +438,8 @@ function buildSplit(
   (root as any).__split_refreshHandles = refreshHandles;
   if (interactive && panelWrappers.length > 1) {
     // Drag handling between adjacent panels
-    const basis: number[] = (direction === 'column' && rowUnits && rowUnits.length === n)
-      ? rowUnits.map((u) => Math.max(1, Math.floor(u || 0)))
+    const basis: number[] = (direction === 'column' && currentUnits && currentUnits.length === n)
+      ? currentUnits.slice()
       : sizes.slice();
     const onPointerDown = (ev: PointerEvent, idx: number) => {
       if (!(ev.target instanceof HTMLElement)) return;
@@ -543,7 +451,7 @@ function buildSplit(
       const move = (e: PointerEvent) => {
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
-        if (direction === 'column' && rowUnits && rowUnits.length === n) {
+        if (direction === 'column' && currentUnits && currentUnits.length === n) {
           // units-based vertical split: snap to integer blade units
           const unitPx = computeUnitPx(root);
           const totalUnits = a0 + b0;
@@ -552,6 +460,8 @@ function buildSplit(
           const bUnits = totalUnits - aUnits;
           basis[idx] = aUnits;
           basis[idx + 1] = bUnits;
+          currentUnits[idx] = aUnits;
+          currentUnits[idx + 1] = bUnits;
           (panelWrappers[idx].style as any).flex = `0 0 ${aUnits * unitPx}px`;
           (panelWrappers[idx + 1].style as any).flex = `0 0 ${bUnits * unitPx}px`;
         } else {
