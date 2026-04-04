@@ -12,6 +12,13 @@
 //   const slots: HTMLElement[] = api.getSlots()
 
 import { measureCssUnit, readUnitPx } from './shared/measure';
+import {
+  countSizeParts,
+  parseSizeExpression as parseSizeTokens,
+  resolveSizeTokens,
+  toFlexSpec,
+  type SizeToken,
+} from './split/sizeExpressions';
 
 // Auto-tweak slider labels to prevent overflow and truncate long text
 function installSliderLabelAutoTweak(
@@ -169,7 +176,7 @@ export type SplitLayoutParams = {
 type NormalizedSplitLayoutParams = {
   view: 'split-layout';
   direction: SplitDirection;
-  sizes: number[]; // normalized percentages per child (sum ~100)
+  sizes: SizeToken[];
   children: SplitLayoutNode[];
   rowUnits?: number[]; // normalized when direction === 'column'
   height?: number | string;
@@ -185,9 +192,9 @@ type BuildResult = {
   cleanup: () => void;
 };
 
-// Parse size expression into normalized percentages
-// Only supports: number[] arrays and string ('1fr 2fr' or 'equal')
-function parseSizeExpression(expr: SizeExpression | undefined, count: number = 2): number[] {
+// Parse relative expressions into normalized percentages.
+// Used temporarily for rowUnits until row-units semantics are split out.
+function parseRelativeExpression(expr: SizeExpression | undefined, count: number = 2): number[] {
   if (!expr) {
     // Default to equal split
     return Array.from({ length: count }, () => 100 / count);
@@ -250,12 +257,10 @@ function normalizeSplitParams(input: any): NormalizedSplitLayoutParams {
   const children: SplitLayoutNode[] = Array.isArray(p.children) ? p.children.slice() : [];
 
   // Determine panel count from sizes or children
-  let panelCount = children.length || 2;
-  if (Array.isArray(p.sizes)) {
-    panelCount = Math.max(panelCount, p.sizes.length);
-  } else if (typeof p.sizes === 'string' && p.sizes !== 'equal') {
-    const parts = p.sizes.trim().split(/\s+/).filter((x: string) => x);
-    if (parts.length > 0) panelCount = Math.max(panelCount, parts.length);
+  const sizeCount = countSizeParts(p.sizes, 2);
+  let panelCount = Math.max(children.length || 0, sizeCount);
+  if (panelCount <= 0) {
+    panelCount = 2;
   }
 
   // Ensure we have enough children
@@ -264,7 +269,7 @@ function normalizeSplitParams(input: any): NormalizedSplitLayoutParams {
   }
 
   // Parse sizes
-  const sizes = parseSizeExpression(p.sizes, panelCount);
+  const sizes = parseSizeTokens(p.sizes, panelCount);
 
   // Normalize gutter/gap
   const gutter = p.gap !== undefined ? (typeof p.gap === 'string' ? parseInt(p.gap) || 6 : p.gap) :
@@ -272,7 +277,7 @@ function normalizeSplitParams(input: any): NormalizedSplitLayoutParams {
                  typeof p.gutter === 'number' ? p.gutter : 6;
 
   // Parse rowUnits if present
-  const rowUnits = p.rowUnits ? parseSizeExpression(p.rowUnits, children.length) : undefined;
+  const rowUnits = p.rowUnits ? parseRelativeExpression(p.rowUnits, children.length) : undefined;
 
   return {
     view: 'split-layout',
@@ -309,8 +314,13 @@ function buildSplit(
   const direction: SplitDirection = params.direction;
   const children = params.children || [];
   const n = children.length;
-  // params.sizes is already normalized to number[] by normalizeSplitParams
-  let sizes = normalizeSizes(n, params.sizes);
+  const sizeTokens = params.sizes;
+  const axisAnchor = envEl || doc.body;
+  const axisRect = axisAnchor.getBoundingClientRect();
+  const estimatedAxisPx = direction === 'row'
+    ? axisRect.width || axisAnchor.clientWidth || 1000
+    : axisRect.height || axisAnchor.clientHeight || 1000;
+  let sizes = normalizeSizes(n, resolveSizeTokens(sizeTokens, estimatedAxisPx));
   // Allow zero-width panels when dragging unless caller overrides
   const minSize = params.minSize ?? 20;
   // Use specified gutter or default to 4px for tight visuals
@@ -363,9 +373,10 @@ function buildSplit(
     // Flex sizing: for row/column-percentage we use grow weights with 0 basis
     // so the gap is excluded from distributable space. For column+rowUnits we use px basis.
     if (direction === 'row') {
-      panel.style.flexGrow = String(Math.max(0.0001, sizes[i]));
-      panel.style.flexShrink = '0';
-      panel.style.flexBasis = '0px';
+      const flexSpec = toFlexSpec(sizeTokens[i], sizes[i]);
+      panel.style.flexGrow = String(flexSpec.grow);
+      panel.style.flexShrink = String(flexSpec.shrink);
+      panel.style.flexBasis = flexSpec.basis;
       panel.style.height = '100%';
     } else {
       if (rowUnits && rowUnits.length === n) {
@@ -375,9 +386,10 @@ function buildSplit(
         panel.style.flexShrink = '0';
         panel.style.flexBasis = '0px';
       } else {
-        panel.style.flexGrow = String(Math.max(0.0001, sizes[i]));
-        panel.style.flexShrink = '0';
-        panel.style.flexBasis = '0px';
+        const flexSpec = toFlexSpec(sizeTokens[i], sizes[i]);
+        panel.style.flexGrow = String(flexSpec.grow);
+        panel.style.flexShrink = String(flexSpec.shrink);
+        panel.style.flexBasis = flexSpec.basis;
       }
       panel.style.width = '100%';
     }
