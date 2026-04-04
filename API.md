@@ -95,7 +95,7 @@ pane.addBlade({
 
   // 约束
   minSize: 50,          // 最小尺寸
-  height: 400,          // 固定高度（仅row方向）
+  height: 400,          // row方向时是行高；column方向时是总高度
 });
 ```
 
@@ -107,14 +107,22 @@ pane.addBlade({
   direction: 'column',
   sizes: '1fr 2fr',
 
-  // 每行的高度分配（支持所有尺寸表达式）
+  // 每行的高度权重（只接受 equal / 裸数字 / fr，不接受 px / %）
   rowUnits: 'equal',        // 每行等高
+  rowUnits: '1 1 2',        // 裸数字权重
   rowUnits: '2fr 1fr 1fr',  // 比例分配
 
-  // 固定总高度
+  // 固定总高度；省略时会按 rowUnits 自动推导
   height: 600
 });
 ```
+
+## 支持面
+
+- `sizes` 支持 `number[]`、`'equal'`、纯 `fr` 字符串，以及 `200px 1fr 30%` 这类混合字符串
+- `rowUnits` 只支持单位权重语法：`number[]`、`'equal'`、`'1 1 2'`、`'2fr 1fr 1fr'`
+- `gutter` 是公开的间距参数
+- `compactSliders` 是唯一公开的紧凑 slider 开关
 
 ## 嵌套布局
 

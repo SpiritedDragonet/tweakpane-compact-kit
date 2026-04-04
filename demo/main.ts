@@ -240,7 +240,6 @@ function main() {
         direction: 'row',
         sizes: '1fr 1fr',
         compactSliders: state.compact,
-        preserveLabels: true,
         children: ['leaf', 'leaf']
       }) as unknown as SplitApi;
       rowApi = api;

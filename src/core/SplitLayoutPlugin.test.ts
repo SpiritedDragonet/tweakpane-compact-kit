@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Pane } from 'tweakpane';
 
 import { CompactKitBundle } from '../index';
+import * as splitLayoutModule from './SplitLayoutPlugin';
 
 function createSplitFixture(params: Record<string, unknown>) {
   document.body.innerHTML = '';
@@ -55,6 +56,10 @@ describe('SplitLayoutPlugin height semantics', () => {
 });
 
 describe('SplitLayoutPlugin slot API', () => {
+  it('keeps the split module runtime surface minimal', () => {
+    expect(Object.keys(splitLayoutModule).sort()).toEqual(['SplitLayoutPlugin']);
+  });
+
   it('returns slots in depth-first document order and filters by category', () => {
     const { api } = createSplitFixture({
       direction: 'row',

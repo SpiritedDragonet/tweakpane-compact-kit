@@ -276,20 +276,3 @@ export const SplitLayoutPlugin: any = {
   `,
 };
 
-// Helper to mount split layout without formal plugin registration (shim-style)
-export function addSplitLayout(hostApi: any, params: SplitLayoutParams) {
-  const contentEl: HTMLElement | null = (hostApi?.controller?.view?.containerElement ?? null) as HTMLElement | null;
-  const hostEl: HTMLElement = contentEl || (hostApi?.element as HTMLElement) || (hostApi?.controller?.view?.element as HTMLElement);
-  if (!hostEl) throw new Error('addSplitLayout: invalid host API (no element)');
-
-  const doc = (hostEl.ownerDocument || document) as Document;
-  const norm = normalizeSplitParams(params as any);
-  const built = mountSplitLayout(doc, norm, { envEl: hostEl });
-  hostEl.appendChild(built.element);
-
-  return {
-    getSlots(): HTMLElement[] { return built.leaves.slice(); },
-    dispose() { try { built.cleanup(); } catch {} try { hostEl.removeChild(built.element); } catch {} },
-    element: built.element,
-  };
-}
