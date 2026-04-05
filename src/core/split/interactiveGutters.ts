@@ -16,6 +16,25 @@ function clamp(n: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, n));
 }
 
+export function computeDraggedPairWidths(args: {
+  leftVisiblePx: number;
+  rightVisiblePx: number;
+  deltaPx: number;
+  minVisiblePx: number;
+}) {
+  const totalVisiblePx = args.leftVisiblePx + args.rightVisiblePx;
+  const leftVisiblePx = clamp(
+    args.leftVisiblePx + args.deltaPx,
+    args.minVisiblePx,
+    totalVisiblePx - args.minVisiblePx,
+  );
+
+  return {
+    leftVisiblePx,
+    rightVisiblePx: totalVisiblePx - leftVisiblePx,
+  };
+}
+
 export function attachInteractiveGutters(options: GutterOptions) {
   const {
     doc,
@@ -40,6 +59,10 @@ export function attachInteractiveGutters(options: GutterOptions) {
     const startY = ev.clientY;
     const a0 = basis[idx];
     const b0 = basis[idx + 1];
+    const leftPanelRect = panelWrappers[idx].getBoundingClientRect();
+    const rightPanelRect = panelWrappers[idx + 1].getBoundingClientRect();
+    const leftVisiblePx0 = leftPanelRect.width;
+    const rightVisiblePx0 = rightPanelRect.width;
 
     const move = (e: PointerEvent) => {
       const dx = e.clientX - startX;
@@ -61,13 +84,26 @@ export function attachInteractiveGutters(options: GutterOptions) {
       }
 
       const total = a0 + b0;
-      let a = a0;
       if (direction === 'row') {
-        a = clamp(a0 + (dx / rect.width) * total, minSize, total - minSize);
-      } else {
-        a = clamp(a0 + (dy / rect.height) * total, minSize, total - minSize);
+        const totalVisiblePx = leftVisiblePx0 + rightVisiblePx0;
+        const minVisiblePx = Math.max(1, (minSize / 100) * totalVisiblePx);
+        const next = computeDraggedPairWidths({
+          leftVisiblePx: leftVisiblePx0,
+          rightVisiblePx: rightVisiblePx0,
+          deltaPx: dx,
+          minVisiblePx,
+        });
+
+        panelWrappers[idx].style.flexGrow = '0';
+        panelWrappers[idx].style.flexShrink = '0';
+        panelWrappers[idx].style.flexBasis = `${next.leftVisiblePx}px`;
+        panelWrappers[idx + 1].style.flexGrow = '0';
+        panelWrappers[idx + 1].style.flexShrink = '0';
+        panelWrappers[idx + 1].style.flexBasis = `${next.rightVisiblePx}px`;
+        return;
       }
 
+      const a = clamp(a0 + (dy / rect.height) * total, minSize, total - minSize);
       const b = total - a;
       basis[idx] = a;
       basis[idx + 1] = b;
