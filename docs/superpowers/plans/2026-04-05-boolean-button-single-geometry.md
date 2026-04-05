@@ -720,3 +720,18 @@ Completed manual checks on YYYY-MM-DD:
 git add docs/superpowers/plans/2026-04-05-boolean-button-single-geometry.md
 git commit -m "chore: record boolean button verification"
 ```
+
+## Execution Record
+
+Completed on 2026-04-05 in `G:\BProj\ECGsplitter2\.worktrees\boolean-button-single-geometry`.
+
+- [x] Task 1 through Task 5 were completed and committed as `f9c1f8e`, `78dd060`, `cde0db5`, `e86d452`, and `1645ae6`
+- [x] Task 6 demo and README updates were completed and committed as `4e51dd5`
+- [x] Split-root native inset alignment and default gutter unification were completed and committed as `91322b4`
+- [x] Final `npm.cmd test` verification passed with 11 files and 32 tests
+- [x] Final `npm.cmd run build` verification passed and emitted the library bundles plus declarations
+- [x] `npm.cmd run demo` started successfully during headless Chrome verification
+- [x] `Button Extensions` contains the compact slider toggle and boolean-button examples
+- [x] A multi-unit icon + text boolean-button renders in the demo
+- [x] `20 80` aligns with `1fr 2fr 2fr` at the first divider under the single-geometry model
+- [x] Split full-row buttons are visually flush with native full-width button edges after restoring the native horizontal inset scale
