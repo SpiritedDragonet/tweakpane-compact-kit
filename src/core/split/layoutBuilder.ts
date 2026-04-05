@@ -79,6 +79,8 @@ export function buildSplitLayout(
   root.style.flexDirection = direction === 'row' ? 'row' : 'column';
   root.style.width = '100%';
   root.style.boxSizing = 'border-box';
+  root.style.paddingLeft = 'var(--cnt-hp)';
+  root.style.paddingRight = 'var(--cnt-hp)';
 
   let unitPxForColumn: number | null = null;
   let currentUnits: number[] | null = null;

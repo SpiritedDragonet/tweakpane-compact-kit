@@ -27,6 +27,27 @@ function waitForMacrotask() {
 }
 
 describe('SplitLayoutPlugin height semantics', () => {
+  it('uses native horizontal inset on row roots', () => {
+    const { api } = createSplitFixture({
+      direction: 'row',
+      children: ['leaf', 'leaf'],
+    });
+
+    const root = api.controller.view.element as HTMLElement;
+    expect(root.style.paddingLeft).toBe('var(--cnt-hp)');
+    expect(root.style.paddingRight).toBe('var(--cnt-hp)');
+  });
+
+  it('defaults gutter to 4px so inner gaps match the native inset scale', () => {
+    const { api } = createSplitFixture({
+      direction: 'row',
+      children: ['leaf', 'leaf'],
+    });
+
+    const root = api.controller.view.element as HTMLElement;
+    expect(root.style.gap).toBe('4px');
+  });
+
   it('derives column height from rowUnits when height is omitted', () => {
     const { api } = createSplitFixture({
       direction: 'column',
@@ -35,7 +56,7 @@ describe('SplitLayoutPlugin height semantics', () => {
     });
 
     const root = api.controller.view.element as HTMLElement;
-    expect(root.style.height).toBe('84px');
+    expect(root.style.height).toBe('80px');
   });
 
   it('uses fixed column height when rowUnits and height are both present', () => {

@@ -57,7 +57,7 @@ export function normalizeSplitParams(input: SplitLayoutParams & Record<string, u
     children,
     rowUnits: p.rowUnits ? parseRowUnits(p.rowUnits, panelCount) : undefined,
     height: p.height,
-    gutter: parseNumericSetting(p.gutter, 6),
+    gutter: parseNumericSetting(p.gutter, 4),
     minSize: typeof p.minSize === 'number' ? p.minSize : 20,
     interactive: !!p.interactive,
     compactSliders: p.compactSliders !== false,

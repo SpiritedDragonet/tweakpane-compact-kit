@@ -18,7 +18,7 @@ export type SplitLayoutNode =
       children: SplitLayoutNode[];
       minSize?: number; // min percentage for each pane (default 5)
       // Allow string for convenience (e.g., '6')
-      gutter?: number | string; // gutter size in px (default 6)
+      gutter?: number | string; // gutter size in px (default 4)
       height?: number | string; // only meaningful when direction === 'column'
     };
 
@@ -38,7 +38,7 @@ export type SplitLayoutParams = {
   rowUnits?: SizeExpression;
   // Optional fixed height for row layout
   height?: number | string;
-  // Gutter size (default: 6px)
+  // Gutter size (default: 4px)
   gutter?: number | string;
   // Minimum size for each panel (default: 20)
   minSize?: number;
