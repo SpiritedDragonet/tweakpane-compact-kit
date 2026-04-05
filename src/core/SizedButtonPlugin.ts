@@ -7,7 +7,13 @@
 // import type { BladeApi } from 'tweakpane';
 // Using any to avoid coupling to Tweakpane's internal types
 
-import { measureCssUnit, readUnitPx } from './shared/measure';
+import {
+  normalizeButtonContent,
+  renderButtonContent,
+  type ButtonContent,
+  type ButtonIcon,
+} from './button/buttonContent';
+import { createButtonShell } from './button/buttonShell';
 
 // Controller for the sized button blade
 class SizedButtonController {
@@ -23,74 +29,33 @@ class SizedButtonController {
     viewProps?: any;
   }) {
     const { document, params, viewProps } = args;
-    const element = document.createElement('div');
-    element.className = 'tp-sized-button';
-    this.view = { element };
+    const shell = createButtonShell(document, {
+      rootClassName: 'tp-sized-button',
+      units: params.units || 1,
+    });
+
+    while (shell.contentHost.firstChild) {
+      shell.contentHost.firstChild.remove();
+    }
+    shell.contentHost.appendChild(renderButtonContent(document, params.content));
+
+    this.view = { element: shell.root };
     this.blade = (args as any).blade;
     this.viewProps = viewProps;
-
-    // Create container for the button
-    // Create official button view structure: wrapper .tp-btnv with inner button .tp-btnv_b
-    const wrapper = document.createElement('div');
-    wrapper.className = 'tp-btnv';
-    element.appendChild(wrapper);
-
-    const button = document.createElement('button');
-    button.className = 'tp-btnv_b';
-    // Put label in a span to allow multi-line without affecting button styles
-    const label = document.createElement('span');
-    label.className = 'tp-sb-label';
-    label.textContent = params.title || '';
-    button.appendChild(label);
-    wrapper.appendChild(button);
-    this.buttonEl = button;
+    this.buttonEl = shell.button;
 
     // Apply click handler
     if (params.onClick && typeof params.onClick === 'function') {
-      button.addEventListener('click', params.onClick);
+      shell.button.addEventListener('click', params.onClick);
     }
 
     // Store elements for disposal
     this.disposeFn = () => {
-      button.removeEventListener('click', params.onClick);
+      shell.button.removeEventListener('click', params.onClick);
     };
-
-    // Set initial height
-    this.updateHeight(params.units || 1);
 
     // Hook disposal to view props lifecycle
     try { this.viewProps?.handleDispose?.(() => this.dispose()); } catch {}
-  }
-
-  updateHeight(units: number) {
-    const button = this.buttonEl as HTMLElement;
-    if (!button) return;
-
-    // Compute 1 blade unit (px)
-    const computeUnitPx = (): number => {
-      const findContainer = (el: HTMLElement | null): HTMLElement | null => {
-        let cur: HTMLElement | null = el;
-        while (cur) {
-          if (cur.classList?.contains('tp-cntv') || cur.classList?.contains('tp-rotv')) return cur;
-          cur = cur.parentElement;
-        }
-        return el;
-      };
-      const cont = findContainer(this.view.element) || this.view.element;
-      return readUnitPx(cont, 0) || measureCssUnit(cont, '--cnt-usz', 0);
-    };
-
-    const unitPx = computeUnitPx();
-    const gutter = 4; // match the gutter in SplitLayoutPlugin
-
-    // Apply height with gap compensation
-    if (unitPx > 0) {
-      const totalHeight = units * unitPx + (units - 1) * gutter;
-      button.style.height = `${totalHeight}px`;
-    } else {
-      const gapPx = (units - 1) * gutter;
-      button.style.height = `calc(var(--cnt-usz) * ${units} + ${gapPx}px)`;
-    }
   }
 
   dispose() {
@@ -143,20 +108,46 @@ export const SizedButtonPlugin: any = {
     .tp-sized-button { width: 100%; box-sizing: border-box; }
     .tp-sized-button .tp-btnv { width: 100%; }
     .tp-sized-button .tp-btnv_b { width: 100%; box-sizing: border-box; }
-    .tp-sb-label { white-space: pre-line; }
+    .tp-sized-button .tp-btnv_c {
+      align-items: center;
+      display: inline-flex;
+      gap: 6px;
+      justify-content: center;
+      width: 100%;
+    }
+    .tp-btnc {
+      align-items: center;
+      display: inline-flex;
+      gap: 6px;
+      justify-content: center;
+      max-width: 100%;
+    }
+    .tp-btnc_t { white-space: pre-line; }
+    .tp-btnc_i {
+      display: block;
+      fill: none;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      width: 16px;
+    }
   `,
   accept(params: any) {
     if (!params || params.view !== 'sized-button') return null;
 
     // Validate parameters
     const units = Math.max(1, Math.floor(params.units ?? 1));
-    const title = params.title ?? '';
+    const content = normalizeButtonContent(params as {
+      title?: string;
+      icon?: ButtonIcon;
+      content?: ButtonContent;
+    });
     const onClick = params.onClick;
 
     return {
       params: {
         view: 'sized-button',
-        title,
+        content,
         units,
         onClick
       }
@@ -173,6 +164,8 @@ export const SizedButtonPlugin: any = {
 
 export type SizedButtonOptions = {
   title?: string;
+  icon?: ButtonIcon;
+  content?: ButtonContent;
   units?: number; // number of blade rows, integer >= 1
   onClick?: () => void;
 };
