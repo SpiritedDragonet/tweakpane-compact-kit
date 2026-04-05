@@ -3,7 +3,7 @@
 Compact layout toolkit for Tweakpane v4 — build dense, tidy panels in ~320px.
 
 - SplitLayout: split by rows/columns and mount panes/DOM per slot
-- SizedButton: multi-line buttons aligned to Tweakpane grid units
+- SizedButton and BooleanButton: full-row buttons with shared icon/text content
 - Optional compact slider/value layout
 
 ## Install
@@ -66,7 +66,7 @@ R.appendChild(text);
 </details>
 
 ### Basics — Size Expressions
-Four presets in one pane: 66/34, equal (3 columns), 1fr 2fr, and normalization (40:10 → 80:20).
+Four rows in one pane: equal (3 columns), `1fr 2fr`, `20 80`, and `1fr 2fr 2fr`. With the single geometry model, the first divider of `20 80` naturally lines up with `1fr 2fr 2fr`.
 
 <img src="docs/images/basics-2.svg" style="width:50%;height:auto;" alt="Basics 2/3" />
 
@@ -74,40 +74,35 @@ Four presets in one pane: 66/34, equal (3 columns), 1fr 2fr, and normalization (
 <summary>View code</summary>
 
 ```js
-// 66 / 34
-const rA = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['leaf','leaf'] });
-rA.getSlots().forEach((slot, i) => {
-  const p = new Pane({ container: slot });
-  p.registerPlugin(CompactKitBundle);
-  p.addBlade({ view: 'sized-button', title: i === 0 ? '66%' : '34%', units: 2 });
-});
+function mountRow(sizes, labels) {
+  const row = pane.addBlade({
+    view: 'split-layout',
+    direction: 'row',
+    sizes,
+    children: labels.map(() => 'leaf'),
+  });
+  row.getSlots().forEach((slot, i) => {
+    const p = new Pane({ container: slot });
+    p.registerPlugin(CompactKitBundle);
+    p.addBlade({ view: 'sized-button', title: labels[i], units: 2 });
+  });
+}
 
-// equal (3 cols)
-const rB = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf','leaf','leaf'] });
-rB.getSlots().forEach((slot, i) => {
-  const p = new Pane({ container: slot });
-  p.registerPlugin(CompactKitBundle);
-  p.addBlade({ view: 'sized-button', title: `Equal\n${i + 1}`, units: 2 });
-});
-
-// 1fr 2fr
-const rC = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf','leaf'] });
-rC.getSlots().forEach((slot, i) => {
-  const p = new Pane({ container: slot });
-  p.registerPlugin(CompactKitBundle);
-  p.addBlade({ view: 'sized-button', title: i === 0 ? '1fr' : '2fr', units: 2 });
-});
-
-// 40 10 (normalized: 40:10 → 80:20)
-const rD = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: [40, 10], children: ['leaf','leaf'] });
-rD.getSlots().forEach((slot) => {
-  const p = new Pane({ container: slot });
-  p.registerPlugin(CompactKitBundle);
-  p.addBlade({ view: 'sized-button', title: 'Normalized', units: 2 });
-});
+mountRow('equal', ['Equal 1', 'Equal 2', 'Equal 3']);
+mountRow('1fr 2fr', ['1fr', '2fr']);
+mountRow([20, 80], ['20', '80']);
+mountRow('1fr 2fr 2fr', ['1fr', '2fr', '2fr']);
 ```
 
 </details>
+
+All row sizes share one geometry rule:
+
+- `px` and `%` reserve a pre-cut span directly
+- Bare numbers and `fr` values divide the remaining pre-cut span
+- The final visible panel width is `span - gutter`
+
+That is why `20 80`, `66 34`, and `200px 1fr 30%` can all stay in the same alignment system without a second layout mode.
 
 ## Mixed DOM — Custom Content
 Show that you can place arbitrary DOM (canvas, charts, etc.) into any slot. Here we render a custom canvas on the right (4u) next to controls on the left.
@@ -164,45 +159,63 @@ drawGauge(host);
 
 </details>
 
-## Compact Sliders Toggle
-Compare original (top) vs compact (bottom) slider layout.
+## Button Extensions
+Use `boolean-button` for real boolean bindings and `sized-button` for stateless actions. Both share the same icon/text content model, so the demo can mix compact-slider toggles, multi-unit boolean buttons, and regular action buttons without a second rendering path.
 
-<img src="docs/images/compact-toggle (original).svg" style="width:50%;height:auto;display:block;margin-bottom:8px;" alt="Original" />
-<img src="docs/images/compact-toggle(compact).svg" style="width:50%;height:auto;" alt="Compact" />
+- `title` and top-level `icon` remain as shorthand
+- `content` is the shared normalized shape: `{ text?: string; icon?: string | { path, viewBox? } }`
+- `contentOn` is optional for `boolean-button`; missing fields inherit from base `content`
 
 <details>
 <summary>View code</summary>
 
 ```js
-// Build two rows to match the screenshots
-const S = { a: 50 };
+const icons = {
+  sliders: { path: 'M3 4h10M2 8h12M5 12h6', viewBox: '0 0 16 16' },
+  graph: { path: 'M2.5 11.5 6 8l2.5 2.5 5-6M3 3v10h10', viewBox: '0 0 16 16' },
+};
 
-// original (top)
-const rTop = pane.addBlade({
-  view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: false, children: ['leaf','leaf']
-});
-{
-  const [L, R] = rTop.getSlots();
-  const pl = new Pane({ container: L });
-  const pr = new Pane({ container: R });
-  pl.addBinding({ compact: false }, 'compact', { label: 'Compact' });
-  pr.addBinding(S, 'a', { min: 0, max: 100, label: 'Value' });
-}
+const state = { compact: true, monitoring: false };
 
-// compact (bottom)
-const rBottom = pane.addBlade({
-  view: 'split-layout', direction: 'row', sizes: '1fr 1fr', compactSliders: true, children: ['leaf','leaf']
+pane.addBinding(state, 'compact', {
+  view: 'boolean-button',
+  units: 2,
+  content: {
+    text: 'Compact Sliders\nOff',
+    icon: icons.sliders,
+  },
+  contentOn: {
+    text: 'Compact Sliders\nOn',
+  },
+  onColor: '#0ea5e9',
 });
-{
-  const [L, R] = rBottom.getSlots();
-  const pl = new Pane({ container: L });
-  const pr = new Pane({ container: R });
-  pl.addBinding({ compact: true }, 'compact', { label: 'Compact' });
-  pr.addBinding(S, 'a', { min: 0, max: 100, label: 'Value' });
-}
+
+pane.addBinding(state, 'monitoring', {
+  view: 'boolean-button',
+  units: 3,
+  content: {
+    text: 'Monitor\nGraph',
+    icon: icons.graph,
+  },
+  contentOn: {
+    text: 'Monitoring\nGraph',
+  },
+  onColor: '#22c55e',
+});
+
+pane.addBlade({
+  view: 'sized-button',
+  units: 2,
+  content: {
+    text: 'Run\nAction',
+    icon: icons.graph,
+  },
+});
 ```
 
 </details>
+
+In the demo, the `compact` boolean above is also fed back into a `split-layout` row via `compactSliders: state.compact`, so the pressed state and the slider layout stay tied to the same source of truth.
 
 ## Custom Categories
 Use semantic leaf names (alpha/beta/gamma) and fill each slot with different controls. Below are two rows to match the screenshot.
@@ -259,11 +272,13 @@ if (g2) {
 
 ## API Quick Reference
 
-Supported public split-layout syntax:
+Supported public API highlights:
 
-- `sizes`: `number[]`, `'equal'`, pure `fr` strings, and mixed strings such as `200px 1fr 30%`
+- `sizes`: `number[]`, `'equal'`, bare numeric strings, pure `fr` strings, and mixed strings such as `200px 1fr 30%`
+- `px` and `%` tokens are pre-cut spans, not final visible widths
 - `rowUnits`: `number[]`, `'equal'`, bare numeric strings such as `'1 1 2'`, and `fr` strings such as `'2fr 1fr 1fr'`
 - `height`: row height for `direction: 'row'`; total column height for `direction: 'column'`, or derived from `rowUnits` when omitted
+- `boolean-button`: boolean binding view with `units`, `content`, `contentOn`, `onColor`, and `offColor`
 - `gutter`, `interactive`, `compactSliders`, and semantic `children` categories are supported
 
 Short, common calls you’ll use most:
@@ -289,8 +304,20 @@ pane.addBlade({
 // compact sliders
 pane.addBlade({ view: 'split-layout', direction: 'row', compactSliders: true, children: ['leaf'] });
 
+// boolean button
+pane.addBinding(state, 'enabled', {
+  view: 'boolean-button',
+  units: 2,
+  content: { text: 'Enabled' },
+  contentOn: { text: 'Enabled\nOn' },
+});
+
 // sized button
-pane.addBlade({ view: 'sized-button', title: 'Multi-line\nButton', units: 3 });
+pane.addBlade({
+  view: 'sized-button',
+  units: 3,
+  content: { text: 'Multi-line\nButton' },
+});
 ```
 
 </details>
@@ -310,7 +337,7 @@ npm run demo
 Open the shown URL; try compact sliders, drag gutters, and the gauge.
 
 ## TypeScript
-Public types are exported: `SplitDirection`, `SizeExpression`, `SizedButtonOptions`.
+Public types are exported: `SplitDirection`, `SizeExpression`, `SizedButtonOptions`, `BooleanButtonOptions`.
 
 ## Notes
 - Tweakpane v4 only (core.major = 2)

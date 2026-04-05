@@ -35,12 +35,63 @@ type PaneWithFolder = Pane & {
   addFolder?: (params: { title: string; expanded?: boolean }) => FolderLike | undefined;
 };
 
+const ICONS = {
+  sliders: {
+    path: 'M3 4h10M2 8h12M5 12h6',
+    viewBox: '0 0 16 16',
+  },
+  power: {
+    path: 'M8 2v5M5.2 4.5a4.5 4.5 0 1 0 5.6 0',
+    viewBox: '0 0 16 16',
+  },
+  graph: {
+    path: 'M2.5 11.5 6 8l2.5 2.5 5-6M3 3v10h10',
+    viewBox: '0 0 16 16',
+  },
+} as const;
+
 function toSplitApi(v: unknown): SplitApi {
   return v as SplitApi;
 }
 
 function tryWrapPane(split: SplitApi, pane: Pane): void {
   try { split.wrapPane?.(pane); } catch {}
+}
+
+function createChildPane(split: SplitApi, slot: HTMLElement, options?: { essentials?: boolean }) {
+  const pane = new Pane({ container: slot });
+  tryWrapPane(split, pane);
+  ensureRegistered(pane);
+  if (options?.essentials) {
+    try { pane.registerPlugin(Essentials); } catch {}
+  }
+  return pane;
+}
+
+function mountSplitButtonRow(
+  pane: Pane,
+  args: {
+    sizes: number[] | string;
+    labels: string[];
+    gutter?: number;
+  },
+) {
+  const split = toSplitApi(pane.addBlade({
+    view: 'split-layout',
+    direction: 'row',
+    sizes: args.sizes,
+    gutter: args.gutter ?? 4,
+    children: args.labels.map(() => 'leaf'),
+  }));
+
+  split.getSlots().forEach((slot: HTMLElement, i: number) => {
+    const childPane = createChildPane(split, slot);
+    childPane.addBlade({
+      view: 'sized-button',
+      title: args.labels[i],
+      units: 2,
+    });
+  });
 }
 
 function unitPx(el: HTMLElement): number {
@@ -163,40 +214,21 @@ function main() {
     ensureRegistered(paneB);
     try { paneB.registerPlugin(Essentials); } catch {}
 
-    // 66 / 34
-    const rA = toSplitApi(paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['leaf', 'leaf'] }));
-    rA.getSlots().forEach((slot: HTMLElement, i: number) => {
-      const p = new Pane({ container: slot });
-      tryWrapPane(rA, p);
-      ensureRegistered(p);
-      p.addBlade({ view: 'sized-button', title: i === 0 ? '66%' : '34%', units: 2 });
+    mountSplitButtonRow(paneB, {
+      sizes: 'equal',
+      labels: ['Equal 1', 'Equal 2', 'Equal 3'],
     });
-
-    // equal — 3 columns
-    const rB = toSplitApi(paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['leaf', 'leaf', 'leaf'] }));
-    rB.getSlots().forEach((slot: HTMLElement, i: number) => {
-      const p = new Pane({ container: slot });
-      tryWrapPane(rB, p);
-      ensureRegistered(p);
-      p.addBlade({ view: 'sized-button', title: `Equal\n${i + 1}`, units: 2 });
+    mountSplitButtonRow(paneB, {
+      sizes: '1fr 2fr',
+      labels: ['1fr', '2fr'],
     });
-
-    // 1fr 2fr
-    const rC = toSplitApi(paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 2fr', children: ['leaf', 'leaf'] }));
-    rC.getSlots().forEach((slot: HTMLElement, i: number) => {
-      const p = new Pane({ container: slot });
-      tryWrapPane(rC, p);
-      ensureRegistered(p);
-      p.addBlade({ view: 'sized-button', title: i === 0 ? '1fr' : '2fr', units: 2 });
+    mountSplitButtonRow(paneB, {
+      sizes: [20, 80],
+      labels: ['20', '80'],
     });
-
-    // 40 10 (normalized)
-    const rN = toSplitApi(paneB.addBlade({ view: 'split-layout', direction: 'row', sizes: [40, 10], children: ['leaf', 'leaf'] }));
-    rN.getSlots().forEach((slot: HTMLElement) => {
-      const p = new Pane({ container: slot });
-      tryWrapPane(rN, p);
-      ensureRegistered(p);
-      p.addBlade({ view: 'sized-button', title: `Normalized`, units: 2 });
+    mountSplitButtonRow(paneB, {
+      sizes: '1fr 2fr 2fr',
+      labels: ['1fr', '2fr', '2fr'],
     });
   }
 
@@ -233,30 +265,94 @@ function main() {
     try { leftPaneForGauge?.on('change', renderGauge); } catch {}
   }
 
-  // Section 2: Compact sliders toggle
+  // Section 2: Button extensions
   const host2 = document.getElementById('host-compact') as HTMLElement | null;
   if (host2) {
-    const pane2 = new Pane({ container: host2, title: 'Compact vs Original' });
+    const pane2 = new Pane({ container: host2, title: 'Button Extensions' });
     ensureRegistered(pane2);
     try { pane2.registerPlugin(Essentials); } catch {}
 
-    const state = { compact: true, a: 50 };
-    let rowApi: SplitApi | null = null;
-    let childPanes: Pane[] = [];
+    const state = { compact: true, armed: false, monitoring: false, a: 50, b: 24 };
 
-    const clearRow = () => {
-      // Dispose child panes first (sliders, etc.)
-      childPanes.forEach((p) => { try { p.dispose(); } catch {} });
-      childPanes = [];
-      // Remove the previous split-layout blade from pane
-      if (rowApi) {
-        try { (pane2 as unknown as { remove: (api: object) => void }).remove(rowApi as unknown as object); } catch {}
-        rowApi = null;
+    const buttonRow = toSplitApi(pane2.addBlade({
+      view: 'split-layout',
+      direction: 'row',
+      sizes: '1fr 1fr',
+      children: ['leaf', 'leaf'],
+    }));
+    const [toggleSlot, armedSlot] = buttonRow.getSlots();
+    if (toggleSlot) {
+      const togglePane = createChildPane(buttonRow, toggleSlot);
+      const toggleApi = togglePane.addBinding(state, 'compact', {
+        view: 'boolean-button',
+        units: 2,
+        content: {
+          text: 'Compact Sliders\nOff',
+          icon: ICONS.sliders,
+        },
+        contentOn: {
+          text: 'Compact Sliders\nOn',
+        },
+        onColor: '#0ea5e9',
+      });
+      toggleApi.on('change', () => {
+        requestAnimationFrame(renderPreview);
+      });
+    }
+    if (armedSlot) {
+      const armedPane = createChildPane(buttonRow, armedSlot);
+      armedPane.addBinding(state, 'armed', {
+        view: 'boolean-button',
+        units: 2,
+        content: {
+          text: 'Armed',
+          icon: ICONS.power,
+        },
+        contentOn: {
+          text: 'Armed',
+        },
+        onColor: '#ef4444',
+      });
+    }
+
+    const fullRow = toSplitApi(pane2.addBlade({
+      view: 'split-layout',
+      direction: 'row',
+      children: ['leaf'],
+    }));
+    const [fullRowSlot] = fullRow.getSlots();
+    if (fullRowSlot) {
+      const fullRowPane = createChildPane(fullRow, fullRowSlot);
+      fullRowPane.addBinding(state, 'monitoring', {
+        view: 'boolean-button',
+        units: 3,
+        content: {
+          text: 'Monitor\nGraph',
+          icon: ICONS.graph,
+        },
+        contentOn: {
+          text: 'Monitoring\nGraph',
+        },
+        onColor: '#22c55e',
+      });
+    }
+
+    pane2.addButton({ title: 'Native Full-Width Button' });
+
+    let previewApi: SplitApi | null = null;
+    let previewPanes: Pane[] = [];
+
+    const clearPreview = () => {
+      previewPanes.forEach((p) => { try { p.dispose(); } catch {} });
+      previewPanes = [];
+      if (previewApi) {
+        try { (pane2 as unknown as { remove: (api: object) => void }).remove(previewApi as unknown as object); } catch {}
+        previewApi = null;
       }
     };
 
-    const render = () => {
-      clearRow();
+    function renderPreview() {
+      clearPreview();
       const api = toSplitApi(pane2.addBlade({
         view: 'split-layout',
         direction: 'row',
@@ -264,21 +360,16 @@ function main() {
         compactSliders: state.compact,
         children: ['leaf', 'leaf']
       }));
-      rowApi = api;
+      previewApi = api;
       const [L, R] = api.getSlots();
-      const pl = new Pane({ container: L }); tryWrapPane(api, pl); ensureRegistered(pl);
-      const pr = new Pane({ container: R }); tryWrapPane(api, pr); ensureRegistered(pr);
-      try { pl.registerPlugin(Essentials); } catch {}
-      try { pr.registerPlugin(Essentials); } catch {}
-      // Left: checkbox with label
-      const leftCtl = pl.addBinding(state, 'compact', { label: 'Compact' });
-      leftCtl.on('change', () => { requestAnimationFrame(render); });
-      // Right: a single slider to demonstrate layout
-      pr.addBinding(state, 'a', { min: 0, max: 100, label: 'Value' });
-      childPanes.push(pl, pr);
-    };
+      const pl = createChildPane(api, L, { essentials: true });
+      const pr = createChildPane(api, R, { essentials: true });
+      pl.addBinding(state, 'a', { min: 0, max: 100, label: 'Left Value' });
+      pr.addBinding(state, 'b', { min: 0, max: 100, label: 'Right Value' });
+      previewPanes.push(pl, pr);
+    }
 
-    render();
+    renderPreview();
   }
 
   // Section 3: Custom categories (dense, equal occupancy per column)
