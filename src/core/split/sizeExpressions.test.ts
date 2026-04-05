@@ -22,6 +22,6 @@ describe('parseSizeExpression', () => {
   });
 
   it('supports documented mixed strings without approximation', () => {
-    expect(resolveSizeTokens(parseSizeExpression('200px 1fr 30%', 3), 1000)).toEqual([200, 500, 300]);
+    expect(resolveSizeTokens(parseSizeExpression('200px 1fr 30%', 3), 1000, 6)).toEqual([200, 506, 300]);
   });
 });

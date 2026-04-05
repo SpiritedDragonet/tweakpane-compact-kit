@@ -2,6 +2,7 @@ import type { SplitDirection, SplitLayoutParams } from '../SplitLayoutPlugin';
 import { measureCssUnit, readUnitPx } from '../shared/measure';
 import { normalizeSplitParams, type NormalizedSplitLayoutParams } from './params';
 import { resolveSizeTokens, toFlexSpec } from './sizeExpressions';
+import { buildVisibleBasisCss } from './singleGeometry';
 
 export type BuildResult = {
   element: HTMLElement;
@@ -51,15 +52,16 @@ export function buildSplitLayout(
   const children = params.children || [];
   const n = children.length;
   const sizeTokens = params.sizes;
+  const minSize = params.minSize ?? 20;
+  const gutter = params.gutter ?? 4;
   const axisAnchor = envEl || doc.body;
   const axisRect = axisAnchor.getBoundingClientRect();
   const estimatedAxisPx = direction === 'row'
     ? axisRect.width || axisAnchor.clientWidth || 1000
     : axisRect.height || axisAnchor.clientHeight || 1000;
-  let sizes = normalizeSizes(n, resolveSizeTokens(sizeTokens, estimatedAxisPx));
-  const minSize = params.minSize ?? 20;
-  const gutter = params.gutter ?? 4;
+  let sizes = normalizeSizes(n, resolveSizeTokens(sizeTokens, estimatedAxisPx, gutter));
   const rowUnits = direction === 'column' ? params.rowUnits : undefined;
+  const rowBasis = direction === 'row' ? buildVisibleBasisCss(sizeTokens, gutter) : null;
   const computeUnitPx = (fallbackEl: HTMLElement): number => {
     const anchor = envEl || doc.body || fallbackEl;
     return (
@@ -114,10 +116,9 @@ export function buildSplitLayout(
     panel.className = 'tp-split-panel';
 
     if (direction === 'row') {
-      const flexSpec = toFlexSpec(sizeTokens[i], sizes[i]);
-      panel.style.flexGrow = String(flexSpec.grow);
-      panel.style.flexShrink = String(flexSpec.shrink);
-      panel.style.flexBasis = flexSpec.basis;
+      panel.style.flexGrow = '0';
+      panel.style.flexShrink = '0';
+      panel.style.flexBasis = rowBasis?.[i] ?? '0px';
       panel.style.height = '100%';
     } else {
       if (rowUnits && rowUnits.length === n) {

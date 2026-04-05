@@ -1,3 +1,5 @@
+import { computeSplitGeometry } from './singleGeometry';
+
 export type SizeToken =
   | { kind: 'ratio'; value: number }
   | { kind: 'fr'; value: number }
@@ -63,38 +65,8 @@ export function parseSizeExpression(input: number[] | string | undefined, fallba
   });
 }
 
-export function resolveSizeTokens(tokens: SizeToken[], containerPx: number): number[] {
-  const totalPx = Math.max(0, containerPx);
-
-  let reservedPx = 0;
-  let flexibleWeight = 0;
-
-  for (const token of tokens) {
-    if (token.kind === 'px') {
-      reservedPx += token.value;
-      continue;
-    }
-    if (token.kind === 'percent') {
-      reservedPx += (token.value / 100) * totalPx;
-      continue;
-    }
-    flexibleWeight += token.value;
-  }
-
-  const remainingPx = Math.max(0, totalPx - reservedPx);
-
-  return tokens.map((token) => {
-    if (token.kind === 'px') {
-      return token.value;
-    }
-    if (token.kind === 'percent') {
-      return (token.value / 100) * totalPx;
-    }
-    if (flexibleWeight <= 0) {
-      return 0;
-    }
-    return (token.value / flexibleWeight) * remainingPx;
-  });
+export function resolveSizeTokens(tokens: SizeToken[], containerPx: number, gutterPx = 0): number[] {
+  return computeSplitGeometry(tokens, containerPx, gutterPx).preCutPx;
 }
 
 export function toFlexSpec(token: SizeToken | undefined, fallbackWeight: number): FlexSpec {
