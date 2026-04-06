@@ -21,7 +21,11 @@ describe('parseSizeExpression', () => {
     expect(resolveSizeTokens(parseSizeExpression('1fr 2fr', 2), 900)).toEqual([300, 600]);
   });
 
-  it('supports documented mixed strings without approximation', () => {
-    expect(resolveSizeTokens(parseSizeExpression('200px 1fr 30%', 3), 1000, 6)).toEqual([200, 506, 300]);
+  it('supports documented mixed strings with virtual-width percent spans', () => {
+    const resolved = resolveSizeTokens(parseSizeExpression('200px 1fr 30%', 3), 1000, 6);
+
+    expect(resolved[0]).toBeCloseTo(200, 6);
+    expect(resolved[1]).toBeCloseTo(504.2, 6);
+    expect(resolved[2]).toBeCloseTo(301.8, 6);
   });
 });

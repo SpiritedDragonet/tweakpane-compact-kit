@@ -66,7 +66,7 @@ R.appendChild(text);
 </details>
 
 ### Basics — Size Expressions
-Four rows in one pane: equal (3 columns), `1fr 2fr`, `20 80`, and `1fr 2fr 2fr`. With the single geometry model, the first divider of `20 80` naturally lines up with `1fr 2fr 2fr`.
+Four rows in one pane: equal (3 columns), `2fr 1fr`, `20% 80%`, and `1fr 2fr 2fr`. With the single geometry model, the first divider of `20% 80%` naturally lines up with `1fr 2fr 2fr`.
 
 <img src="docs/images/basics-2.svg" style="width:50%;height:auto;" alt="Basics 2/3" />
 
@@ -89,8 +89,8 @@ function mountRow(sizes, labels) {
 }
 
 mountRow('equal', ['Equal 1', 'Equal 2', 'Equal 3']);
-mountRow('1fr 2fr', ['1fr', '2fr']);
-mountRow([20, 80], ['20', '80']);
+mountRow('2fr 1fr', ['2fr', '1fr']);
+mountRow('20% 80%', ['20%', '80%']);
 mountRow('1fr 2fr 2fr', ['1fr', '2fr', '2fr']);
 ```
 
@@ -102,10 +102,10 @@ All row sizes share one geometry rule:
 - Bare numbers and `fr` values divide the remaining pre-cut span
 - The final visible panel width is `span - gutter`
 
-That is why `20 80`, `66 34`, and `200px 1fr 30%` can all stay in the same alignment system without a second layout mode.
+That is why `20% 80%`, `66 33`, and `200px 1fr 30%` can all stay in the same alignment system without a second layout mode.
 
-## Mixed DOM — Custom Content
-Show that you can place arbitrary DOM (canvas, charts, etc.) into any slot. Here we render a custom canvas on the right (4u) next to controls on the left.
+## Mixed DOM — Custom Control Host
+Each split slot can act as a custom control host. Known compact-kit controls publish their own `units`; unknown DOM falls back to measured adaptive height. Here we render a custom SVG donut gauge on the right (4u) next to controls on the left.
 
 <img src="docs/images/basics-3.svg" style="width:50%;height:auto;" alt="Basics 3/3" />
 
@@ -113,7 +113,7 @@ Show that you can place arbitrary DOM (canvas, charts, etc.) into any slot. Here
 <summary>View code</summary>
 
 ```js
-// Row: controls | custom canvas
+// Row: controls | custom SVG gauge
 const gRow = pane.addBlade({ view: 'split-layout', direction: 'row', sizes: '1fr 1fr', gutter: 6, children: ['leaf','leaf'] });
 const [gL, gR] = gRow.getSlots();
 const state = { value: 64, thickness: 10, rounded: true, color: '#22d3ee' };
@@ -126,7 +126,7 @@ pL.addBinding(state, 'thickness', { min: 4, max: 20, step: 1, label: 'Thickness'
 pL.addBinding(state, 'rounded', { label: 'Rounded' });
 pL.addBinding(state, 'color', { label: '' });
 
-// right custom canvas (4u)
+// right custom SVG host (4u)
 const host = document.createElement('div');
 host.style.height = 'calc(4 * var(--cnt-usz) + 3 * 4px)';
 host.style.display = 'grid';
@@ -134,30 +134,42 @@ host.style.placeItems = 'center';
 gR.appendChild(host);
 
 function drawGauge(root: HTMLElement) {
-  const canvas = document.createElement('canvas');
-  const dpr = window.devicePixelRatio || 1;
-  const w = root.clientWidth, h = root.clientHeight;
-  canvas.width = Math.max(1, Math.floor(w * dpr));
-  canvas.height = Math.max(1, Math.floor(h * dpr));
-  canvas.style.width = '100%'; canvas.style.height = '100%';
-  const ctx = canvas.getContext('2d'); if (!ctx) return;
-  ctx.scale(dpr, dpr);
-  const cx = w / 2, cy = h / 2; const r = Math.min(cx, cy) - state.thickness;
-  // track
-  ctx.lineWidth = state.thickness; ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
-  // value arc
-  const start = -Math.PI/2, end = start + (Math.max(0, Math.min(100, state.value))/100) * Math.PI*2;
-  ctx.lineCap = state.rounded ? 'round' : 'butt'; ctx.strokeStyle = state.color; ctx.beginPath(); ctx.arc(cx, cy, r, start, end); ctx.stroke();
-  // text
-  ctx.fillStyle = '#e5e7eb'; ctx.font = `${Math.floor(Math.min(w,h)*0.28)}px system-ui`; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(`${Math.round(state.value)}%`, cx, cy);
-  root.appendChild(canvas);
+  const w = Math.max(1, root.clientWidth);
+  const h = Math.max(1, root.clientHeight);
+  const cx = w / 2, cy = h / 2;
+  const r = Math.max(8, Math.min(cx, cy) - state.thickness);
+  const c = Math.PI * 2 * r;
+  const p = c * (Math.max(0, Math.min(100, state.value)) / 100);
+
+  root.innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="${state.thickness}" />
+      <circle
+        cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${state.color}" stroke-width="${state.thickness}"
+        stroke-linecap="${state.rounded ? 'round' : 'butt'}"
+        stroke-dasharray="${p} ${Math.max(0, c - p)}"
+        transform="rotate(-90 ${cx} ${cy})"
+      />
+      <text
+        x="${cx}" y="${cy}" fill="#e5e7eb"
+        font-size="${Math.floor(Math.min(w, h) * 0.28)}"
+        font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+        text-anchor="middle" dominant-baseline="middle"
+      >${Math.round(state.value)}%</text>
+    </svg>`;
 }
 
 drawGauge(host);
 ```
 
 </details>
+
+Unknown custom content uses the runtime's measured fallback:
+
+- `safe`: round upward to the next whole unit so content never clips
+- `tight`: round to the nearest whole unit when you explicitly want tighter quantization
+
+Built-in split hosts use `safe` by default.
 
 ## Button Extensions
 Use `boolean-button` for real boolean bindings and `sized-button` for stateless actions. Both share the same icon/text content model, so the demo can mix compact-slider toggles, multi-unit boolean buttons, and regular action buttons without a second rendering path.
@@ -187,7 +199,6 @@ pane.addBinding(state, 'compact', {
   contentOn: {
     text: 'Compact Sliders\nOn',
   },
-  onColor: '#0ea5e9',
 });
 
 pane.addBinding(state, 'monitoring', {
@@ -200,7 +211,6 @@ pane.addBinding(state, 'monitoring', {
   contentOn: {
     text: 'Monitoring\nGraph',
   },
-  onColor: '#22c55e',
 });
 
 pane.addBlade({
@@ -228,7 +238,7 @@ Use semantic leaf names (alpha/beta/gamma) and fill each slot with different con
 ```js
 // Row 1: 66/34 — alpha | beta
 const row1 = pane.addBlade({
-  view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['alpha','beta']
+  view: 'split-layout', direction: 'row', sizes: [66, 33], children: ['alpha','beta']
 });
 const [a1, b1] = row1.getSlots();
 // alpha: 3u action button
@@ -276,9 +286,10 @@ Supported public API highlights:
 
 - `sizes`: `number[]`, `'equal'`, bare numeric strings, pure `fr` strings, and mixed strings such as `200px 1fr 30%`
 - `px` and `%` tokens are pre-cut spans, not final visible widths
-- `rowUnits`: `number[]`, `'equal'`, bare numeric strings such as `'1 1 2'`, and `fr` strings such as `'2fr 1fr 1fr'`
-- `height`: row height for `direction: 'row'`; total column height for `direction: 'column'`, or derived from `rowUnits` when omitted
-- `boolean-button`: boolean binding view with `units`, `content`, `contentOn`, `onColor`, and `offColor`
+- `units`: the only vertical baseline field; live content can grow past it, but shrink-back stops at the baseline
+- split slots work as custom control hosts; known compact-kit controls publish units directly, unknown DOM uses measured fallback
+- measured fallback defaults to `safe` upward quantization; `tight` is the nearest-unit variant used by the vertical unit model when needed
+- `boolean-button`: boolean binding view with `units`, `content`, `contentOn`, `onColor`, and `offColor`; omitted `onColor` defaults to `#22d3ee`
 - `gutter`, `interactive`, `compactSliders`, and semantic `children` categories are supported
 
 Short, common calls you’ll use most:
@@ -298,7 +309,7 @@ api.getSlotsByCategory?.('alpha');
 
 // vertical units
 pane.addBlade({
-  view: 'split-layout', direction: 'column', rowUnits: '1 1 2', children: ['leaf','leaf','leaf']
+  view: 'split-layout', direction: 'column', units: 4, children: ['leaf','leaf','leaf']
 });
 
 // compact sliders

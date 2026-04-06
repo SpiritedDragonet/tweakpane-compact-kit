@@ -1,4 +1,5 @@
 import { measureCssUnit, readUnitPx } from '../shared/measure';
+import { setDeclaredUnitState } from '../split/domUnitState';
 
 export type ButtonShellState = {
   pressed?: boolean;
@@ -54,6 +55,11 @@ export function createButtonShell(doc: Document, options: ButtonShellOptions) {
     const safeUnits = Math.max(1, Math.floor(units || 1));
     const unitPx = computeUnitPx(root);
     const gutter = 4;
+    setDeclaredUnitState(root, {
+      baseUnits: safeUnits,
+      liveUnits: safeUnits,
+      behavior: 'fixed',
+    });
 
     if (unitPx > 0) {
       button.style.height = `${safeUnits * unitPx + (safeUnits - 1) * gutter}px`;

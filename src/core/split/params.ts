@@ -1,5 +1,4 @@
 import { countSizeParts, parseSizeExpression, type SizeToken } from './sizeExpressions';
-import { parseRowUnits } from './rowUnits';
 import type { SplitDirection, SplitLayoutNode, SplitLayoutParams } from '../SplitLayoutPlugin';
 
 export type NormalizedSplitLayoutParams = {
@@ -7,8 +6,7 @@ export type NormalizedSplitLayoutParams = {
   direction: SplitDirection;
   sizes: SizeToken[];
   children: SplitLayoutNode[];
-  rowUnits?: number[];
-  height?: number | string;
+  units: number;
   gutter: number;
   minSize: number;
   interactive: boolean;
@@ -34,14 +32,19 @@ export function normalizeSplitParams(input: SplitLayoutParams & Record<string, u
   if ('gap' in input) {
     throw new Error('Use `gutter`; `gap` is not supported.');
   }
+  if ('rowUnits' in input) {
+    throw new Error('`rowUnits` has been retired; use `units`.');
+  }
+  if ('height' in input) {
+    throw new Error('`height` has been retired; use `units`.');
+  }
 
   const p = { ...input };
   const direction: SplitDirection = p.direction === 'column' ? 'column' : 'row';
   const children: SplitLayoutNode[] = Array.isArray(p.children) ? p.children.slice() : [];
 
-  const sizeCount = countSizeParts(p.sizes, 2);
-  const rowUnitCount = p.rowUnits ? countSizeParts(p.rowUnits, 0) : 0;
-  let panelCount = Math.max(children.length || 0, sizeCount, rowUnitCount);
+  const sizeCount = countSizeParts(p.sizes, children.length || 2);
+  let panelCount = Math.max(children.length || 0, sizeCount);
   if (panelCount <= 0) {
     panelCount = 2;
   }
@@ -55,8 +58,7 @@ export function normalizeSplitParams(input: SplitLayoutParams & Record<string, u
     direction,
     sizes: parseSizeExpression(p.sizes, panelCount),
     children,
-    rowUnits: p.rowUnits ? parseRowUnits(p.rowUnits, panelCount) : undefined,
-    height: p.height,
+    units: Math.max(0, Math.floor(typeof p.units === 'number' && Number.isFinite(p.units) ? p.units : 0)),
     gutter: parseNumericSetting(p.gutter, 4),
     minSize: typeof p.minSize === 'number' ? p.minSize : 20,
     interactive: !!p.interactive,

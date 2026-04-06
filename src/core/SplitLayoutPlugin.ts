@@ -2,6 +2,8 @@ import { normalizeSplitParams, type NormalizedSplitLayoutParams } from './split/
 import { buildSplitLayout } from './split/layoutBuilder';
 import { attachInteractiveGutters } from './split/interactiveGutters';
 import { installCompactSliderPatch } from './hacks/compactSliderPatch';
+import { bindBladePositionClasses } from './shared/bladePositionClasses';
+import { setSplitRootHorizontalInset } from './split/rootInset';
 
 export type SplitDirection = 'row' | 'column';
 
@@ -12,14 +14,14 @@ export type SplitLayoutNode =
       direction: SplitDirection;
       // Allow full SizeExpression for nested nodes to support presets like 'equal'
       sizes?: SizeExpression;
-      // When direction === 'column', optional per-row heights in blade units.
-      // If provided, overrides 'sizes' and computes container height from units.
-      rowUnits?: SizeExpression;
+      // Baseline vertical span for this node. Adaptive content may exceed it.
+      units?: number;
       children: SplitLayoutNode[];
       minSize?: number; // min percentage for each pane (default 5)
       // Allow string for convenience (e.g., '6')
       gutter?: number | string; // gutter size in px (default 4)
-      height?: number | string; // only meaningful when direction === 'column'
+      interactive?: boolean;
+      compactSliders?: boolean;
     };
 
 // Size expressions - keep only the actually used formats
@@ -34,10 +36,8 @@ export type SplitLayoutParams = {
   sizes?: SizeExpression;
   // Children - inferred from sizes if not provided
   children?: SplitLayoutNode[];
-  // Vertical unit allocation for column layout (supports same expressions)
-  rowUnits?: SizeExpression;
-  // Optional fixed height for row layout
-  height?: number | string;
+  // Baseline vertical span for this split root.
+  units?: number;
   // Gutter size (default: 4px)
   gutter?: number | string;
   // Minimum size for each panel (default: 20)
@@ -109,8 +109,13 @@ class SplitLayoutController {
     this.blade = args.blade;
     this.viewProps = args.viewProps;
     this.slots = built.leaves;
-    this._dispose = built.cleanup;
-    try { this.viewProps?.handleDispose?.(() => { try { built.cleanup(); } catch {} }); } catch {}
+    const cleanupPositionClasses = bindBladePositionClasses(this.blade, built.element);
+    this._dispose = () => {
+      cleanupPositionClasses();
+      built.cleanup();
+    };
+    try { this.viewProps?.bindClassModifiers?.(built.element); } catch {}
+    try { this.viewProps?.handleDispose?.(() => { try { this._dispose(); } catch {} }); } catch {}
   }
   dispose() {
     this._dispose?.();
@@ -156,22 +161,71 @@ class SplitLayoutApi {
     return map;
   }
 
-  // Wrap a Pane instance so that addBinding() hides label when not explicitly provided
+  // Wrap a Pane instance so split leaves can normalize hidden-label full-width controls.
   wrapPane<T extends { addBinding: Function }>(pane: T): T {
-    const orig = (pane.addBinding as Function).bind(pane);
+    const normalizeNoLabelRoots = (api: any, options?: { hideLabel?: boolean }) => {
+      try {
+        const el = api?.controller?.view?.element as HTMLElement | undefined;
+        if (!el) return api;
+
+        const labeledRoots = el.classList.contains('tp-lblv')
+          ? [el]
+          : Array.from(el.querySelectorAll('.tp-lblv')) as HTMLElement[];
+
+        if (options?.hideLabel) {
+          labeledRoots.forEach((root) => {
+            const label = root.querySelector('.tp-lblv_l') as HTMLElement | null;
+            if (label) {
+              label.remove();
+            }
+            root.classList.add('tp-lblv-nol');
+          });
+        }
+
+        const noLabelRoots = labeledRoots.filter((root) => root.classList.contains('tp-lblv-nol'));
+        noLabelRoots.forEach((root) => {
+          root.style.paddingLeft = '0px';
+          root.style.paddingRight = '0px';
+        });
+      } catch {}
+      return api;
+    };
+
+    const origBinding = (pane.addBinding as Function).bind(pane);
     (pane as any).addBinding = (obj: unknown, key: string, params?: Record<string, unknown>) => {
       const hasLabel = !!(params && Object.prototype.hasOwnProperty.call(params, 'label'));
       const labelEmpty = hasLabel && (params as any).label === '';
-      const api = orig(obj, key, params);
-      if (!hasLabel || labelEmpty) {
-        try {
-          const el = (api as any)?.controller?.view?.element as HTMLElement | undefined;
-          const lbl = el?.querySelector('.tp-lblv_l') as HTMLElement | null;
-          if (lbl) { lbl.remove(); el?.classList.add('tp-lblv-nol'); }
-        } catch {}
-      }
-      return api;
+      const api = origBinding(obj, key, params);
+      return normalizeNoLabelRoots(api, {
+        hideLabel: !hasLabel || labelEmpty,
+      });
     };
+
+    if (typeof (pane as any).addButton === 'function') {
+      const origButton = (pane as any).addButton.bind(pane);
+      (pane as any).addButton = (params?: Record<string, unknown>) => {
+        const api = origButton(params);
+        return normalizeNoLabelRoots(api);
+      };
+    }
+
+    if (typeof (pane as any).addBlade === 'function') {
+      const origBlade = (pane as any).addBlade.bind(pane);
+      (pane as any).addBlade = (params?: Record<string, unknown>) => {
+        const api = origBlade(params);
+        normalizeNoLabelRoots(api);
+        if (params?.view === 'split-layout') {
+          try {
+            const el = api?.controller?.view?.element as HTMLElement | undefined;
+            if (el?.classList.contains('tp-split-root')) {
+              setSplitRootHorizontalInset(el, false);
+            }
+          } catch {}
+        }
+        return api;
+      };
+    }
+
     return pane;
   }
 }
@@ -216,9 +270,6 @@ export const SplitLayoutPlugin: any = {
     /* Make all containers shrink to content height */
     .tp-split-leaf.tp-split-leaf.tp-split-leaf {
       height: auto !important;
-    }
-    .tp-split-root-column > .tp-split-panel.tp-split-panel {
-      flex: 0 0 auto !important;
     }
     .tp-split-leaf .tp-rotv.tp-rotv.tp-rotv {
       height: auto !important;

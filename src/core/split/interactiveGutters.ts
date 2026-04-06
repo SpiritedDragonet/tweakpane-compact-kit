@@ -1,4 +1,5 @@
 import type { SplitDirection } from '../SplitLayoutPlugin';
+import { computeColumnUnitHeightPx } from './columnUnits';
 
 type GutterOptions = {
   doc: Document;
@@ -35,6 +36,27 @@ export function computeDraggedPairWidths(args: {
   };
 }
 
+export function computeDraggedColumnPairUnits(args: {
+  leftUnits: number;
+  rightUnits: number;
+  deltaPx: number;
+  unitPx: number;
+  gutterPx: number;
+}) {
+  const totalUnits = args.leftUnits + args.rightUnits;
+  const trackPx = Math.max(1, args.unitPx + args.gutterPx);
+  const leftUnits = clamp(
+    args.leftUnits + Math.round(args.deltaPx / trackPx),
+    1,
+    totalUnits - 1,
+  );
+
+  return {
+    leftUnits,
+    rightUnits: totalUnits - leftUnits,
+  };
+}
+
 export function attachInteractiveGutters(options: GutterOptions) {
   const {
     doc,
@@ -63,6 +85,12 @@ export function attachInteractiveGutters(options: GutterOptions) {
     const rightPanelRect = panelWrappers[idx + 1].getBoundingClientRect();
     const leftVisiblePx0 = leftPanelRect.width;
     const rightVisiblePx0 = rightPanelRect.width;
+    const rootTransition = root.style.transition;
+    const panelTransitions = panelWrappers.map((panel) => panel.style.transition);
+    root.style.transition = 'none';
+    panelWrappers.forEach((panel) => {
+      panel.style.transition = 'none';
+    });
 
     const move = (e: PointerEvent) => {
       const dx = e.clientX - startX;
@@ -70,16 +98,25 @@ export function attachInteractiveGutters(options: GutterOptions) {
 
       if (direction === 'column' && currentUnits && currentUnits.length === panelWrappers.length) {
         const unitPx = computeUnitPx(root);
-        const totalUnits = a0 + b0;
-        const deltaUnits = Math.round(dy / unitPx);
-        const aUnits = clamp(a0 + deltaUnits, 1, totalUnits - 1);
-        const bUnits = totalUnits - aUnits;
+        const next = computeDraggedColumnPairUnits({
+          leftUnits: a0,
+          rightUnits: b0,
+          deltaPx: dy,
+          unitPx,
+          gutterPx: gutter,
+        });
+        const aUnits = next.leftUnits;
+        const bUnits = next.rightUnits;
         basis[idx] = aUnits;
         basis[idx + 1] = bUnits;
         currentUnits[idx] = aUnits;
         currentUnits[idx + 1] = bUnits;
-        panelWrappers[idx].style.flex = `0 0 ${aUnits * unitPx}px`;
-        panelWrappers[idx + 1].style.flex = `0 0 ${bUnits * unitPx}px`;
+        panelWrappers[idx].style.flexGrow = '0';
+        panelWrappers[idx].style.flexShrink = '0';
+        panelWrappers[idx].style.flexBasis = `${computeColumnUnitHeightPx(aUnits, unitPx, gutter)}px`;
+        panelWrappers[idx + 1].style.flexGrow = '0';
+        panelWrappers[idx + 1].style.flexShrink = '0';
+        panelWrappers[idx + 1].style.flexBasis = `${computeColumnUnitHeightPx(bUnits, unitPx, gutter)}px`;
         return;
       }
 
@@ -118,6 +155,10 @@ export function attachInteractiveGutters(options: GutterOptions) {
     const up = () => {
       doc.removeEventListener('pointermove', move as any);
       doc.removeEventListener('pointerup', up as any);
+      root.style.transition = rootTransition;
+      panelWrappers.forEach((panel, panelIndex) => {
+        panel.style.transition = panelTransitions[panelIndex] ?? '';
+      });
     };
 
     doc.addEventListener('pointermove', move as any);

@@ -1,9 +1,9 @@
-import { vi } from 'vitest';
+import { afterEach, vi } from 'vitest';
 
-class ResizeObserverStub {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-}
+import { ResizeObserverStub, resetResizeObservers } from './resizeObserver';
 
 vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+
+afterEach(() => {
+  resetResizeObservers();
+});

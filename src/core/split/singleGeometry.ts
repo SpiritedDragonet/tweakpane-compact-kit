@@ -11,12 +11,33 @@ function formatPx(value: number): string {
   return `${value}px`;
 }
 
-function resolveFixedPreCutPx(token: SizeToken, containerPx: number): number {
+function buildVirtualExpr(gutterPx: number): string {
+  if (gutterPx === 0) {
+    return '100%';
+  }
+  return `(100% + ${formatPx(gutterPx)})`;
+}
+
+function buildPercentPreCutExpr(percent: number, gutterPx: number): string {
+  return `(${buildVirtualExpr(gutterPx)} * ${percent} / 100)`;
+}
+
+function buildFixedPreCutExpr(token: SizeToken, gutterPx: number): string | null {
+  if (token.kind === 'px') {
+    return formatPx(token.value);
+  }
+  if (token.kind === 'percent') {
+    return buildPercentPreCutExpr(token.value, gutterPx);
+  }
+  return null;
+}
+
+function resolveFixedPreCutPx(token: SizeToken, containerPx: number, gutterPx: number): number {
   if (token.kind === 'px') {
     return token.value;
   }
   if (token.kind === 'percent') {
-    return (token.value / 100) * containerPx;
+    return (token.value / 100) * (containerPx + gutterPx);
   }
   return 0;
 }
@@ -30,29 +51,19 @@ function getFlexibleWeight(tokens: SizeToken[]): number {
   }, 0);
 }
 
-function getReservedPreCutPx(tokens: SizeToken[], containerPx: number): number {
-  return tokens.reduce((sum, token) => sum + resolveFixedPreCutPx(token, containerPx), 0);
+function getReservedPreCutPx(tokens: SizeToken[], containerPx: number, gutterPx: number): number {
+  return tokens.reduce((sum, token) => sum + resolveFixedPreCutPx(token, containerPx, gutterPx), 0);
 }
 
 function buildRemainingExpr(tokens: SizeToken[], gutterPx: number): string {
-  const parts: string[] = [];
+  const fixedTerms = tokens
+    .map((token) => buildFixedPreCutExpr(token, gutterPx))
+    .filter((term): term is string => term !== null);
 
-  parts.push('100%');
-  if (gutterPx !== 0) {
-    parts.push(formatPx(gutterPx));
-  }
-
-  for (const token of tokens) {
-    if (token.kind === 'px') {
-      parts.push(`- ${formatPx(token.value)}`);
-      continue;
-    }
-    if (token.kind === 'percent') {
-      parts.push(`- ${token.value}%`);
-    }
-  }
-
-  return parts.join(' + ').replace(/\+\s-\s/g, '- ');
+  return fixedTerms.reduce(
+    (expr, term) => `${expr} - ${term}`,
+    buildVirtualExpr(gutterPx),
+  );
 }
 
 export function computeSplitGeometry(
@@ -63,13 +74,13 @@ export function computeSplitGeometry(
   const safeContainerPx = Math.max(0, containerPx);
   const safeGutterPx = Math.max(0, gutterPx);
   const virtualPx = safeContainerPx + safeGutterPx;
-  const reservedPreCutPx = getReservedPreCutPx(tokens, safeContainerPx);
+  const reservedPreCutPx = getReservedPreCutPx(tokens, safeContainerPx, safeGutterPx);
   const flexibleWeight = getFlexibleWeight(tokens);
   const remainingPreCutPx = Math.max(0, virtualPx - reservedPreCutPx);
 
   const preCutPx = tokens.map((token) => {
     if (token.kind === 'px' || token.kind === 'percent') {
-      return resolveFixedPreCutPx(token, safeContainerPx);
+      return resolveFixedPreCutPx(token, safeContainerPx, safeGutterPx);
     }
     if (flexibleWeight <= 0) {
       return 0;
@@ -101,15 +112,18 @@ export function buildVisibleBasisCss(tokens: SizeToken[], gutterPx: number): str
   const remainingExpr = buildRemainingExpr(tokens, safeGutterPx);
 
   return tokens.map((token) => {
-    if (token.kind === 'px') {
-      return `calc(${formatPx(token.value)} - ${formatPx(safeGutterPx)})`;
-    }
-    if (token.kind === 'percent') {
-      return `calc(${token.value}% - ${formatPx(safeGutterPx)})`;
+    const fixedExpr = buildFixedPreCutExpr(token, safeGutterPx);
+    if (fixedExpr) {
+      return safeGutterPx === 0
+        ? fixedExpr
+        : `calc(${fixedExpr} - ${formatPx(safeGutterPx)})`;
     }
     if (flexibleWeight <= 0) {
       return '0px';
     }
-    return `calc(((${remainingExpr}) * ${token.value} / ${flexibleWeight}) - ${formatPx(safeGutterPx)})`;
+    const preCutExpr = `((${remainingExpr}) * ${token.value} / ${flexibleWeight})`;
+    return safeGutterPx === 0
+      ? preCutExpr
+      : `calc(${preCutExpr} - ${formatPx(safeGutterPx)})`;
   });
 }

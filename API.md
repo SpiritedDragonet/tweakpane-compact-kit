@@ -20,7 +20,12 @@ pane.registerPlugin(SplitLayoutPlugin);
 ```typescript
 // 自动2等分
 pane.addBlade({ view: 'split-layout', direction: 'row' });
-pane.addBlade({ view: 'split-layout', direction: 'column' });
+pane.addBlade({
+  view: 'split-layout',
+  direction: 'column',
+  units: 2,
+  children: ['leaf']
+});
 ```
 
 ## 尺寸表达式
@@ -93,9 +98,9 @@ pane.addBlade({
   // 样式
   compactSliders: false, // 关闭紧凑slider样式
 
-  // 约束
+  // 约束 / 基线
   minSize: 50,          // 最小尺寸
-  height: 400,          // row方向时是行高；column方向时是总高度
+  units: 4,             // 纵向基线跨度；内容可超过它
 });
 ```
 
@@ -105,24 +110,34 @@ pane.addBlade({
 pane.addBlade({
   view: 'split-layout',
   direction: 'column',
-  sizes: '1fr 2fr',
-
-  // 每行的高度权重（只接受 equal / 裸数字 / fr，不接受 px / %）
-  rowUnits: 'equal',        // 每行等高
-  rowUnits: '1 1 2',        // 裸数字权重
-  rowUnits: '2fr 1fr 1fr',  // 比例分配
-
-  // 固定总高度；省略时会按 rowUnits 自动推导
-  height: 600
+  units: 3,  // 收缩时至少保留 3u
+  children: [
+    'header',
+    {
+      view: 'split-layout',
+      direction: 'row',
+      sizes: '1fr 2fr',
+      units: 2,
+      children: ['left', 'right'],
+    },
+    'footer',
+  ],
 });
 ```
+
+- `units` 是唯一的纵向字段
+- `row.liveUnits = max(baseUnits, max(children.liveUnits))`
+- `column.liveUnits = max(baseUnits, sum(children.liveUnits))`
+- 已知 compact-kit 控件会直接发布自己的 `units`
+- 陌生 DOM / 第三方控件会走测量回退，默认使用 `safe` 向上取整
 
 ## 支持面
 
 - `sizes` 支持 `number[]`、`'equal'`、纯 `fr` 字符串，以及 `200px 1fr 30%` 这类混合字符串
-- `rowUnits` 只支持单位权重语法：`number[]`、`'equal'`、`'1 1 2'`、`'2fr 1fr 1fr'`
+- `units` 是唯一公开的纵向基线语义
 - `gutter` 是公开的间距参数
 - `compactSliders` 是唯一公开的紧凑 slider 开关
+- slot 可以作为 custom control host；未知内容会按测量结果换算成整 `units`
 
 ## 嵌套布局
 
@@ -231,8 +246,7 @@ type SplitLayoutParams = {
   direction: 'row' | 'column';
   sizes?: SizeExpression;
   children?: SplitLayoutNode[];
-  rowUnits?: SizeExpression;
-  height?: number | string;
+  units?: number;
   gutter?: number | string;
   minSize?: number;
   interactive?: boolean;

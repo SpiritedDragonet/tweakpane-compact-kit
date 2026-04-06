@@ -5,6 +5,7 @@
 import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 import * as Essentials from '@tweakpane/plugin-essentials';
+import { renderDonutGaugeSvg } from '../src/demo/donutGaugeSvg';
 
 // Utilities
 function ensureRegistered(pane: Pane) {
@@ -119,67 +120,63 @@ function mountDomUnits(slot: HTMLElement, units: number, inner?: (box: HTMLEleme
   else box.textContent = `${units}u DOM (not a Tweakpane control)`;
 }
 
-// (sparkline demo removed)
+function createRafScheduler(task: () => void) {
+  let rafId = 0;
 
-// Donut gauge (value 0..100) to showcase mixed DOM + controls
-function drawDonutGauge(
-  container: HTMLElement,
-  value: number,
-  options?: { color?: string; thickness?: number; rounded?: boolean }
-) {
-  const color = options?.color ?? '#22d3ee';
-  const thickness = Math.max(2, Math.min(24, Math.floor(options?.thickness ?? 10)));
-  const rounded = !!options?.rounded;
+  const run = () => {
+    if (rafId !== 0) {
+      return;
+    }
+    rafId = requestAnimationFrame(() => {
+      rafId = 0;
+      task();
+    });
+  };
 
-  // Clear previous content
-  container.innerHTML = '';
+  const dispose = () => {
+    if (rafId !== 0) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+  };
 
-  const canvas = document.createElement('canvas');
-  const rect = container.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-  canvas.height = Math.max(1, Math.floor(rect.height * dpr));
-  canvas.style.width = '100%';
-  canvas.style.height = '100%';
-  canvas.style.display = 'block';
-  container.appendChild(canvas);
-
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  ctx.scale(dpr, dpr);
-
-  const W = rect.width;
-  const H = rect.height;
-  const cx = W / 2;
-  const cy = H / 2;
-  const R = Math.max(8, Math.min(cx, cy) - thickness);
-  const start = -Math.PI / 2; // top
-  const end = start + (Math.max(0, Math.min(100, value)) / 100) * Math.PI * 2;
-
-  // Track
-  ctx.beginPath();
-  ctx.arc(cx, cy, R, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.lineWidth = thickness;
-  ctx.lineCap = rounded ? 'round' : 'butt';
-  ctx.stroke();
-
-  // Value arc
-  ctx.beginPath();
-  ctx.arc(cx, cy, R, start, end);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = thickness;
-  ctx.lineCap = rounded ? 'round' : 'butt';
-  ctx.stroke();
-
-  // Center text
-  const pct = Math.round(Math.max(0, Math.min(100, value)));
-  ctx.fillStyle = '#e5e7eb';
-  ctx.font = `${Math.floor(Math.min(W, H) * 0.28)}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`${pct}%`, cx, cy);
+  return { run, dispose };
 }
+
+function observeElementResize(target: HTMLElement, onResize: () => void) {
+  let rafId = 0;
+  const schedule = () => {
+    if (rafId !== 0) {
+      cancelAnimationFrame(rafId);
+    }
+    rafId = requestAnimationFrame(() => {
+      rafId = 0;
+      onResize();
+    });
+  };
+
+  let ro: ResizeObserver | null = null;
+  if (typeof ResizeObserver !== 'undefined') {
+    ro = new ResizeObserver(() => {
+      schedule();
+    });
+    ro.observe(target);
+  }
+
+  window.addEventListener('resize', schedule);
+  schedule();
+
+  return () => {
+    if (rafId !== 0) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+    ro?.disconnect();
+    window.removeEventListener('resize', schedule);
+  };
+}
+
+// (sparkline demo removed)
 
 function main() {
   // Basics 1/3 — First Split
@@ -219,12 +216,12 @@ function main() {
       labels: ['Equal 1', 'Equal 2', 'Equal 3'],
     });
     mountSplitButtonRow(paneB, {
-      sizes: '1fr 2fr',
-      labels: ['1fr', '2fr'],
+      sizes: '2fr 1fr',
+      labels: ['2fr', '1fr'],
     });
     mountSplitButtonRow(paneB, {
-      sizes: [20, 80],
-      labels: ['20', '80'],
+      sizes: '20% 80%',
+      labels: ['20%', '80%'],
     });
     mountSplitButtonRow(paneB, {
       sizes: '1fr 2fr 2fr',
@@ -257,12 +254,21 @@ function main() {
     let gaugeBox: HTMLElement | null = null;
     if (gR) { mountDomUnits(gR, 4, (box) => { gaugeBox = box; }); }
     const renderGauge = () => {
-      if (gaugeBox) drawDonutGauge(gaugeBox, gaugeState.value, {
+      if (gaugeBox) renderDonutGaugeSvg(gaugeBox, gaugeState.value, {
         color: gaugeState.color, thickness: gaugeState.thickness, rounded: gaugeState.rounded,
       });
     };
-    renderGauge();
-    try { leftPaneForGauge?.on('change', renderGauge); } catch {}
+    const gaugeRender = createRafScheduler(renderGauge);
+    let disposeGaugeResize = () => {};
+    if (gaugeBox) {
+      disposeGaugeResize = observeElementResize(gaugeBox, gaugeRender.run);
+    }
+    gaugeRender.run();
+    try { leftPaneForGauge?.on('change', gaugeRender.run); } catch {}
+    window.addEventListener('beforeunload', () => {
+      disposeGaugeResize();
+      gaugeRender.dispose();
+    }, { once: true });
   }
 
   // Section 2: Button extensions
@@ -293,7 +299,6 @@ function main() {
         contentOn: {
           text: 'Compact Sliders\nOn',
         },
-        onColor: '#0ea5e9',
       });
       toggleApi.on('change', () => {
         requestAnimationFrame(renderPreview);
@@ -311,7 +316,6 @@ function main() {
         contentOn: {
           text: 'Armed',
         },
-        onColor: '#ef4444',
       });
     }
 
@@ -333,7 +337,6 @@ function main() {
         contentOn: {
           text: 'Monitoring\nGraph',
         },
-        onColor: '#22c55e',
       });
     }
 
@@ -379,13 +382,13 @@ function main() {
     ensureRegistered(pane3);
     try { pane3.registerPlugin(Essentials); } catch {}
 
-    // Row C1: 66 / 34 — no nested columns (avoid rowUnits), fill with controls
-    const c1 = toSplitApi(pane3.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 34], children: ['alpha', 'beta'] }));
+    // Row C1: 66 / 34 — fill with controls
+    const c1 = toSplitApi(pane3.addBlade({ view: 'split-layout', direction: 'row', sizes: [66, 33], children: ['alpha', 'beta'] }));
 
     // Row C2: equal — three columns, fill each with two controls
     const c2 = toSplitApi(pane3.addBlade({ view: 'split-layout', direction: 'row', sizes: 'equal', children: ['alpha', 'beta', 'gamma'] }));
 
-    // Row C3: 1fr 2fr — fill each side with three controls
+    // Row C3: 1fr 2fr — left side is a nested adaptive column
     const c3 = toSplitApi(pane3.addBlade({
       view: 'split-layout',
       direction: 'row',
@@ -394,8 +397,7 @@ function main() {
         {
           view: 'split-layout',
           direction: 'column',
-          rowUnits: '1 1 1',  // Use rowUnits to auto-calculate height
-          compactSliders: false,  // Non-compact for left side
+          compactSliders: false,
           children: ['alpha', 'alpha', 'alpha']
         },
         'gamma'

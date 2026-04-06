@@ -40,4 +40,23 @@ describe('SizedButtonPlugin', () => {
     expect(root.querySelector('svg')).not.toBeNull();
     expect(root.textContent).toContain('Compact Sliders');
   });
+
+  it('binds tweakpane positional classes onto the sized-button root', () => {
+    document.body.innerHTML = '';
+    document.body.style.setProperty('--cnt-usz', '18px');
+
+    const pane = new Pane({container: document.body});
+    pane.registerPlugin(CompactKitBundle);
+    const api = pane.addBlade({
+      view: 'sized-button',
+      title: 'Run\nAction',
+      units: 3,
+    }) as any;
+
+    const root = api.controller.view.element as HTMLElement;
+    expect(root.classList.contains('tp-v-fst')).toBe(true);
+    expect(root.classList.contains('tp-v-vfst')).toBe(true);
+    expect(root.classList.contains('tp-v-lst')).toBe(true);
+    expect(root.classList.contains('tp-v-vlst')).toBe(true);
+  });
 });

@@ -14,6 +14,7 @@ import {
   type ButtonIcon,
 } from './button/buttonContent';
 import { createButtonShell } from './button/buttonShell';
+import { bindBladePositionClasses } from './shared/bladePositionClasses';
 
 // Controller for the sized button blade
 class SizedButtonController {
@@ -43,6 +44,10 @@ class SizedButtonController {
     this.blade = (args as any).blade;
     this.viewProps = viewProps;
     this.buttonEl = shell.button;
+    const cleanupPositionClasses = bindBladePositionClasses(this.blade, shell.root);
+
+    try { this.viewProps?.bindClassModifiers?.(shell.root); } catch {}
+    try { this.viewProps?.bindDisabled?.(shell.button); } catch {}
 
     // Apply click handler
     if (params.onClick && typeof params.onClick === 'function') {
@@ -52,6 +57,7 @@ class SizedButtonController {
     // Store elements for disposal
     this.disposeFn = () => {
       shell.button.removeEventListener('click', params.onClick);
+      cleanupPositionClasses();
     };
 
     // Hook disposal to view props lifecycle

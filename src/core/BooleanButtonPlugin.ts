@@ -6,6 +6,7 @@ import {
   type ButtonIcon,
 } from './button/buttonContent';
 import { createButtonShell } from './button/buttonShell';
+import { copyDeclaredUnitState } from './split/domUnitState';
 
 function boolFromUnknown(value: unknown) {
   if (value === 'false') {
@@ -26,6 +27,8 @@ type BooleanButtonParams = {
   offColor?: string;
   onColor?: string;
 };
+
+const DEFAULT_BOOLEAN_BUTTON_ON_COLOR = '#22d3ee';
 
 class BooleanButtonController {
   public value: any;
@@ -88,9 +91,12 @@ class BooleanButtonController {
       : this.params_.content;
 
     this.contentHost_.appendChild(renderButtonContent(this.contentHost_.ownerDocument, content));
+    this.buttonEl.setAttribute('aria-pressed', isOn ? 'true' : 'false');
     this.setState_({
       pressed: isOn,
-      accentColor: isOn ? this.params_.onColor : this.params_.offColor,
+      accentColor: isOn
+        ? (this.params_.onColor ?? DEFAULT_BOOLEAN_BUTTON_ON_COLOR)
+        : this.params_.offColor,
     });
   }
 }
@@ -103,10 +109,40 @@ export const BooleanButtonPlugin: any = {
   css: `
     .tp-boolean-button { width: 100%; box-sizing: border-box; }
     .tp-boolean-button .tp-btnv { width: 100%; }
-    .tp-boolean-button .tp-btnv_b { width: 100%; box-sizing: border-box; }
+    .tp-boolean-button .tp-btnv_b {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid transparent;
+      transition:
+        transform 0.14s ease-out,
+        box-shadow 0.16s ease-out,
+        background-color 0.16s ease-out,
+        background-image 0.16s ease-out,
+        border-color 0.16s ease-out,
+        filter 0.16s ease-out;
+    }
     .tp-boolean-button[data-button-pressed="true"] .tp-btnv_b {
-      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
+      background-color: var(--tp-btn-accent, ${DEFAULT_BOOLEAN_BUTTON_ON_COLOR});
+      background-image: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--tp-btn-accent, ${DEFAULT_BOOLEAN_BUTTON_ON_COLOR}) 86%, rgba(255, 255, 255, 0.12)),
+        color-mix(in srgb, var(--tp-btn-accent, ${DEFAULT_BOOLEAN_BUTTON_ON_COLOR}) 76%, rgba(0, 0, 0, 0.18))
+      );
+      border-color: color-mix(in srgb, var(--tp-btn-accent, ${DEFAULT_BOOLEAN_BUTTON_ON_COLOR}) 62%, rgba(0, 0, 0, 0.45));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.24),
+        0 0 0 1px rgba(0, 0, 0, 0.08);
       transform: translateY(1px);
+    }
+    .tp-boolean-button[data-button-pressed="true"] .tp-btnv_b:hover {
+      filter: brightness(1.03) saturate(1.05);
+    }
+    .tp-boolean-button[data-button-pressed="true"] .tp-btnv_b:focus {
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.24),
+        0 0 0 1px color-mix(in srgb, var(--tp-btn-accent, ${DEFAULT_BOOLEAN_BUTTON_ON_COLOR}) 35%, rgba(255, 255, 255, 0.28));
     }
   `,
   accept(value: unknown, params: any) {
@@ -144,6 +180,10 @@ export const BooleanButtonPlugin: any = {
     try {
       args.controller.labelController?.props?.set('label', null);
       args.controller.buttonEl = args.controller.valueController.buttonEl;
+      copyDeclaredUnitState(
+        args.controller.valueController.view.element as HTMLElement,
+        args.controller.view.element as HTMLElement,
+      );
     } catch {}
     return null;
   },
