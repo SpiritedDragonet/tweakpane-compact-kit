@@ -1,4 +1,11 @@
-import { measureCssUnit, readUnitPx } from '../shared/measure';
+/**
+ * Shared button shell used by both custom button plugins.
+ *
+ * The shell owns the DOM shape, height formula, and declared unit metadata.
+ * Higher-level plugins only decide what content to render and how button state
+ * should react to user input.
+ */
+import { resolveUnitPx } from '../shared/unitPx';
 import { setDeclaredUnitState } from '../split/domUnitState';
 
 export type ButtonShellState = {
@@ -12,29 +19,10 @@ type ButtonShellOptions = {
   state?: ButtonShellState;
 };
 
-function findMeasurementAnchor(el: HTMLElement): HTMLElement {
-  let cur: HTMLElement | null = el;
-
-  while (cur) {
-    if (cur.classList?.contains('tp-cntv') || cur.classList?.contains('tp-rotv')) {
-      return cur;
-    }
-    cur = cur.parentElement;
-  }
-
-  return el.ownerDocument.body || el;
-}
-
-function computeUnitPx(root: HTMLElement): number {
-  const anchor = findMeasurementAnchor(root);
-  return (
-    readUnitPx(anchor, 0)
-    || readUnitPx(root, 0)
-    || measureCssUnit(anchor, '--cnt-usz', 0, root)
-    || measureCssUnit(root, '--cnt-usz', 0, anchor)
-  );
-}
-
+/**
+ * Creates a Tweakpane-compatible button subtree and returns a tiny imperative
+ * interface for updating its size and visual state.
+ */
 export function createButtonShell(doc: Document, options: ButtonShellOptions) {
   const root = doc.createElement('div');
   root.className = options.rootClassName;
@@ -53,14 +41,18 @@ export function createButtonShell(doc: Document, options: ButtonShellOptions) {
 
   const setUnits = (units: number) => {
     const safeUnits = Math.max(1, Math.floor(units || 1));
-    const unitPx = computeUnitPx(root);
+    const unitPx = resolveUnitPx(root);
     const gutter = 4;
+
+    // Buttons are fixed-height atomic controls in the split-layout model, so we
+    // publish their unit contract directly on the root element for parent hosts.
     setDeclaredUnitState(root, {
       baseUnits: safeUnits,
       liveUnits: safeUnits,
       behavior: 'fixed',
     });
 
+    // Height uses the same "N tracks + (N - 1) gutters" formula as column spans.
     if (unitPx > 0) {
       button.style.height = `${safeUnits * unitPx + (safeUnits - 1) * gutter}px`;
       return;

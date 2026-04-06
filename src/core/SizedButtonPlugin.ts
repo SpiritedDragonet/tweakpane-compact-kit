@@ -1,11 +1,10 @@
-// SizedButton Blade Plugin for Tweakpane v4
-// - Provides multi-line buttons with configurable heights
-// - Automatically calculates height based on Tweakpane unit size
-// - Includes gap compensation for proper alignment
-// - Minimal API: { view: 'sized-button', title?, units?, onClick? }
-
-// import type { BladeApi } from 'tweakpane';
-// Using any to avoid coupling to Tweakpane's internal types
+/**
+ * Sized button blade plugin.
+ *
+ * This is the simpler of the two custom button plugins: it renders a button
+ * with a fixed vertical span and an optional click handler, while reusing the
+ * same button shell and content renderer as the boolean button.
+ */
 
 import {
   normalizeButtonContent,
@@ -16,7 +15,6 @@ import {
 import { createButtonShell } from './button/buttonShell';
 import { bindBladePositionClasses } from './shared/bladePositionClasses';
 
-// Controller for the sized button blade
 class SizedButtonController {
   public blade: any;
   public view: { element: HTMLElement };
@@ -49,18 +47,17 @@ class SizedButtonController {
     try { this.viewProps?.bindClassModifiers?.(shell.root); } catch {}
     try { this.viewProps?.bindDisabled?.(shell.button); } catch {}
 
-    // Apply click handler
+    // Click binding stays local to the button shell. The plugin does not need a
+    // value model because it behaves like a pure action blade.
     if (params.onClick && typeof params.onClick === 'function') {
       shell.button.addEventListener('click', params.onClick);
     }
 
-    // Store elements for disposal
     this.disposeFn = () => {
       shell.button.removeEventListener('click', params.onClick);
       cleanupPositionClasses();
     };
 
-    // Hook disposal to view props lifecycle
     try { this.viewProps?.handleDispose?.(() => this.dispose()); } catch {}
   }
 
@@ -71,7 +68,6 @@ class SizedButtonController {
   }
 }
 
-// API class for the sized button
 class SizedButtonApi {
   public controller: any;
   private _c: SizedButtonController;
@@ -100,10 +96,13 @@ class SizedButtonApi {
   }
 }
 
-// NOTE: The 'core' semver here refers to @tweakpane/core's major version.
-// For Tweakpane v4.x, @tweakpane/core's major is 2.
-
-// Plugin definition
+/**
+ * Plugin descriptor consumed by Tweakpane.
+ *
+ * The plugin intentionally keeps its public shape tiny: content, units, and an
+ * optional click handler. Anything more complicated is expected to build on top
+ * of this primitive rather than inside it.
+ */
 export const SizedButtonPlugin: any = {
   id: 'sized-button',
   type: 'blade',
@@ -141,7 +140,6 @@ export const SizedButtonPlugin: any = {
   accept(params: any) {
     if (!params || params.view !== 'sized-button') return null;
 
-    // Validate parameters
     const units = Math.max(1, Math.floor(params.units ?? 1));
     const content = normalizeButtonContent(params as {
       title?: string;
@@ -172,6 +170,7 @@ export type SizedButtonOptions = {
   title?: string;
   icon?: ButtonIcon;
   content?: ButtonContent;
-  units?: number; // number of blade rows, integer >= 1
+  // Number of vertical tracks the button should occupy.
+  units?: number;
   onClick?: () => void;
 };

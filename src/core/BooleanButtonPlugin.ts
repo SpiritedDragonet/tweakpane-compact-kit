@@ -1,3 +1,10 @@
+/**
+ * Boolean button input plugin.
+ *
+ * Semantically this is still a boolean binding, not a new state model. The
+ * custom part is visual: it presents the binding as a pressable button that can
+ * swap content and accent color between the off/on states.
+ */
 import {
   mergeButtonContent,
   normalizeButtonContent,
@@ -8,6 +15,10 @@ import {
 import { createButtonShell } from './button/buttonShell';
 import { copyDeclaredUnitState } from './split/domUnitState';
 
+/**
+ * Tweakpane readers can see booleans through several primitive shapes. We keep
+ * the coercion intentionally tiny and unsurprising.
+ */
 function boolFromUnknown(value: unknown) {
   if (value === 'false') {
     return false;
@@ -15,6 +26,9 @@ function boolFromUnknown(value: unknown) {
   return !!value;
 }
 
+/**
+ * Writer shape expected by Tweakpane's primitive binding adapter.
+ */
 function writePrimitive(target: { write: (value: boolean) => void }, value: boolean) {
   target.write(value);
 }
@@ -85,6 +99,8 @@ class BooleanButtonController {
       this.contentHost_.firstChild.remove();
     }
 
+    // The pressed state is derived entirely from the binding value. Visual
+    // state therefore remains truthful even when the value changes externally.
     const isOn = !!this.value.rawValue;
     const content = isOn
       ? mergeButtonContent(this.params_.content, this.params_.contentOn)
@@ -101,7 +117,9 @@ class BooleanButtonController {
   }
 }
 
-// Plugin definition
+/**
+ * Plugin descriptor for a button-styled boolean binding.
+ */
 export const BooleanButtonPlugin: any = {
   id: 'boolean-button',
   type: 'input',
@@ -178,6 +196,9 @@ export const BooleanButtonPlugin: any = {
   api(args: any) {
     if (!(args.controller?.valueController instanceof BooleanButtonController)) return null;
     try {
+      // The label controller owns the outer row. We strip its label and copy the
+      // declared units up so split-layout sees the same atomic control contract
+      // whether it inspects the inner value view or the outer binding wrapper.
       args.controller.labelController?.props?.set('label', null);
       args.controller.buttonEl = args.controller.valueController.buttonEl;
       copyDeclaredUnitState(

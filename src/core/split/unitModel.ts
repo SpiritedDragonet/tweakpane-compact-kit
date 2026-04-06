@@ -1,3 +1,12 @@
+/**
+ * Canonical unit semantics for split layout.
+ *
+ * Every vertical sizing rule eventually reduces to this tree model:
+ * - fixed nodes always stay at their base units
+ * - adaptive nodes can grow above base units
+ * - row nodes take the tallest child
+ * - column nodes sum visible children
+ */
 export type UnitQuantization = 'safe' | 'tight';
 
 export type UnitNode =
@@ -14,6 +23,10 @@ function toNonNegativeInteger(value: number): number {
   return Math.max(0, Math.floor(value));
 }
 
+/**
+ * Converts an integer span into rendered pixels using the shared
+ * `units * unitPx + gutters` formula.
+ */
 export function computeSpanHeightPx(units: number, unitPx: number, gutterPx: number): number {
   const safeUnits = toNonNegativeInteger(units);
   if (safeUnits <= 0) {
@@ -22,6 +35,12 @@ export function computeSpanHeightPx(units: number, unitPx: number, gutterPx: num
   return safeUnits * unitPx + Math.max(0, safeUnits - 1) * gutterPx;
 }
 
+/**
+ * Quantizes measured DOM height back into units.
+ *
+ * `safe` rounds upward to avoid clipping. `tight` is available for places that
+ * intentionally want a closer fit.
+ */
 export function computeMeasuredUnits(
   heightPx: number,
   unitPx: number,
@@ -37,6 +56,9 @@ export function computeMeasuredUnits(
   return Math.max(0, quantized);
 }
 
+/**
+ * Evaluates a unit tree to the live span the layout engine should honor.
+ */
 export function computeNodeLiveUnits(node: UnitNode): number {
   if (node.hidden) {
     return 0;

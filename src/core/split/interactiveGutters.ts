@@ -1,3 +1,10 @@
+/**
+ * Interactive gutter handles.
+ *
+ * The base layout engine is declarative; this module is the imperative layer
+ * that temporarily mutates pane bases while the user drags between neighbors.
+ * Row drags operate in visible pixels, column drags operate in integer units.
+ */
 import type { SplitDirection } from '../SplitLayoutPlugin';
 import { computeColumnUnitHeightPx } from './columnUnits';
 
@@ -17,6 +24,10 @@ function clamp(n: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, n));
 }
 
+/**
+ * Resolves a horizontal drag into the next visible widths for two neighboring
+ * panes while preserving their combined visible width.
+ */
 export function computeDraggedPairWidths(args: {
   leftVisiblePx: number;
   rightVisiblePx: number;
@@ -36,6 +47,10 @@ export function computeDraggedPairWidths(args: {
   };
 }
 
+/**
+ * Resolves a vertical drag into the next integer unit split for two neighboring
+ * column children.
+ */
 export function computeDraggedColumnPairUnits(args: {
   leftUnits: number;
   rightUnits: number;
@@ -57,6 +72,9 @@ export function computeDraggedColumnPairUnits(args: {
   };
 }
 
+/**
+ * Mounts draggable handles onto a split root and returns refresh/cleanup hooks.
+ */
 export function attachInteractiveGutters(options: GutterOptions) {
   const {
     doc,
@@ -70,6 +88,8 @@ export function attachInteractiveGutters(options: GutterOptions) {
     gutter,
   } = options;
 
+  // During a drag we keep a mutable basis snapshot. The main layout kernel can
+  // later overwrite it on the next declarative refresh.
   const basis: number[] = (direction === 'column' && currentUnits && currentUnits.length === panelWrappers.length)
     ? currentUnits.slice()
     : sizes.slice();
@@ -87,6 +107,9 @@ export function attachInteractiveGutters(options: GutterOptions) {
     const rightVisiblePx0 = rightPanelRect.width;
     const rootTransition = root.style.transition;
     const panelTransitions = panelWrappers.map((panel) => panel.style.transition);
+
+    // Dragging should feel direct, so we suspend layout transitions until the
+    // pointer is released.
     root.style.transition = 'none';
     panelWrappers.forEach((panel) => {
       panel.style.transition = 'none';
@@ -174,6 +197,8 @@ export function attachInteractiveGutters(options: GutterOptions) {
     handles.forEach((handle) => handle.remove());
     handles.length = 0;
 
+    // Handles are rebuilt from live panel geometry so they continue to align
+    // after container resizes or content-driven relayouts.
     const rootRect = root.getBoundingClientRect();
     for (let i = 0; i < panelWrappers.length - 1; i++) {
       const panelRect = panelWrappers[i].getBoundingClientRect();

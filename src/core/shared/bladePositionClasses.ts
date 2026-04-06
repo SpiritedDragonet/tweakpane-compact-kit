@@ -1,3 +1,9 @@
+/**
+ * Mirrors Tweakpane blade position flags onto arbitrary custom roots.
+ *
+ * Native views receive these classes automatically. Custom plugin roots do not,
+ * so we subscribe to the blade metadata and forward the same classes manually.
+ */
 const POSITION_CLASSES = {
   veryfirst: 'tp-v-vfst',
   first: 'tp-v-fst',
@@ -25,6 +31,10 @@ function updateBladePositionClasses(blade: any, el: HTMLElement) {
   });
 }
 
+/**
+ * Keeps a custom element in sync with Tweakpane's position-class lifecycle and
+ * returns the corresponding unsubscribe function.
+ */
 export function bindBladePositionClasses(blade: any, el: HTMLElement): () => void {
   const positionsValue = blade?.value?.('positions');
   const emitter = positionsValue?.emitter;

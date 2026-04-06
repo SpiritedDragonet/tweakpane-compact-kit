@@ -1,3 +1,10 @@
+/**
+ * Geometry sanity checks for the compact slider patch.
+ *
+ * The patch intentionally repositions several native slider sub-elements. These
+ * helpers let the patch verify "still looks structurally sane" using simple
+ * rectangles instead of screenshot comparisons.
+ */
 export type CompactRect = {
   left: number;
   top: number;
@@ -33,6 +40,9 @@ function intersectionArea(a: CompactRect, b: CompactRect): number {
   return overlapWidth * overlapHeight;
 }
 
+/**
+ * Confirms that a child rectangle stays visually inside its expected host.
+ */
 function assertInside(name: string, inner: CompactRect, outer: CompactRect) {
   if (inner.left < outer.left - EPSILON_PX || inner.right > outer.right + EPSILON_PX) {
     throw new Error(`${name} escapes its horizontal bounds`);
@@ -52,6 +62,10 @@ function readRect(el: HTMLElement): CompactRect {
   };
 }
 
+/**
+ * Returns `true` only when every tracked rectangle has a positive renderable
+ * area. Hidden or zero-sized controls are ignored by the patch.
+ */
 export function isRenderableCompactLayout(metrics: CompactLayoutMetrics): boolean {
   return [
     metrics.labeledView,
@@ -62,6 +76,12 @@ export function isRenderableCompactLayout(metrics: CompactLayoutMetrics): boolea
   ].every((rect) => width(rect) > 0 && height(rect) > 0);
 }
 
+/**
+ * Applies a deliberately small set of layout heuristics:
+ * - title stays in the upper-left region
+ * - value text stays on the right side
+ * - the compressed track does not run through the value text
+ */
 export function assertCompactLayoutSane(metrics: CompactLayoutMetrics): void {
   assertInside('title', metrics.title, metrics.labeledView);
   assertInside('value text', metrics.valueText, metrics.valueBox);
@@ -86,6 +106,9 @@ export function assertCompactLayoutSane(metrics: CompactLayoutMetrics): void {
   }
 }
 
+/**
+ * Pulls the few rectangles we care about out of the native slider DOM.
+ */
 export function collectCompactLayoutMetrics(labeledView: HTMLElement): CompactLayoutMetrics | null {
   const title = labeledView.querySelector('.tp-lblv_l') as HTMLElement | null;
   const valueBox = labeledView.querySelector('.tp-lblv_v') as HTMLElement | null;

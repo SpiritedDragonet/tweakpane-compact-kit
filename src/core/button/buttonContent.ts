@@ -1,3 +1,10 @@
+/**
+ * Shared button content model.
+ *
+ * Both sized buttons and boolean buttons accept a slightly richer content
+ * description than native Tweakpane buttons. Keeping the normalization and DOM
+ * rendering here prevents the plugins from duplicating icon/title glue code.
+ */
 export type ButtonIcon =
   | string
   | {path: string; viewBox?: string};
@@ -22,6 +29,10 @@ function normalizeIcon(icon: ButtonIcon | undefined): ButtonIcon | undefined {
   };
 }
 
+/**
+ * Collapses the public shorthands (`title`, `icon`) into the single internal
+ * content shape used by the renderers.
+ */
 export function normalizeButtonContent(input: ButtonContentInput): ButtonContent {
   return {
     text: input.content?.text ?? input.title ?? '',
@@ -29,6 +40,10 @@ export function normalizeButtonContent(input: ButtonContentInput): ButtonContent
   };
 }
 
+/**
+ * Builds the "pressed" variant for boolean buttons without mutating the base
+ * content definition.
+ */
 export function mergeButtonContent(
   base: ButtonContent,
   override?: ButtonContent,
@@ -52,6 +67,10 @@ function renderButtonIcon(doc: Document, icon: ButtonIcon): SVGSVGElement {
   return svg;
 }
 
+/**
+ * Renders a compact inline icon/text cluster that can be dropped into the
+ * standard Tweakpane button markup.
+ */
 export function renderButtonContent(
   doc: Document,
   content: ButtonContent,

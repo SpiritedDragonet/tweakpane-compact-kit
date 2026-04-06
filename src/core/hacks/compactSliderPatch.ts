@@ -1,3 +1,11 @@
+/**
+ * Compact slider DOM patch.
+ *
+ * This module deliberately treats native slider markup as a host we can
+ * rearrange rather than reimplementing slider behavior from scratch. The patch
+ * only touches layout/presentation and leaves the underlying slider logic to
+ * Tweakpane.
+ */
 import {
   assertCompactLayoutSane,
   collectCompactLayoutMetrics,
@@ -17,6 +25,9 @@ function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+/**
+ * Reports optional metrics and sanity failures after a slider has been patched.
+ */
 function maybeReportMetrics(labeledView: HTMLElement, options: CompactSliderOptions) {
   if (!options.onMetrics && !options.checkSanity && !options.onSanityError) {
     return;
@@ -44,6 +55,10 @@ function maybeReportMetrics(labeledView: HTMLElement, options: CompactSliderOpti
   }
 }
 
+/**
+ * Installs the compact-slider patch on a host container and keeps applying it
+ * as Tweakpane adds or updates slider rows underneath that host.
+ */
 export function installCompactSliderPatch(
   container: HTMLElement,
   options: CompactSliderOptions = {},
@@ -72,6 +87,9 @@ export function installCompactSliderPatch(
       tweakedSet.add(labeledView);
 
       if (hasSlider) {
+        // The track is vertically compressed in place. We hide the handle rather
+        // than trying to resize it because the compact variant is meant to read
+        // like a thin gauge, not a drag knob.
         const sliderSurface = (valueBox.querySelector('.tp-sldtxtv_s') as HTMLElement | null)
           ?? (valueBox.querySelector('.tp-sldv_s') as HTMLElement | null);
 
@@ -93,6 +111,8 @@ export function installCompactSliderPatch(
 
         const textArea = valueBox.querySelector('.tp-sldtxtv_t') as HTMLElement | null;
         if (textArea) {
+          // The numeric text is re-parented into the value box so it can float
+          // over the compact slider without consuming a second layout row.
           try {
             valueBox.appendChild(textArea);
           } catch {}
@@ -118,6 +138,8 @@ export function installCompactSliderPatch(
 
       const labelStillVisible = !!(labelBox && (!options.hideLabels || labelBox.isConnected));
       if (labelBox && labelStillVisible && hasSlider) {
+        // Labels are pinned into the upper-left corner to free the main track
+        // area for the shrunken slider and the enlarged numeric readout.
         labelBox.style.position = 'absolute';
         labelBox.style.left = '6px';
         labelBox.style.top = '4px';
@@ -147,6 +169,8 @@ export function installCompactSliderPatch(
     labeled.forEach((labeledView) => tweakSliderLabel(labeledView as HTMLElement));
   };
 
+  // A subtree observer is enough here because slider rows are mutated in place
+  // by Tweakpane; no layout polling is needed.
   patchAll(container);
 
   const observer = new MutationObserver(() => patchAll(container));

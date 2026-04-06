@@ -1,3 +1,9 @@
+/**
+ * Normalizes the public split-layout params into one internal shape.
+ *
+ * This is also where we retire old entry points. Rejecting legacy spellings
+ * early keeps the rest of the layout code free from compatibility branches.
+ */
 import { countSizeParts, parseSizeExpression, type SizeToken } from './sizeExpressions';
 import type { SplitDirection, SplitLayoutNode, SplitLayoutParams } from '../SplitLayoutPlugin';
 
@@ -49,6 +55,8 @@ export function normalizeSplitParams(input: SplitLayoutParams & Record<string, u
     panelCount = 2;
   }
 
+  // Missing children are padded with generic leaf slots so the size expression
+  // remains authoritative about arity.
   while (children.length < panelCount) {
     children.push('leaf');
   }

@@ -1,3 +1,12 @@
+/**
+ * Single-geometry row sizing model.
+ *
+ * All row expressions are evaluated on one virtual axis whose length is
+ * `container + gutter`. Each pane first receives a "pre-cut" span on that axis,
+ * then each pane exposes only `span - gutter` as visible width. That single
+ * rule keeps gutters naturally aligned across ratios, `fr`, percentages, and
+ * fixed pixel terms without special casing.
+ */
 import type { SizeToken } from './sizeExpressions';
 
 type SplitGeometry = {
@@ -11,6 +20,8 @@ function formatPx(value: number): string {
   return `${value}px`;
 }
 
+// The virtual axis includes one gutter so each pane can be "cut" symmetrically
+// by a full gutter while the visible gaps still add up to the real gutter size.
 function buildVirtualExpr(gutterPx: number): string {
   if (gutterPx === 0) {
     return '100%';
@@ -88,6 +99,8 @@ export function computeSplitGeometry(
     return (token.value / flexibleWeight) * remainingPreCutPx;
   });
 
+  // Every pane "pays" one gutter from its pre-cut share; adjacent panes then
+  // meet with exactly one real gutter between them.
   const visiblePx = preCutPx.map((span) => Math.max(0, span - safeGutterPx));
   const dividerStartsPx: number[] = [];
   let cursorPx = 0;
@@ -106,6 +119,10 @@ export function computeSplitGeometry(
   };
 }
 
+/**
+ * Produces CSS `flex-basis` expressions that mirror the same geometry model
+ * used by the numeric resolver above.
+ */
 export function buildVisibleBasisCss(tokens: SizeToken[], gutterPx: number): string[] {
   const safeGutterPx = Math.max(0, gutterPx);
   const flexibleWeight = getFlexibleWeight(tokens);

@@ -1,9 +1,17 @@
+/**
+ * Public split-layout plugin surface.
+ *
+ * This file is the boundary between Tweakpane's plugin API and the internal
+ * layout engine. It defines the public types, mounts the built split tree, and
+ * layers on optional conveniences such as compact sliders and interactive
+ * gutters.
+ */
 import { normalizeSplitParams, type NormalizedSplitLayoutParams } from './split/params';
 import { buildSplitLayout } from './split/layoutBuilder';
 import { attachInteractiveGutters } from './split/interactiveGutters';
 import { installCompactSliderPatch } from './hacks/compactSliderPatch';
 import { bindBladePositionClasses } from './shared/bladePositionClasses';
-import { setSplitRootHorizontalInset } from './split/rootInset';
+import { wrapSplitPane } from './split/wrapPane';
 
 export type SplitDirection = 'row' | 'column';
 
@@ -54,6 +62,10 @@ type MountedSplitLayout = {
   cleanup: () => void;
 };
 
+/**
+ * Mounts one normalized split tree and wires the optional runtime add-ons that
+ * live above the core builder.
+ */
 function mountSplitLayout(
   doc: Document,
   params: NormalizedSplitLayoutParams,
@@ -70,6 +82,8 @@ function mountSplitLayout(
 
   let cleanupGutters = () => {};
   if (params.interactive && built.panelWrappers.length > 1) {
+    // Interactive gutters are attached outside the core builder so the builder
+    // stays focused on declarative layout and unit propagation.
     const gutters = attachInteractiveGutters({
       doc,
       root: built.element,
@@ -132,13 +146,15 @@ class SplitLayoutApi {
   getSlots(): HTMLElement[] {
     return this._c.slots;
   }
-  // Get slots by category (user-defined leaf types)
+
+  // Semantic leaf categories let callers mount related UI into selected slots
+  // without depending on fragile DOM traversal.
   getSlotsByCategory(category: string): HTMLElement[] {
     return this._c.slots.filter(slot =>
       slot.dataset && slot.dataset.leafCategory === category
     );
   }
-  // Get all unique categories
+
   getCategories(): string[] {
     const categories = new Set<string>();
     this._c.slots.forEach(slot => {
@@ -148,7 +164,7 @@ class SplitLayoutApi {
     });
     return Array.from(categories);
   }
-  // Get slots as a map of category -> slots[]
+
   getSlotsByCategoryMap(): Map<string, HTMLElement[]> {
     const map = new Map<string, HTMLElement[]>();
     this._c.slots.forEach(slot => {
@@ -161,83 +177,16 @@ class SplitLayoutApi {
     return map;
   }
 
-  // Wrap a Pane instance so split leaves can normalize hidden-label full-width controls.
+  // Nested panes inherit split-friendly padding and inset behavior through this adapter.
   wrapPane<T extends { addBinding: Function }>(pane: T): T {
-    const normalizeNoLabelRoots = (api: any, options?: { hideLabel?: boolean }) => {
-      try {
-        const el = api?.controller?.view?.element as HTMLElement | undefined;
-        if (!el) return api;
-
-        const labeledRoots = el.classList.contains('tp-lblv')
-          ? [el]
-          : Array.from(el.querySelectorAll('.tp-lblv')) as HTMLElement[];
-
-        if (options?.hideLabel) {
-          labeledRoots.forEach((root) => {
-            const label = root.querySelector('.tp-lblv_l') as HTMLElement | null;
-            if (label) {
-              label.remove();
-            }
-            root.classList.add('tp-lblv-nol');
-          });
-        }
-
-        const noLabelRoots = labeledRoots.filter((root) => root.classList.contains('tp-lblv-nol'));
-        noLabelRoots.forEach((root) => {
-          root.style.paddingLeft = '0px';
-          root.style.paddingRight = '0px';
-        });
-      } catch {}
-      return api;
-    };
-
-    const origBinding = (pane.addBinding as Function).bind(pane);
-    (pane as any).addBinding = (obj: unknown, key: string, params?: Record<string, unknown>) => {
-      const hasLabel = !!(params && Object.prototype.hasOwnProperty.call(params, 'label'));
-      const labelEmpty = hasLabel && (params as any).label === '';
-      const api = origBinding(obj, key, params);
-      return normalizeNoLabelRoots(api, {
-        hideLabel: !hasLabel || labelEmpty,
-      });
-    };
-
-    if (typeof (pane as any).addButton === 'function') {
-      const origButton = (pane as any).addButton.bind(pane);
-      (pane as any).addButton = (params?: Record<string, unknown>) => {
-        const api = origButton(params);
-        return normalizeNoLabelRoots(api);
-      };
-    }
-
-    if (typeof (pane as any).addBlade === 'function') {
-      const origBlade = (pane as any).addBlade.bind(pane);
-      (pane as any).addBlade = (params?: Record<string, unknown>) => {
-        const api = origBlade(params);
-        normalizeNoLabelRoots(api);
-        if (params?.view === 'split-layout') {
-          try {
-            const el = api?.controller?.view?.element as HTMLElement | undefined;
-            if (el?.classList.contains('tp-split-root')) {
-              setSplitRootHorizontalInset(el, false);
-            }
-          } catch {}
-        }
-        return api;
-      };
-    }
-
-    return pane;
+    return wrapSplitPane(pane);
   }
 }
 
-// NOTE: The 'core' semver here refers to @tweakpane/core's major version.
-// For Tweakpane v4.x, @tweakpane/core's major is 2.
-
 export const SplitLayoutPlugin: any = {
   id: 'split-layout',
-  // Mark as blade plugin so it can be added via addBlade({ view: 'split-layout' })
   type: 'blade',
-  // Tweakpane compatibility: match @tweakpane/core major version (v2 for Tweakpane v4)
+  // `core` tracks @tweakpane/core, which is major 2 for Tweakpane v4.
   core: { major: 2, minor: 0, patch: 0 },
   accept(params: any) {
     if (!params || params.view !== 'split-layout') return null;
@@ -251,7 +200,8 @@ export const SplitLayoutPlugin: any = {
     if (!(args.controller instanceof SplitLayoutController)) return null;
     return new SplitLayoutApi(args.controller as SplitLayoutController);
   },
-  // Auto-inject styles for tight layout (no gaps, no overflow)
+  // The CSS here mainly removes native chrome that would otherwise fight the
+  // custom row/column geometry inside split leaves.
   css: `
     /* Hide Tweakpane title bar and spacing elements to eliminate vertical gaps */
     .tp-split-leaf .tp-rotv_b {

@@ -1,3 +1,10 @@
+/**
+ * Parser and adapters for horizontal size expressions.
+ *
+ * Public input can be ratios, `fr`, pixels, or percentages. We normalize those
+ * syntaxes into a tiny token set that the geometry layer can reason about
+ * without remembering the original surface syntax.
+ */
 import { computeSplitGeometry } from './singleGeometry';
 
 export type SizeToken =
@@ -17,6 +24,10 @@ function parsePositiveNumber(raw: string): number {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
+/**
+ * Counts how many panes an expression implies so callers can reconcile omitted
+ * children with omitted size terms.
+ */
 export function countSizeParts(input: number[] | string | undefined, fallbackCount = 2): number {
   if (!input) return fallbackCount;
   if (Array.isArray(input)) return input.length || fallbackCount;
@@ -26,6 +37,9 @@ export function countSizeParts(input: number[] | string | undefined, fallbackCou
   return parts.length || fallbackCount;
 }
 
+/**
+ * Converts the public size expression into normalized tokens.
+ */
 export function parseSizeExpression(input: number[] | string | undefined, fallbackCount = 2): SizeToken[] {
   if (!input) {
     return Array.from({ length: fallbackCount }, () => ({ kind: 'ratio', value: 1 as number }));
@@ -65,10 +79,19 @@ export function parseSizeExpression(input: number[] | string | undefined, fallba
   });
 }
 
+/**
+ * Resolves each token to its pre-cut width on the virtual axis used by the
+ * single-geometry model.
+ */
 export function resolveSizeTokens(tokens: SizeToken[], containerPx: number, gutterPx = 0): number[] {
   return computeSplitGeometry(tokens, containerPx, gutterPx).preCutPx;
 }
 
+/**
+ * Older flex-based callers still use this adapter. Newer row layout paths
+ * prefer `singleGeometry.ts`, but keeping this helper makes the token layer
+ * usable from both styles.
+ */
 export function toFlexSpec(token: SizeToken | undefined, fallbackWeight: number): FlexSpec {
   if (!token || token.kind === 'ratio' || token.kind === 'fr') {
     return {

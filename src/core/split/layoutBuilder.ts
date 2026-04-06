@@ -1,18 +1,26 @@
+/**
+ * Split layout tree builder.
+ *
+ * Responsibilities in this file are intentionally grouped around one rendering
+ * pipeline:
+ * 1. understand how host content maps to units
+ * 2. build the DOM tree for row/column nodes
+ * 3. run the central `refreshLayout()` pass that translates live units into
+ *    actual element sizes
+ *
+ * The file is large because those steps are tightly coupled by design. The
+ * supporting helpers extracted elsewhere (`hostRuntime`, `unitPx`, `wrapPane`)
+ * remove plumbing, but the layout refresh kernel remains here on purpose.
+ */
 import type { SplitDirection, SplitLayoutParams } from '../SplitLayoutPlugin';
-import { measureCssUnit, readUnitPx } from '../shared/measure';
+import { resolveUnitPx } from '../shared/unitPx';
+import { createHostRuntime, type VerticalState } from './hostRuntime';
 import { normalizeSplitParams, type NormalizedSplitLayoutParams } from './params';
 import { resolveSizeTokens, toFlexSpec } from './sizeExpressions';
 import { buildVisibleBasisCss } from './singleGeometry';
 import { readDeclaredUnitState, setDeclaredUnitState } from './domUnitState';
 import { computeMeasuredUnits, computeNodeLiveUnits, computeSpanHeightPx } from './unitModel';
 import { setSplitRootHorizontalInset } from './rootInset';
-
-type VerticalState = {
-  getBaseUnits: () => number;
-  getLiveUnits: () => number;
-  setBaseUnits: (nextUnits: number) => void;
-  refresh: () => void;
-};
 
 export type BuildResult = {
   element: HTMLElement;
@@ -59,6 +67,10 @@ function toUnits(value: number): number {
   return Math.max(0, Math.floor(value));
 }
 
+/**
+ * Visibility checks are used throughout the host-unit pipeline. Hidden content
+ * should contribute zero units regardless of any remembered live state.
+ */
 function isElementHidden(el: HTMLElement): boolean {
   const doc = el.ownerDocument;
   const win = doc.defaultView;
@@ -104,10 +116,21 @@ function expandCompoundHostItem(root: HTMLElement): HTMLElement[] {
   return [root];
 }
 
+/**
+ * Collects the top-level semantic items inside a host container.
+ *
+ * A host might contain plain custom DOM, native Tweakpane rows, or wrapper rows
+ * whose content should be treated as multiple logical items. This normalization
+ * gives the unit resolver one stable list to inspect.
+ */
 function collectHostItems(container: HTMLElement): HTMLElement[] {
   return getVisibleElementChildren(container).flatMap((child) => expandCompoundHostItem(child));
 }
 
+/**
+ * Walks through a host item looking for a control that has explicitly declared
+ * its split-layout unit contract via DOM data attributes.
+ */
 function resolveDeclaredUnitsForHostItem(item: HTMLElement): number | null {
   const queue: HTMLElement[] = [item];
   const visited = new Set<HTMLElement>();
@@ -182,6 +205,10 @@ function computeFolderUnits(
   return 1 + resolveHostContentUnits(content, unitPx, gutter);
 }
 
+/**
+ * Recognizes native controls whose unit semantics are simpler and more reliable
+ * than raw measurement.
+ */
 function resolveKnownUnitsForHostItem(
   item: HTMLElement,
   unitPx: number,
@@ -195,6 +222,14 @@ function resolveKnownUnitsForHostItem(
   return null;
 }
 
+/**
+ * Resolves the live unit demand of one mounted host container.
+ *
+ * The order matters:
+ * 1. known native controls
+ * 2. declared unit metadata from custom controls
+ * 3. measured fallback for unknown DOM
+ */
 function resolveHostContentUnits(
   container: HTMLElement,
   unitPx: number,
@@ -229,6 +264,13 @@ function resolveHostContentUnits(
   }, 0);
 }
 
+/**
+ * Best-effort intrinsic measurement used only as the fallback path for unknown
+ * host content.
+ *
+ * The measurement logic prefers the most meaningful inner control wrapper when
+ * one exists so we do not accidentally charge units for outer structural shells.
+ */
 function measureIntrinsicHeightPx(container: HTMLElement): number {
   if (isElementHidden(container)) {
     return 0;
@@ -323,14 +365,14 @@ export function buildSplitLayout(
     ? normalizeSizes(n, resolveSizeTokens(sizeTokens, estimatedAxisPx, gutter))
     : Array.from({ length: n }, () => 0);
   const rowBasis = direction === 'row' ? buildVisibleBasisCss(sizeTokens, gutter) : null;
+
+  // Unit size is always borrowed from the nearest real Tweakpane container so
+  // our custom views stay visually locked to native controls.
   const computeUnitPx = (fallbackEl: HTMLElement): number => {
-    const anchor = envEl || doc.body || fallbackEl;
-    return (
-      readUnitPx(anchor, 0)
-      || readUnitPx(fallbackEl, 0)
-      || measureCssUnit(anchor, '--cnt-usz', 1, fallbackEl)
-      || measureCssUnit(fallbackEl, '--cnt-usz', 1, anchor)
-    );
+    return resolveUnitPx(fallbackEl, {
+      anchor: envEl || doc.body || fallbackEl,
+      fallback: 1,
+    });
   };
 
   const root = doc.createElement('div');
@@ -367,6 +409,7 @@ export function buildSplitLayout(
     const unitPx = computeUnitPx(root);
     const childLiveUnits = childStates.map((state) => state.getLiveUnits());
 
+    // Row nodes take the tallest child; column nodes sum visible children.
     liveUnits = direction === 'row'
       ? computeNodeLiveUnits({
           kind: 'row',
@@ -391,6 +434,9 @@ export function buildSplitLayout(
       liveUnits,
       behavior: 'adaptive',
     });
+
+    // Root height always follows live units. Child panel sizing then depends on
+    // whether this node lays children out horizontally or vertically.
     root.style.height = `${computeSpanHeightPx(liveUnits, unitPx, gutter)}px`;
 
     if (direction === 'row') {
@@ -412,6 +458,8 @@ export function buildSplitLayout(
         panel.style.display = 'flex';
         panel.style.flexGrow = '0';
         panel.style.flexShrink = '0';
+        // Vertical gaps are applied only between visible panels so hidden or
+        // zero-unit children collapse cleanly.
         panel.style.marginTop = seenVisiblePanel && units > 0 ? `${gutter}px` : '0px';
 
         if (units <= 0) {
@@ -435,91 +483,6 @@ export function buildSplitLayout(
     }
     baseUnits = safeUnits;
     refreshLayout();
-  };
-
-  const createHostState = (container: HTMLElement): VerticalState => {
-    let hostBaseUnits = 0;
-    let liveHostUnits = 0;
-    let refreshQueued = false;
-
-    const refreshHost = () => {
-      liveHostUnits = resolveHostContentUnits(container, computeUnitPx(root), gutter);
-      refreshLayout();
-    };
-
-    const scheduleRefreshHost = () => {
-      if (refreshQueued || disposed) {
-        return;
-      }
-      refreshQueued = true;
-
-      const run = () => {
-        refreshQueued = false;
-        if (disposed) {
-          return;
-        }
-        refreshHost();
-      };
-
-      if (typeof queueMicrotask === 'function') {
-        queueMicrotask(run);
-        return;
-      }
-
-      Promise.resolve().then(run).catch(() => {});
-    };
-
-    try {
-      const ro = new ResizeObserver(() => {
-        scheduleRefreshHost();
-      });
-      ro.observe(container);
-      disposers.push(() => {
-        ro.disconnect();
-      });
-    } catch {}
-
-    try {
-      const mo = new MutationObserver((records) => {
-        const shouldRefresh = records.some((record) =>
-          record.type === 'childList'
-          || (record.type === 'attributes'
-            && (record.attributeName === 'class'
-              || record.attributeName === 'hidden')));
-
-        if (shouldRefresh) {
-          scheduleRefreshHost();
-        }
-      });
-      mo.observe(container, {
-        subtree: true,
-        childList: true,
-        attributes: true,
-        attributeFilter: ['class', 'hidden'],
-      });
-      disposers.push(() => {
-        mo.disconnect();
-      });
-    } catch {}
-
-    return {
-      getBaseUnits: () => hostBaseUnits,
-      getLiveUnits: () => {
-        if (isElementHidden(container)) {
-          return 0;
-        }
-        return Math.max(hostBaseUnits, liveHostUnits);
-      },
-      setBaseUnits: (nextUnits: number) => {
-        const safeUnits = toUnits(nextUnits);
-        if (safeUnits === hostBaseUnits) {
-          return;
-        }
-        hostBaseUnits = safeUnits;
-        refreshLayout();
-      },
-      refresh: refreshHost,
-    };
   };
 
   for (let i = 0; i < n; i++) {
@@ -559,6 +522,8 @@ export function buildSplitLayout(
     const container = panelWrappers[i].firstElementChild as HTMLElement;
 
     if (typeof child === 'string') {
+      // String children are semantic leaf slots. Consumers mount their own DOM
+      // or nested panes into these containers later.
       container.style.display = 'flex';
       container.style.flexDirection = 'column';
       container.style.alignItems = 'stretch';
@@ -584,13 +549,23 @@ export function buildSplitLayout(
         } catch {}
       }
 
-      const hostState = createHostState(container);
+      const hostState = createHostRuntime({
+        container,
+        resolveLiveUnits: () => resolveHostContentUnits(container, computeUnitPx(root), gutter),
+        refreshLayout,
+        isDisposed: () => disposed,
+        isElementHidden,
+        toUnits,
+        disposers,
+      });
       childStates.push(hostState);
       directHostStates.push(hostState);
       continue;
     }
 
     if (child && (child as any).view === 'split-layout') {
+      // Nested splits participate directly in the unit tree rather than going
+      // through host measurement.
       const nested = buildSplitLayout(doc, normalizeSplitParams(child as SplitLayoutParams), {
         path: path.concat(i),
         envEl,
@@ -612,11 +587,20 @@ export function buildSplitLayout(
       continue;
     }
 
+    // Any other node shape is treated as a generic host container.
     container.style.display = 'block';
     container.style.width = '100%';
     container.style.height = 'auto';
     leaves.push(container);
-    const hostState = createHostState(container);
+    const hostState = createHostRuntime({
+      container,
+      resolveLiveUnits: () => resolveHostContentUnits(container, computeUnitPx(root), gutter),
+      refreshLayout,
+      isDisposed: () => disposed,
+      isElementHidden,
+      toUnits,
+      disposers,
+    });
     childStates.push(hostState);
     directHostStates.push(hostState);
   }
@@ -624,6 +608,9 @@ export function buildSplitLayout(
   refreshLayout();
   initialized = true;
 
+  // Mounted hosts often receive their real content later in the same turn. One
+  // post-build microtask is enough to pick those contents up without waiting for
+  // a ResizeObserver flush.
   const scheduleInitialHostRefresh = () => {
     const run = () => {
       if (disposed) {
