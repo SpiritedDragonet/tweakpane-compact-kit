@@ -35,13 +35,37 @@ describe('mergeButtonContent', () => {
 });
 
 describe('renderButtonContent', () => {
-  it('renders icon + text without custom user DOM', () => {
+  it('renders a stable mixed icon-text structure', () => {
     const el = renderButtonContent(document, {
       text: 'Compact Sliders',
       icon: {path: 'M3 8h10', viewBox: '0 0 16 16'},
     });
 
-    expect(el.querySelector('svg')).not.toBeNull();
-    expect(el.textContent).toContain('Compact Sliders');
+    expect(el.classList.contains('tp-btnc-mixed')).toBe(true);
+    expect(el.querySelector('.tp-btnc_ir')).not.toBeNull();
+    expect(el.querySelector('.tp-btnc_tr')).not.toBeNull();
+    expect(el.querySelector('.tp-btnc_gh')).not.toBeNull();
+    expect(el.querySelector('.tp-btnc_iw svg')).not.toBeNull();
+    expect(el.querySelector('.tp-btnc_tw')?.textContent).toBe('Compact Sliders');
+  });
+
+  it('renders text-only content without an icon rail payload', () => {
+    const el = renderButtonContent(document, {
+      text: 'Run Action',
+    });
+
+    expect(el.classList.contains('tp-btnc-text')).toBe(true);
+    expect(el.querySelector('.tp-btnc_iw')).toBeNull();
+    expect(el.querySelector('.tp-btnc_tw')?.textContent).toBe('Run Action');
+  });
+
+  it('renders icon-only content without a text rail payload', () => {
+    const el = renderButtonContent(document, {
+      icon: {path: 'M3 8h10', viewBox: '0 0 16 16'},
+    });
+
+    expect(el.classList.contains('tp-btnc-icon')).toBe(true);
+    expect(el.querySelector('.tp-btnc_tw')).toBeNull();
+    expect(el.querySelector('.tp-btnc_iw svg')).not.toBeNull();
   });
 });

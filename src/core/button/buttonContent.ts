@@ -67,28 +67,56 @@ function renderButtonIcon(doc: Document, icon: ButtonIcon): SVGSVGElement {
   return svg;
 }
 
+function getButtonContentMode(content: ButtonContent) {
+  const hasIcon = !!content.icon;
+  const hasText = !!content.text;
+
+  if (hasIcon && hasText) return 'mixed';
+  if (hasIcon) return 'icon';
+  if (hasText) return 'text';
+  return 'empty';
+}
+
 /**
- * Renders a compact inline icon/text cluster that can be dropped into the
- * standard Tweakpane button markup.
+ * Renders a stable icon/text layout for both custom button plugins.
+ *
+ * Mixed content uses a fixed-width icon rail plus a balanced ghost rail so the
+ * text can stay centered without the icon drifting when the label changes.
  */
 export function renderButtonContent(
   doc: Document,
   content: ButtonContent,
 ): HTMLElement {
   const root = doc.createElement('span');
-  root.className = 'tp-btnc';
+  const mode = getButtonContentMode(content);
+  root.className = `tp-btnc tp-btnc-${mode}`;
+
+  const iconRail = doc.createElement('span');
+  iconRail.className = 'tp-btnc_ir';
+  root.appendChild(iconRail);
+
+  const textRail = doc.createElement('span');
+  textRail.className = 'tp-btnc_tr';
+  root.appendChild(textRail);
+
+  const ghostRail = doc.createElement('span');
+  ghostRail.className = 'tp-btnc_gh';
+  root.appendChild(ghostRail);
 
   if (content.icon) {
+    const iconWrap = doc.createElement('span');
+    iconWrap.className = 'tp-btnc_iw';
     const icon = renderButtonIcon(doc, content.icon);
     icon.classList.add('tp-btnc_i');
-    root.appendChild(icon);
+    iconWrap.appendChild(icon);
+    iconRail.appendChild(iconWrap);
   }
 
   if (content.text) {
     const text = doc.createElement('span');
-    text.className = 'tp-btnc_t';
+    text.className = 'tp-btnc_tw';
     text.textContent = content.text;
-    root.appendChild(text);
+    textRail.appendChild(text);
   }
 
   return root;

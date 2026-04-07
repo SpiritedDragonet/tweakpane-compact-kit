@@ -13,6 +13,7 @@ import {
   type ButtonIcon,
 } from './button/buttonContent';
 import { createButtonShell } from './button/buttonShell';
+import { BUTTON_CONTENT_CSS } from './button/buttonStyles';
 import { copyDeclaredUnitState } from './split/domUnitState';
 
 /**
@@ -162,6 +163,7 @@ export const BooleanButtonPlugin: any = {
         inset 0 -1px 0 rgba(0, 0, 0, 0.24),
         0 0 0 1px color-mix(in srgb, var(--tp-btn-accent, ${DEFAULT_BOOLEAN_BUTTON_ON_COLOR}) 35%, rgba(255, 255, 255, 0.28));
     }
+    ${BUTTON_CONTENT_CSS}
   `,
   accept(value: unknown, params: any) {
     if (!params || params.view !== 'boolean-button') return null;

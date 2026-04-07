@@ -13,6 +13,7 @@ import {
   type ButtonIcon,
 } from './button/buttonContent';
 import { createButtonShell } from './button/buttonShell';
+import { BUTTON_CONTENT_CSS } from './button/buttonStyles';
 import { bindBladePositionClasses } from './shared/bladePositionClasses';
 
 class SizedButtonController {
@@ -113,29 +114,7 @@ export const SizedButtonPlugin: any = {
     .tp-sized-button { width: 100%; box-sizing: border-box; }
     .tp-sized-button .tp-btnv { width: 100%; }
     .tp-sized-button .tp-btnv_b { width: 100%; box-sizing: border-box; }
-    .tp-sized-button .tp-btnv_c {
-      align-items: center;
-      display: inline-flex;
-      gap: 6px;
-      justify-content: center;
-      width: 100%;
-    }
-    .tp-btnc {
-      align-items: center;
-      display: inline-flex;
-      gap: 6px;
-      justify-content: center;
-      max-width: 100%;
-    }
-    .tp-btnc_t { white-space: pre-line; }
-    .tp-btnc_i {
-      display: block;
-      fill: none;
-      height: 16px;
-      stroke: currentColor;
-      stroke-width: 1.5;
-      width: 16px;
-    }
+    ${BUTTON_CONTENT_CSS}
   `,
   accept(params: any) {
     if (!params || params.view !== 'sized-button') return null;
