@@ -15,6 +15,7 @@ import {
 import { createButtonShell } from './button/buttonShell';
 import { BUTTON_CONTENT_CSS } from './button/buttonStyles';
 import { bindBladePositionClasses } from './shared/bladePositionClasses';
+import { copyDeclaredUnitState } from './split/domUnitState';
 
 class SizedButtonController {
   public blade: any;
@@ -32,6 +33,7 @@ class SizedButtonController {
     const shell = createButtonShell(document, {
       rootClassName: 'tp-sized-button',
       units: params.units || 1,
+      iconSize: params.iconSize,
     });
 
     while (shell.contentHost.firstChild) {
@@ -39,13 +41,27 @@ class SizedButtonController {
     }
     shell.contentHost.appendChild(renderButtonContent(document, params.content));
 
-    this.view = { element: shell.root };
+    const row = document.createElement('div');
+    row.className = 'tp-lblv tp-lblv-nol';
+
+    const label = document.createElement('div');
+    label.className = 'tp-lblv_l';
+    row.appendChild(label);
+
+    const value = document.createElement('div');
+    value.className = 'tp-lblv_v';
+    value.appendChild(shell.root);
+    row.appendChild(value);
+
+    copyDeclaredUnitState(shell.root, row);
+
+    this.view = { element: row };
     this.blade = (args as any).blade;
     this.viewProps = viewProps;
     this.buttonEl = shell.button;
-    const cleanupPositionClasses = bindBladePositionClasses(this.blade, shell.root);
+    const cleanupPositionClasses = bindBladePositionClasses(this.blade, row);
 
-    try { this.viewProps?.bindClassModifiers?.(shell.root); } catch {}
+    try { this.viewProps?.bindClassModifiers?.(row); } catch {}
     try { this.viewProps?.bindDisabled?.(shell.button); } catch {}
 
     // Click binding stays local to the button shell. The plugin does not need a
@@ -124,15 +140,18 @@ export const SizedButtonPlugin: any = {
       title?: string;
       icon?: ButtonIcon;
       content?: ButtonContent;
+      iconSize?: number;
     });
     const onClick = params.onClick;
+    const iconSize = typeof params.iconSize === 'number' ? params.iconSize : undefined;
 
     return {
       params: {
         view: 'sized-button',
         content,
         units,
-        onClick
+        onClick,
+        iconSize,
       }
     };
   },
@@ -149,6 +168,7 @@ export type SizedButtonOptions = {
   title?: string;
   icon?: ButtonIcon;
   content?: ButtonContent;
+  iconSize?: number;
   // Number of vertical tracks the button should occupy.
   units?: number;
   onClick?: () => void;

@@ -4,8 +4,10 @@ export const SHOWCASE_SECTION_KEYS = [
   'quick-start',
   'first-split',
   'width-geometry',
+  'custom-dom',
   'units-and-height-flow',
-  'control-semantics',
+  'buttons',
+  'compact-sliders-and-labels',
   'composing-layouts',
   'run-the-demo',
 ] as const;
@@ -18,20 +20,19 @@ export const SHOWCASE_SECTION_TITLES: Record<ShowcaseSectionKey, string> = {
   'quick-start': 'Quick Start',
   'first-split': '1 First Split',
   'width-geometry': '2 Width Geometry',
-  'units-and-height-flow': '3 Units And Height Flow',
-  'control-semantics': '4 Control Semantics',
-  'composing-layouts': '5 Composing Layouts',
+  'custom-dom': '3 Custom DOM',
+  'units-and-height-flow': '4 Units And Height Flow',
+  buttons: '5 Buttons',
+  'compact-sliders-and-labels': '6 Compact Sliders And Labels',
+  'composing-layouts': '7 Composing Layouts',
   'run-the-demo': 'Run the Demo',
 };
-
-export type ShowcaseScreenshot = string | readonly [string, string];
 
 export type ShowcaseSubsection = {
   key: string;
   section: ShowcaseSectionKey;
   title: string;
-  screenshot: ShowcaseScreenshot;
-  stateful?: boolean;
+  screenshot: string;
 };
 
 // This file is the contract shared by the live demo, screenshot export, and
@@ -45,36 +46,46 @@ export const SHOWCASE_SUBSECTIONS: readonly ShowcaseSubsection[] = [
     screenshot: 'split-first-row.svg',
   },
   {
-    key: 'split-size-expressions',
+    key: 'split-width-geometry',
     section: 'width-geometry',
     title: 'Width Geometry',
-    screenshot: 'split-size-expressions.svg',
+    screenshot: 'split-width-geometry.svg',
   },
   {
-    key: 'split-mixed-dom',
+    key: 'split-custom-dom',
+    section: 'custom-dom',
+    title: 'Custom DOM',
+    screenshot: 'split-custom-dom.svg',
+  },
+  {
+    key: 'split-units-height-flow',
     section: 'units-and-height-flow',
     title: 'Units And Height Flow',
-    screenshot: 'split-mixed-dom.svg',
+    screenshot: 'split-units-height-flow.svg',
   },
   {
-    key: 'button-boolean',
-    section: 'control-semantics',
-    title: 'Boolean Button',
-    screenshot: ['button-boolean-off.svg', 'button-boolean-on.svg'],
-    stateful: true,
+    key: 'buttons-overview',
+    section: 'buttons',
+    title: 'Buttons Overview',
+    screenshot: 'buttons-overview.svg',
   },
   {
-    key: 'button-sized-actions',
-    section: 'control-semantics',
-    title: 'Sized Actions',
-    screenshot: 'button-sized-actions.svg',
+    key: 'buttons-boolean-on',
+    section: 'buttons',
+    title: 'Buttons Boolean On',
+    screenshot: 'buttons-boolean-on.svg',
   },
   {
-    key: 'compact-sliders',
-    section: 'control-semantics',
-    title: 'Compact Sliders',
-    screenshot: ['compact-sliders-off.svg', 'compact-sliders-on.svg'],
-    stateful: true,
+    key: 'compact-sliders-compare',
+    section: 'compact-sliders-and-labels',
+    title: 'Compact Sliders Compare',
+    screenshot: 'compact-sliders-compare.svg',
+  },
+  {
+    key: 'compact-sliders-split-leaf',
+    section: 'compact-sliders-and-labels',
+    title: 'Compact Sliders Split Leaf',
+    screenshot: 'compact-sliders-split-leaf.svg',
   },
   {
     key: 'composing-layouts',
@@ -84,6 +95,4 @@ export const SHOWCASE_SUBSECTIONS: readonly ShowcaseSubsection[] = [
   },
 ] as const;
 
-export const README_SCREENSHOT_FILES = SHOWCASE_SUBSECTIONS.flatMap((entry) =>
-  Array.isArray(entry.screenshot) ? [...entry.screenshot] : [entry.screenshot],
-);
+export const README_SCREENSHOT_FILES = SHOWCASE_SUBSECTIONS.map((entry) => entry.screenshot);

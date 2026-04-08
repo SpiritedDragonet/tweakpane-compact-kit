@@ -39,6 +39,7 @@ type BooleanButtonParams = {
   units: number;
   content: ButtonContent;
   contentOn?: ButtonContent;
+  iconSize?: number;
   offColor?: string;
   onColor?: string;
 };
@@ -69,6 +70,7 @@ class BooleanButtonController {
     const shell = createButtonShell(args.document, {
       rootClassName: 'tp-boolean-button',
       units: args.params.units,
+      iconSize: args.params.iconSize,
     });
 
     this.view = { element: shell.root };
@@ -183,6 +185,7 @@ export const BooleanButtonPlugin: any = {
         units: Math.max(1, Math.floor(params.units ?? 1)),
         content,
         contentOn,
+        iconSize: typeof params.iconSize === 'number' ? params.iconSize : undefined,
         offColor: typeof params.offColor === 'string' ? params.offColor : undefined,
         onColor: typeof params.onColor === 'string' ? params.onColor : undefined,
       } satisfies BooleanButtonParams,
@@ -217,6 +220,7 @@ export type BooleanButtonOptions = {
   icon?: ButtonIcon;
   content?: ButtonContent;
   contentOn?: ButtonContent;
+  iconSize?: number;
   units?: number;
   offColor?: string;
   onColor?: string;

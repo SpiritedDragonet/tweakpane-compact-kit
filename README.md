@@ -44,9 +44,11 @@ Jump to:
 
 - [1 First Split](#1-first-split)
 - [2 Width Geometry](#2-width-geometry)
-- [3 Units And Height Flow](#3-units-and-height-flow)
-- [4 Control Semantics](#4-control-semantics)
-- [5 Composing Layouts](#5-composing-layouts)
+- [3 Custom DOM](#3-custom-dom)
+- [4 Units And Height Flow](#4-units-and-height-flow)
+- [5 Buttons](#5-buttons)
+- [6 Compact Sliders And Labels](#6-compact-sliders-and-labels)
+- [7 Composing Layouts](#7-composing-layouts)
 - [Run the Demo](#run-the-demo)
 
 ## 1 First Split
@@ -94,7 +96,7 @@ right.appendChild(domHost);
 
 ## 2 Width Geometry
 
-![Width Geometry](docs/images/split-size-expressions.svg)
+![Width Geometry](docs/images/split-width-geometry.svg)
 
 Row sizing uses one geometry model. `px` and `%` claim width first, `fr` and
 bare numbers divide what remains, and the gutter is applied through the same
@@ -102,7 +104,7 @@ rule for every token. That is why equal tracks, ratios, percentages, and fixed
 pixels line up naturally instead of forcing the plugin into separate layout
 modes.
 
-This also means mixed expressions such as `200px 1fr 30%` are expected. The row
+This also means mixed expressions such as `1fr 3fr 20%` are expected. The row
 does not switch strategies when tokens mix. It stays on one virtual horizontal
 axis, applies the same gutter rule everywhere, and then exposes the visible
 widths that fall out of that single calculation.
@@ -134,14 +136,61 @@ function addRow(sizes: string, labels: string[]) {
 addRow('equal', ['Equal 1', 'Equal 2', 'Equal 3']);
 addRow('2fr 1fr', ['2fr', '1fr']);
 addRow('20% 80%', ['20%', '80%']);
-addRow('1fr 2fr 2fr', ['1fr', '2fr', '2fr']);
+addRow('1fr 3fr 20%', ['1fr', '3fr', '20%']);
 ```
 
 </details>
 
-## 3 Units And Height Flow
+## 3 Custom DOM
 
-![Units And Height Flow](docs/images/split-mixed-dom.svg)
+![Custom DOM](docs/images/split-custom-dom.svg)
+
+There are two DOM stories in this layout system, and they are not equally
+preferred. `Declared Span DOM` is the primary path: if plain DOM already knows
+its intended span, publish that span directly on the host. `Measured Fallback
+DOM` exists for everything else. The layout only measures when no stronger
+contract is available.
+
+This is the current low-level DOM contract: the host reads
+`data-split-base-units`, `data-split-live-units`, and
+`data-split-unit-behavior`. That is why the demo can make the `Declared Span
+DOM` side stay stable while the `Measured Fallback DOM` side grows from its
+natural content height, lands a little taller than `4u`, and rounds upward to
+avoid clipping.
+
+<details>
+<summary>View code</summary>
+
+```ts
+const split = pane.addBlade({
+  view: 'split-layout',
+  direction: 'row',
+  sizes: '1fr 1fr',
+  gutter: 6,
+  children: ['declared', 'measured'],
+});
+
+const [declaredSlot, measuredSlot] = split.getSlots();
+
+const declared = document.createElement('div');
+declared.style.height = 'calc(4 * var(--cnt-usz) + 12px)';
+declared.dataset.splitBaseUnits = '4';
+declared.dataset.splitLiveUnits = '4';
+declared.dataset.splitUnitBehavior = 'fixed';
+declaredSlot.appendChild(declared);
+
+const measured = document.createElement('div');
+measured.textContent = 'No span is declared here, so split-layout measures this host.';
+measured.style.padding = '12px';
+measured.style.lineHeight = '1.45';
+measuredSlot.appendChild(measured);
+```
+
+</details>
+
+## 4 Units And Height Flow
+
+![Units And Height Flow](docs/images/split-units-height-flow.svg)
 
 `units` is the only supported vertical baseline field. Older fields such as
 `rowUnits` and `height` are retired. Fixed controls publish their own unit span
@@ -150,23 +199,22 @@ to the computed baseline for that node rather than some arbitrary measured
 height.
 
 In the canonical model, row nodes resolve to the tallest visible child and
-column nodes resolve to the sum of visible children. Known compact-kit controls
-publish units directly. Custom DOM that already knows its intended span should
-declare that span explicitly. unknown content only falls back to safe measurement
-when no stronger contract is available, and that measured fallback rounds upward
-so the layout does not clip the control.
+column nodes resolve to the sum of visible children. Adaptive content resolves
+to `max(baseUnits, liveUnits)`, so a collapsed folder can sit on a small
+baseline and still push a row taller when it expands. In the demo, a `Units`
+control can republish the declared host span directly, so the right-side DOM
+host grows and shrinks by contract rather than by measurement.
 
 <details>
 <summary>View code</summary>
 
 ```ts
 const state = {
+  units: 4,
   value: 64,
   thickness: 10,
   rounded: true,
-  palette: 'cyan' as 'cyan' | 'amber' | 'rose',
   detailLevel: 0.42,
-  detailMode: 'beta',
 };
 
 const split = pane.addBlade({
@@ -186,50 +234,48 @@ controls.addBinding(state, 'thickness', { min: 4, max: 20, step: 1, label: 'Thic
 
 const folder = controls.addFolder({ title: 'Details', expanded: false });
 folder.addBinding(state, 'rounded', { label: 'Rounded' });
-folder.addBinding(state, 'palette', {
-  label: 'Accent',
-  options: { Cyan: 'cyan', Amber: 'amber', Rose: 'rose' },
-});
 folder.addBinding(state, 'detailLevel', { min: 0, max: 1, label: 'Level' });
-folder.addBinding(state, 'detailMode', {
-  label: 'Mode',
-  options: { Alpha: 'alpha', Beta: 'beta', Gamma: 'gamma' },
-});
+folder.addBinding(state, 'units', { min: 2, max: 6, step: 1, label: 'Units' });
 
-const gaugeHost = document.createElement('div');
-gaugeHost.style.height = 'calc(4 * var(--cnt-usz) + 12px)';
-visualSlot.appendChild(gaugeHost);
+const visual = document.createElement('div');
+visual.style.height = 'calc(state.units * var(--cnt-usz) + (state.units - 1) * 4px)';
+visual.dataset.splitBaseUnits = String(state.units);
+visual.dataset.splitLiveUnits = String(state.units);
+visual.dataset.splitUnitBehavior = 'fixed';
+visual.appendChild(createDonutGaugeSvg(document, {
+  width: Math.max(52, Math.min(96, state.units * 18)),
+  height: Math.max(52, Math.min(96, state.units * 18)),
+  value: state.value,
+}));
+visualSlot.appendChild(visual);
 ```
 
 </details>
 
-## 4 Control Semantics
+## 5 Buttons
 
-This chapter covers the custom controls without treating them like detached
-gadgets. `boolean-button` preserves boolean binding semantics, `sized-button`
-preserves action semantics, and `compactSliders` changes layout treatment only.
-The public content model stays small: `content` is the normalized long form,
-`title` and top-level `icon` are shorthand, and `contentOn` only overrides the
-fields it provides.
+![Buttons Overview](docs/images/buttons-overview.svg)
 
-Icon-only, text-only, and icon-plus-text content are all supported. Mixed
-content is rendered through one shared button-content pipeline so both custom
-button views behave consistently. Inside split leaves, `wrapPane()` also keeps
-native labels and inset assumptions from introducing extra indentation.
+![Buttons Boolean On](docs/images/buttons-boolean-on.svg)
 
-### Boolean Buttons
+Buttons share one content model. The semantic split is still real:
+`boolean-button` preserves boolean binding semantics, while `sized-button`
+preserves stateless action semantics. Both consume the same `content` shape, so
+text-only, icon-only, and mixed icon+text layouts all go through one renderer.
 
-![Boolean Button Off](docs/images/button-boolean-off.svg)
+`content` is the normalized long form. `title` and top-level `icon` are
+shorthand. `contentOn` only overrides the fields it provides. `iconSize`
+belongs to the button itself, so both states share one icon scale. The mixed
+icon+text case anchors the icon against the full button box, which keeps the
+icon stable while the centered text can change length or wrap across lines.
 
-![Boolean Button On](docs/images/button-boolean-on.svg)
-
-Use `boolean-button` when the underlying value is really boolean and should stay
-readable through ordinary bindings.
+<details>
+<summary>View code</summary>
 
 ```ts
-const state = { enabled: false };
+const state = { armed: false };
 
-pane.addBinding(state, 'enabled', {
+pane.addBinding(state, 'armed', {
   view: 'boolean-button',
   units: 2,
   content: {
@@ -243,83 +289,113 @@ pane.addBinding(state, 'enabled', {
     text: 'System\nArmed',
   },
 });
-```
 
-### Sized Actions
-
-![Sized Actions](docs/images/button-sized-actions.svg)
-
-Use `sized-button` when the control is a stateless action that should occupy
-more than one vertical unit.
-
-```ts
 pane.addBlade({
   view: 'sized-button',
-  units: 2,
+  units: 3,
+  iconSize: 22,
   content: {
-    text: 'Run\nAction',
+    text: '3u Multiline\nResizable Icon',
     icon: {
-      path: 'M8 2v5M5.2 4.5a4.5 4.5 0 1 0 5.6 0',
+      path: 'M2.5 11.5 6 8l2.5 2.5 5-6M3 3v10h10',
       viewBox: '0 0 16 16',
     },
   },
 });
 ```
 
-### Compact Sliders
+</details>
 
-![Compact Sliders Off](docs/images/compact-sliders-off.svg)
+## 6 Compact Sliders And Labels
 
-![Compact Sliders On](docs/images/compact-sliders-on.svg)
+![Compact Sliders Compare](docs/images/compact-sliders-compare.svg)
+
+![Compact Sliders Split Leaf](docs/images/compact-sliders-split-leaf.svg)
 
 `compactSliders` changes layout treatment only. The native slider logic, value
-flow, and binding semantics stay untouched; the kit only rearranges the label,
-groove, and numeric value so dense split rows remain readable.
+flow, and binding semantics stay untouched. In the demo, `Native Vs Compact`
+keeps a normal slider on the left and isolates the compact treatment on the
+right, so the comparison stays literal instead of relying on prose.
+
+`Wrapped Labels` shows the second half of the contract. A wrapped leaf can keep
+its visible label when you provide one, or reclaim the full leaf width when you
+omit `label`. That is the same inset normalization used by compact sliders, but
+demonstrated with an ordinary select control instead of another slider row.
+
+<details>
+<summary>View code</summary>
 
 ```ts
-const state = { compact: true, leftValue: 50, rightValue: 24 };
-
-pane.addBinding(state, 'compact', {
-  view: 'boolean-button',
-  units: 2,
-  content: {
-    text: 'Compact Sliders\nOff',
-    icon: { path: 'M3 4h10M2 8h12M5 12h6' },
-  },
-  contentOn: {
-    text: 'Compact Sliders\nOn',
-  },
-});
-
-const preview = pane.addBlade({
+const compare = pane.addBlade({
   view: 'split-layout',
   direction: 'row',
   sizes: '1fr 1fr',
-  compactSliders: state.compact,
+  compactSliders: false,
+  children: ['native', 'compact'],
+});
+
+const [nativeSlot, compactSlot] = compare.getSlots();
+
+const nativePane = new Pane({ container: nativeSlot });
+nativePane.registerPlugin(CompactKitBundle);
+nativePane.addBinding({ value: 50 }, 'value', { min: 0, max: 100, label: 'Native' });
+
+const compactHost = new Pane({ container: compactSlot });
+compare.wrapPane(compactHost);
+compactHost.registerPlugin(CompactKitBundle);
+
+const compactRoot = compactHost.addBlade({
+  view: 'split-layout',
+  direction: 'row',
+  compactSliders: true,
+  children: ['leaf'],
+});
+
+const [compactLeaf] = compactRoot.getSlots();
+const compactPane = new Pane({ container: compactLeaf });
+compactRoot.wrapPane(compactPane);
+compactPane.registerPlugin(CompactKitBundle);
+compactPane.addBinding({ value: 24 }, 'value', { min: 0, max: 100, label: 'Compact' });
+
+const labels = pane.addBlade({
+  view: 'split-layout',
+  direction: 'row',
   children: ['left', 'right'],
+});
+
+const [labeledSlot, unlabeledSlot] = labels.getSlots();
+const labeledPane = new Pane({ container: labeledSlot });
+labels.wrapPane(labeledPane);
+labeledPane.registerPlugin(CompactKitBundle);
+labeledPane.addBinding({ mode: 'beta' }, 'mode', {
+  label: 'Label',
+  options: { Alpha: 'alpha', Beta: 'beta', Gamma: 'gamma' },
+});
+
+const unlabeledPane = new Pane({ container: unlabeledSlot });
+labels.wrapPane(unlabeledPane);
+unlabeledPane.registerPlugin(CompactKitBundle);
+unlabeledPane.addBinding({ mode: 'beta' }, 'mode', {
+  options: { Alpha: 'alpha', Beta: 'beta', Gamma: 'gamma' },
 });
 ```
 
-### Labels Inside Split Leaves
+</details>
 
-Wrapped child panes normalize the native Tweakpane row chrome that would
-otherwise add duplicate label padding or nested inset. That is why the compact
-controls in split leaves can line up with row geometry instead of drifting
-inward compared with full-width native rows.
-
-## 5 Composing Layouts
+## 7 Composing Layouts
 
 ![Composing Layouts](docs/images/composing-layouts.svg)
 
 This is not a separate layout mode. It is the integrated proof that the earlier
-rules still hold together when semantic slots, nested rows and columns, adaptive
-folders, compact sliders, multi-unit controls, and custom DOM all appear in the
-same pane.
+six rules still hold together when semantic slots, nested rows and columns,
+adaptive folders, compact sliders, multi-unit controls, and custom DOM all
+appear in the same pane.
 
 The important thing to notice is not the individual widgets. It is that the
 whole example still follows the same contracts from the earlier chapters: one
 horizontal geometry model, one vertical `units` model, the same child-pane
-wrapping rules, and the same control semantics.
+wrapping rules, the same DOM contract, the same button content contract, and
+the same slider-layout contract.
 
 <details>
 <summary>View code</summary>

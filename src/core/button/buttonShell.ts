@@ -17,6 +17,7 @@ type ButtonShellOptions = {
   rootClassName: string;
   units: number;
   state?: ButtonShellState;
+  iconSize?: number;
 };
 
 /**
@@ -61,6 +62,19 @@ export function createButtonShell(doc: Document, options: ButtonShellOptions) {
     button.style.height = `calc(var(--cnt-usz) * ${safeUnits} + ${(safeUnits - 1) * gutter}px)`;
   };
 
+  const setIconSize = (iconSize: number | undefined) => {
+    const safeSize = typeof iconSize === 'number' && Number.isFinite(iconSize)
+      ? Math.max(12, Math.round(iconSize))
+      : null;
+
+    if (safeSize === null) {
+      button.style.removeProperty('--tp-btnc-icon-size');
+      return;
+    }
+
+    button.style.setProperty('--tp-btnc-icon-size', `${safeSize}px`);
+  };
+
   const setState = (state: ButtonShellState) => {
     if (state.pressed) root.dataset.buttonPressed = 'true';
     else delete root.dataset.buttonPressed;
@@ -70,6 +84,7 @@ export function createButtonShell(doc: Document, options: ButtonShellOptions) {
   };
 
   setUnits(options.units);
+  setIconSize(options.iconSize);
   setState(options.state ?? {});
 
   return {
@@ -77,6 +92,7 @@ export function createButtonShell(doc: Document, options: ButtonShellOptions) {
     button,
     contentHost,
     setUnits,
+    setIconSize,
     setState,
   };
 }

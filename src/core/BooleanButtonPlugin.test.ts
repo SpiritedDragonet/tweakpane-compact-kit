@@ -65,6 +65,53 @@ describe('BooleanButtonPlugin', () => {
     expect(root.querySelector('svg')).not.toBeNull();
   });
 
+  it('inherits the base text when the on-state only overrides the icon', () => {
+    document.body.innerHTML = '';
+    document.body.style.setProperty('--cnt-usz', '18px');
+
+    const state = { enabled: true };
+    const pane = new Pane({container: document.body});
+    pane.registerPlugin(CompactKitBundle);
+    const api = pane.addBinding(state, 'enabled', {
+      view: 'boolean-button',
+      content: {
+        text: 'Signal Live',
+        icon: {path: 'M8 2v5M5.2 4.5a4.5 4.5 0 1 0 5.6 0', viewBox: '0 0 16 16'},
+      },
+      contentOn: {
+        icon: {path: 'M2.5 11.5 6 8l2.5 2.5 5-6M3 3v10h10', viewBox: '0 0 16 16'},
+      },
+      units: 2,
+    }) as any;
+
+    const root = api.controller.view.element as HTMLElement;
+    expect(root.textContent).toContain('Signal Live');
+    expect(root.querySelector('svg path')?.getAttribute('d')).toBe('M2.5 11.5 6 8l2.5 2.5 5-6M3 3v10h10');
+  });
+
+  it('inherits the entire base content when contentOn is omitted', () => {
+    document.body.innerHTML = '';
+    document.body.style.setProperty('--cnt-usz', '18px');
+
+    const state = { enabled: true };
+    const pane = new Pane({container: document.body});
+    pane.registerPlugin(CompactKitBundle);
+    const api = pane.addBinding(state, 'enabled', {
+      view: 'boolean-button',
+      content: {
+        text: 'Power',
+        icon: {path: 'M8 2v5M5.2 4.5a4.5 4.5 0 1 0 5.6 0', viewBox: '0 0 16 16'},
+      },
+      units: 2,
+    }) as any;
+
+    const root = api.controller.view.element as HTMLElement;
+    const button = api.controller.buttonEl as HTMLButtonElement;
+    expect(root.textContent).toContain('Power');
+    expect(root.querySelector('svg path')?.getAttribute('d')).toBe('M8 2v5M5.2 4.5a4.5 4.5 0 1 0 5.6 0');
+    expect(button.style.getPropertyValue('--tp-btn-accent')).toBe('#22d3ee');
+  });
+
   it('publishes a pressed state and accent variable when enabled', () => {
     document.body.innerHTML = '';
     document.body.style.setProperty('--cnt-usz', '18px');
@@ -103,5 +150,26 @@ describe('BooleanButtonPlugin', () => {
 
     const button = api.controller.buttonEl as HTMLButtonElement;
     expect(button.style.getPropertyValue('--tp-btn-accent')).toBe('#22d3ee');
+  });
+
+  it('applies iconSize through the shared button shell', () => {
+    document.body.innerHTML = '';
+    document.body.style.setProperty('--cnt-usz', '18px');
+
+    const state = { enabled: false };
+    const pane = new Pane({container: document.body});
+    pane.registerPlugin(CompactKitBundle);
+    const api = pane.addBinding(state, 'enabled', {
+      view: 'boolean-button',
+      iconSize: 20,
+      content: {
+        text: 'System',
+        icon: {path: 'M3 8h10', viewBox: '0 0 16 16'},
+      },
+      units: 2,
+    }) as any;
+
+    const button = api.controller.buttonEl as HTMLButtonElement;
+    expect(button.style.getPropertyValue('--tp-btnc-icon-size')).toBe('20px');
   });
 });

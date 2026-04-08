@@ -8,6 +8,8 @@
  */
 import { setSplitRootHorizontalInset } from './rootInset';
 
+const WRAPPED_PANE_MARKER = '__tpSplitPaneWrapped';
+
 /**
  * Removes hidden-label padding from wrapped rows and, when requested, strips
  * the label node entirely.
@@ -45,6 +47,11 @@ function normalizeNoLabelRoots(api: any, options?: { hideLabel?: boolean }) {
  * into split leaves.
  */
 export function wrapSplitPane<T extends { addBinding: Function }>(pane: T): T {
+  if ((pane as any)[WRAPPED_PANE_MARKER]) {
+    return pane;
+  }
+  (pane as any)[WRAPPED_PANE_MARKER] = true;
+
   const origBinding = (pane.addBinding as Function).bind(pane);
   (pane as any).addBinding = (obj: unknown, key: string, params?: Record<string, unknown>) => {
     const hasLabel = !!(params && Object.prototype.hasOwnProperty.call(params, 'label'));
@@ -77,6 +84,14 @@ export function wrapSplitPane<T extends { addBinding: Function }>(pane: T): T {
         } catch {}
       }
       return api;
+    };
+  }
+
+  if (typeof (pane as any).addFolder === 'function') {
+    const origFolder = (pane as any).addFolder.bind(pane);
+    (pane as any).addFolder = (params?: Record<string, unknown>) => {
+      const api = origFolder(params);
+      return wrapSplitPane(api);
     };
   }
 

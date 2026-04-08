@@ -1,6 +1,6 @@
 {
   "name": "tweakpane-compact-kit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A compact layout toolkit for Tweakpane with split-layout, grid, and auto-optimized styles",
   "type": "module",
   "main": "./dist/tweakpane-compact-kit.umd.js",
@@ -19,9 +19,11 @@
   "scripts": {
     "build": "npm run build:lib",
     "build:lib": "vite build --config vite.config.lib.ts",
-    "dev": "npm run build:lib && vite --config demo/vite.config.ts --host",
+    "dev": "node scripts/run-demo.mjs",
     "dev:lib": "npm run build:lib -- --watch",
-    "demo": "npm run build:lib && vite --config demo/vite.config.ts --host",
+    "demo": "node scripts/run-demo.mjs",
+    "demo:capture": "node scripts/run-demo.mjs --capture",
+    "demo:published": "node scripts/run-published-demo.mjs",
     "prepublishOnly": "npm run build:lib",
     "test": "vitest run"
   },

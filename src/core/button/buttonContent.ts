@@ -80,8 +80,9 @@ function getButtonContentMode(content: ButtonContent) {
 /**
  * Renders a stable icon/text layout for both custom button plugins.
  *
- * Mixed content uses a fixed-width icon rail plus a balanced ghost rail so the
- * text can stay centered without the icon drifting when the label changes.
+ * Mixed content anchors the icon against the full button box instead of the
+ * measured label width. That keeps the icon stable while the text can stay
+ * centered and multi-line without affecting the icon position.
  */
 export function renderButtonContent(
   doc: Document,
