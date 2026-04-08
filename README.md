@@ -2,12 +2,11 @@
 
 ## Overview
 
-Compact extension kit for Tweakpane v4: split layouts, button views, and
-compact slider treatment that stay aligned with native pane geometry.
+A small add-on kit for Tweakpane v4. It adds split layouts, multi-unit buttons,
+and a compact slider layout while still lining up with the native UI.
 
-The kit is easiest to learn as one short guided tour. The sections below follow
-the same order as the live demo, so the numbered chapter you see in the page is
-the same chapter you can read here in the README.
+The easiest way to learn it is to read this README in the same order as the
+demo page. The chapter numbers match.
 
 ## Install
 
@@ -23,9 +22,12 @@ Peer dependency: `tweakpane` v4.
 import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
 
+// Register once on the pane that will host the custom blades.
 const pane = new Pane();
 pane.registerPlugin(CompactKitBundle);
 
+// split-layout creates a row or column of cells.
+// Each string in `children` creates one leaf cell in order.
 const split = pane.addBlade({
   view: 'split-layout',
   direction: 'row',
@@ -33,12 +35,33 @@ const split = pane.addBlade({
   children: ['left', 'right'],
 });
 
+// getSlots() returns the DOM hosts for those cells in the same order.
 const [left, right] = split.getSlots();
+
+// Mount a child pane into the left cell.
+const leftPane = new Pane({ container: left });
+leftPane.registerPlugin(CompactKitBundle);
+
+// wrapPane() keeps the child pane flush with the split cell.
+split.wrapPane(leftPane);
+
+leftPane.addBlade({
+  view: 'sized-button',
+  title: 'Launch',
+  units: 2,
+});
+
+// Plain DOM can live in a split cell too.
+const rightHost = document.createElement('div');
+right.appendChild(rightHost);
 ```
 
-When you mount a child pane into a split slot, register `CompactKitBundle` on
-the child pane too. `split.wrapPane(pane)` is the preferred path when you want
-hidden-label rows and nested split roots to inherit the same split behavior.
+Each string in `children` creates one leaf cell and also gives that cell a
+category name. A child `Pane`, another split, or plain DOM can all live inside
+that cell. When the cell hosts a child `Pane`, register `CompactKitBundle` on
+that child too and call `split.wrapPane(childPane)` so the nested pane sits
+flush with the cell. Later examples show object entries in `children`, which
+create nested split nodes.
 
 Jump to:
 
@@ -55,19 +78,19 @@ Jump to:
 
 ![First Split](docs/images/split-first-row.svg)
 
-`split-layout` is structural. Its `children` define slots, not a fixed widget
-type. A string child is a semantic leaf slot; a nested object child is another
-split node. Once the slots exist, each slot can host a wrapped child pane, a
-nested split, or plain DOM.
+Picture `split-layout` as a layout frame that hands you cells. A string child
+creates one leaf cell. Once you have that cell, you can mount another pane,
+another split, or plain DOM into it.
 
-`wrapPane()` is the standard way to reconnect a child pane to split semantics.
-It normalizes the native Tweakpane assumptions that would otherwise add extra
-label padding or nested inset inside a split leaf.
+`wrapPane()` is the step that makes a child pane read like content of the cell.
+Without it, the child pane keeps Tweakpane's usual nested inset.
 
 <details>
 <summary>View code</summary>
 
 ```ts
+// Create one horizontal split with two leaf cells.
+// `children` defines the cell count and order.
 const split = pane.addBlade({
   view: 'split-layout',
   direction: 'row',
@@ -78,16 +101,26 @@ const split = pane.addBlade({
 
 const [left, right] = split.getSlots();
 
+// Anything mounted into a split cell can be another Pane.
 const leftPane = new Pane({ container: left });
+
+// wrapPane() removes the native nested inset so the child pane lines up with
+// the split cell and reads like content of that cell.
 split.wrapPane(leftPane);
 leftPane.registerPlugin(CompactKitBundle);
+
+// sized-button is a fixed-height action button.
+// `units: 3` means the button occupies 3 vertical grid units.
 leftPane.addBlade({
   view: 'sized-button',
   title: 'Button\n3u',
   units: 3,
 });
 
+// A split cell can also host plain DOM directly.
 const domHost = document.createElement('div');
+
+// This DOM block is given the same visual height as a 3u control.
 domHost.style.height = 'calc(3 * var(--cnt-usz) + 8px)';
 right.appendChild(domHost);
 ```
@@ -98,33 +131,36 @@ right.appendChild(domHost);
 
 ![Width Geometry](docs/images/split-width-geometry.svg)
 
-Row sizing uses one geometry model. `px` and `%` claim width first, `fr` and
-bare numbers divide what remains, and the gutter is applied through the same
-rule for every token. That is why equal tracks, ratios, percentages, and fixed
-pixels line up naturally instead of forcing the plugin into separate layout
-modes.
+Rows follow one width rule. `px` and `%` take their space first, then `fr`
+shares what is left. That keeps equal splits, ratios, fixed widths, and mixed
+rows lined up.
 
-This also means mixed expressions such as `1fr 3fr 20%` are expected. The row
-does not switch strategies when tokens mix. It stays on one virtual horizontal
-axis, applies the same gutter rule everywhere, and then exposes the visible
-widths that fall out of that single calculation.
+So a row like `1fr 3fr 20%` just works.
 
 <details>
 <summary>View code</summary>
 
 ```ts
+// Small helper: create one row and fill it with 2u buttons so the width math
+// is easy to compare.
 function addRow(sizes: string, labels: string[]) {
   const split = pane.addBlade({
     view: 'split-layout',
     direction: 'row',
+
+    // `sizes` accepts equal, fr, %, px, or mixed expressions.
     sizes,
     children: labels.map(() => 'leaf'),
   });
 
   split.getSlots().forEach((slot, index) => {
     const child = new Pane({ container: slot });
+
+    // Wrap every nested pane that lives inside a split cell.
     split.wrapPane(child);
     child.registerPlugin(CompactKitBundle);
+
+    // Keep height fixed at 2u so only width changes between examples.
     child.addBlade({
       view: 'sized-button',
       title: labels[index],
@@ -133,9 +169,16 @@ function addRow(sizes: string, labels: string[]) {
   });
 }
 
+// Equal tracks.
 addRow('equal', ['Equal 1', 'Equal 2', 'Equal 3']);
+
+// Fractional tracks share the remaining width.
 addRow('2fr 1fr', ['2fr', '1fr']);
+
+// Percentages claim width directly.
 addRow('20% 80%', ['20%', '80%']);
+
+// Mixed expressions still use the same row layout rule.
 addRow('1fr 3fr 20%', ['1fr', '3fr', '20%']);
 ```
 
@@ -145,23 +188,20 @@ addRow('1fr 3fr 20%', ['1fr', '3fr', '20%']);
 
 ![Custom DOM](docs/images/split-custom-dom.svg)
 
-There are two DOM stories in this layout system, and they are not equally
-preferred. `Declared Span DOM` is the primary path: if plain DOM already knows
-its intended span, publish that span directly on the host. `Measured Fallback
-DOM` exists for everything else. The layout only measures when no stronger
-contract is available.
+Plain DOM has two paths in a split. If you already know the span, publish that
+span and give the host a matching CSS height. If the height should come from
+content, append plain DOM and let the layout measure it.
 
-This is the current low-level DOM contract: the host reads
-`data-split-base-units`, `data-split-live-units`, and
-`data-split-unit-behavior`. That is why the demo can make the `Declared Span
-DOM` side stay stable while the `Measured Fallback DOM` side grows from its
-natural content height, lands a little taller than `4u`, and rounds upward to
-avoid clipping.
+In the demo, the left block says "I am 4u tall" and stays there. The right
+block is plain content with no split metadata, so its height comes from the
+content box.
 
 <details>
 <summary>View code</summary>
 
 ```ts
+// One row with two slots: one will declare its span, the other will rely on
+// measurement.
 const split = pane.addBlade({
   view: 'split-layout',
   direction: 'row',
@@ -172,13 +212,22 @@ const split = pane.addBlade({
 
 const [declaredSlot, measuredSlot] = split.getSlots();
 
+// Declared DOM: you already know that this block should behave like a 4u item.
 const declared = document.createElement('div');
+
+// The CSS height and the published split units should describe the same span.
 declared.style.height = 'calc(4 * var(--cnt-usz) + 12px)';
+
+// baseUnits = baseline height
+// liveUnits = current visible height
+// fixed      = do not auto-grow beyond the declared span
 declared.dataset.splitBaseUnits = '4';
 declared.dataset.splitLiveUnits = '4';
 declared.dataset.splitUnitBehavior = 'fixed';
 declaredSlot.appendChild(declared);
 
+// Measured DOM: no split metadata is needed here.
+// split-layout measures the content box and rounds up to a whole unit count.
 const measured = document.createElement('div');
 measured.textContent = 'No span is declared here, so split-layout measures this host.';
 measured.style.padding = '12px';
@@ -192,23 +241,20 @@ measuredSlot.appendChild(measured);
 
 ![Units And Height Flow](docs/images/split-units-height-flow.svg)
 
-`units` is the only supported vertical baseline field. Older fields such as
-`rowUnits` and `height` are retired. Fixed controls publish their own unit span
-directly, adaptive content can grow above its baseline, and shrink-back returns
-to the computed baseline for that node rather than some arbitrary measured
-height.
+Use `units` when a blade has a known fixed span, such as a sized button. Native
+controls already report their own height. Rows follow the tallest visible
+child. Columns stack the heights of their visible children.
 
-In the canonical model, row nodes resolve to the tallest visible child and
-column nodes resolve to the sum of visible children. Adaptive content resolves
-to `max(baseUnits, liveUnits)`, so a collapsed folder can sit on a small
-baseline and still push a row taller when it expands. In the demo, a `Units`
-control can republish the declared host span directly, so the right-side DOM
-host grows and shrinks by contract rather than by measurement.
+Folders and other expanding controls can grow when opened and settle back when
+closed. In the demo, the `Units` control changes the right-side DOM block
+directly, so that block grows and shrinks through its declared span.
 
 <details>
 <summary>View code</summary>
 
 ```ts
+// Keep the demo state in one object so bindings and the visual preview stay in
+// sync.
 const state = {
   units: 4,
   value: 64,
@@ -217,6 +263,8 @@ const state = {
   color: '#22d3ee',
 };
 
+// Left slot = regular Tweakpane controls.
+// Right slot = plain DOM that publishes its current span.
 const split = pane.addBlade({
   view: 'split-layout',
   direction: 'row',
@@ -226,22 +274,34 @@ const split = pane.addBlade({
 });
 
 const [controlsSlot, visualSlot] = split.getSlots();
+
+// Mount the control pane into the left split cell.
 const controls = new Pane({ container: controlsSlot });
 split.wrapPane(controls);
 controls.registerPlugin(CompactKitBundle);
+
+// These are ordinary Tweakpane bindings.
+// Sliders and inputs already know their own height, so no manual `units` field
+// is needed here.
 controls.addBinding(state, 'value', { min: 0, max: 100, label: 'Value' });
 controls.addBinding(state, 'thickness', { min: 4, max: 20, step: 1, label: 'Thickness' });
 
+// Folders are adaptive: collapsed height is small, expanded height can grow.
 const folder = controls.addFolder({ title: 'Details', expanded: false });
 folder.addBinding(state, 'rounded', { label: 'Rounded' });
 folder.addBinding(state, 'color', { label: '' });
+
+// This binding updates the declared span for the DOM preview on the right.
 folder.addBinding(state, 'units', { min: 2, max: 6, step: 1, label: 'Units' });
 
+// The visual preview is plain DOM. Here it follows declared units.
 const visual = document.createElement('div');
 visual.style.height = 'calc(state.units * var(--cnt-usz) + (state.units - 1) * 4px)';
 visual.dataset.splitBaseUnits = String(state.units);
 visual.dataset.splitLiveUnits = String(state.units);
 visual.dataset.splitUnitBehavior = 'fixed';
+
+// The donut graphic itself is just regular SVG inserted into that DOM host.
 visual.appendChild(createDonutGaugeSvg(document, {
   width: Math.max(52, Math.min(96, state.units * 18)),
   height: Math.max(52, Math.min(96, state.units * 18)),
@@ -259,16 +319,14 @@ visualSlot.appendChild(visual);
 
 ![Buttons Boolean On](docs/images/buttons-boolean-on.svg)
 
-Buttons share one content model. The semantic split is still real:
-`boolean-button` preserves boolean binding semantics, while `sized-button`
-preserves stateless action semantics. Both consume the same `content` shape, so
-text-only, icon-only, and mixed icon+text layouts all go through one renderer.
+Buttons use one content format. Use `boolean-button` for a true/false value.
+Use `sized-button` for a plain action button. Both support text only, icon
+only, or icon + text.
 
-`content` is the normalized long form. `title` and top-level `icon` are
-shorthand. `contentOn` only overrides the fields it provides. `iconSize`
-belongs to the button itself, so both states share one icon scale. The mixed
-icon+text case anchors the icon against the full button box, which keeps the
-icon stable while the centered text can change length or wrap across lines.
+Use the full `content` object when you want more control, or the shorter
+`title` and `icon` fields for quick cases. `contentOn` only needs the parts
+that change in the pressed state. Think of `content` as the face drawn on the
+button. `iconSize` applies to the whole button, so both states stay aligned.
 
 <details>
 <summary>View code</summary>
@@ -276,9 +334,15 @@ icon stable while the centered text can change length or wrap across lines.
 ```ts
 const state = { armed: true };
 
+// boolean-button is a real binding, so use addBinding().
+// The blade reads and writes `state.armed`.
 pane.addBinding(state, 'armed', {
   view: 'boolean-button',
+
+  // Like other fixed-height controls, buttons use `units` for vertical span.
   units: 2,
+
+  // `content` is the default visual state.
   content: {
     text: 'System\nIdle',
     icon: {
@@ -286,6 +350,9 @@ pane.addBinding(state, 'armed', {
       viewBox: '0 0 16 16',
     },
   },
+
+  // `contentOn` only needs to provide the pieces that change when the boolean
+  // becomes true.
   contentOn: {
     text: 'Signal\nLive',
     icon: {
@@ -295,9 +362,12 @@ pane.addBinding(state, 'armed', {
   },
 });
 
+// sized-button is stateless, so use addBlade().
 pane.addBlade({
   view: 'sized-button',
   units: 3,
+
+  // One iconSize value covers the whole button.
   iconSize: 22,
   content: {
     text: '3u Multiline\nResizable Icon',
@@ -317,38 +387,43 @@ pane.addBlade({
 
 ![Compact Sliders Split Leaf](docs/images/compact-sliders-split-leaf.svg)
 
-`compactSliders` changes layout treatment only. The native slider logic, value
-flow, and binding semantics stay untouched. In the demo, `Native Vs Compact`
-keeps a normal slider on the left and isolates the compact treatment on the
-right, so the comparison stays literal instead of relying on prose.
+`compactSliders` changes the slider layout for the split subtree that owns the
+leaf. The binding and slider logic stay the same. In the demo, the left side
+keeps the native layout and the right side turns on the compact layout.
 
-`Wrapped Labels` shows the second half of the contract. A wrapped leaf can keep
-its visible label when you provide one, or reclaim the full leaf width when you
-omit `label`. That is the same inset normalization used by compact sliders, but
-demonstrated with an ordinary select control instead of another slider row.
+`Wrapped Labels` shows the other half of the same idea. If you give a wrapped
+control a label, the label stays visible. If you omit the label, the control
+can use the full width of the split leaf.
 
 <details>
 <summary>View code</summary>
 
 ```ts
+// First row: compare a native slider against the compact slider treatment.
 const compare = pane.addBlade({
   view: 'split-layout',
   direction: 'row',
   sizes: '1fr 1fr',
+
+  // The outer comparison row keeps native slider layout.
   compactSliders: false,
   children: ['native', 'compact'],
 });
 
 const [nativeSlot, compactSlot] = compare.getSlots();
 
+// Left side: untouched native Tweakpane slider.
 const nativePane = new Pane({ container: nativeSlot });
 nativePane.registerPlugin(CompactKitBundle);
 nativePane.addBinding({ value: 50 }, 'value', { min: 0, max: 100, label: 'Native' });
 
+// Right side: a wrapped child pane inside the split cell.
 const compactHost = new Pane({ container: compactSlot });
 compare.wrapPane(compactHost);
 compactHost.registerPlugin(CompactKitBundle);
 
+// Inside that wrapped pane, create a second split root that turns on compact
+// slider layout for the controls mounted under that root.
 const compactRoot = compactHost.addBlade({
   view: 'split-layout',
   direction: 'row',
@@ -362,6 +437,7 @@ compactRoot.wrapPane(compactPane);
 compactPane.registerPlugin(CompactKitBundle);
 compactPane.addBinding({ value: 24 }, 'value', { min: 0, max: 100, label: 'Compact' });
 
+// Second row: wrapped controls with and without a visible label.
 const labels = pane.addBlade({
   view: 'split-layout',
   direction: 'row',
@@ -372,6 +448,8 @@ const [labeledSlot, unlabeledSlot] = labels.getSlots();
 const labeledPane = new Pane({ container: labeledSlot });
 labels.wrapPane(labeledPane);
 labeledPane.registerPlugin(CompactKitBundle);
+
+// When `label` is present, the wrapped control keeps its inline title area.
 labeledPane.addBinding({ mode: 'beta' }, 'mode', {
   label: 'Label',
   options: { Alpha: 'alpha', Beta: 'beta', Gamma: 'gamma' },
@@ -380,6 +458,8 @@ labeledPane.addBinding({ mode: 'beta' }, 'mode', {
 const unlabeledPane = new Pane({ container: unlabeledSlot });
 labels.wrapPane(unlabeledPane);
 unlabeledPane.registerPlugin(CompactKitBundle);
+
+// When `label` is omitted, the wrapped control can use the full split width.
 unlabeledPane.addBinding({ mode: 'beta' }, 'mode', {
   options: { Alpha: 'alpha', Beta: 'beta', Gamma: 'gamma' },
 });
@@ -391,21 +471,23 @@ unlabeledPane.addBinding({ mode: 'beta' }, 'mode', {
 
 ![Composing Layouts](docs/images/composing-layouts.svg)
 
-This is not a separate layout mode. It is the integrated proof that the earlier
-rules still hold together when nested rows and columns, wrapped panes,
-adaptive folders, multi-unit controls, native bindings, graphs, and button
-grids all appear in the same pane.
+This is the full example that mixes the earlier pieces together: nested rows
+and columns, wrapped panes, folders, buttons, native controls, graphs, and
+custom layout blocks.
 
-The important thing to notice is not the individual widgets. It is that the
-whole example still follows the same contracts from the earlier chapters: one
-horizontal geometry model, one vertical `units` model, the same child-pane
-wrapping rules, the same button content contract, and the same slider-layout
-inset normalization.
+It is here to show that the same rules still hold when you combine everything
+in one denser pane.
+
+Read `children` here as a layout tree. A string entry creates a leaf cell. An
+object entry creates another split-layout node. The top level in this example
+is one row: a nested column on the left and one leaf cell on the right. When a
+leaf name matters, you can retrieve that cell with `getSlotsByCategory()`.
 
 <details>
 <summary>View code</summary>
 
 ```ts
+// A larger composition can mix row and column nodes in one tree.
 const root = pane.addBlade({
   view: 'split-layout',
   direction: 'row',
@@ -413,18 +495,27 @@ const root = pane.addBlade({
   children: [
     {
       view: 'split-layout',
+
+      // This object entry creates another split node.
+      // Its children stack vertically because the direction is `column`.
       direction: 'column',
       children: ['action', 'details'],
     },
+
+    // A string entry creates a leaf cell.
     'visual',
   ],
 });
 
+// String names also work as category names.
+// getSlotsByCategory() is handy when a larger tree is easier to read by name.
 const actionPane = new Pane({
   container: root.getSlotsByCategory?.('action')?.[0],
 });
 root.wrapPane(actionPane);
 actionPane.registerPlugin(CompactKitBundle);
+
+// A 3u action button in the upper-left cell.
 actionPane.addBlade({
   view: 'sized-button',
   units: 3,
@@ -436,6 +527,9 @@ const detailsPane = new Pane({
 });
 root.wrapPane(detailsPane);
 detailsPane.registerPlugin(CompactKitBundle);
+
+// This nested folder shows that ordinary Tweakpane controls and adaptive
+// controls can live inside a composed split layout too.
 const folder = detailsPane.addFolder({ title: 'Details', expanded: true });
 folder.addBinding({ level: 0.42 }, 'level', { min: 0, max: 1, label: 'Level' });
 folder.addBinding({ mode: 'beta' }, 'mode', {
@@ -450,15 +544,19 @@ folder.addButton({ title: 'Apply' });
 ## Run the Demo
 
 ```bash
+# Build the distributable library files.
 npm run build
+
+# Start the source-linked local demo on http://127.0.0.1:5173/.
 npm run demo
+
+# Start the npm-installed demo on http://127.0.0.1:5174/.
 npm run demo:published
 ```
 
 Open `http://127.0.0.1:5173/` for the guided tour demo.
 
-Open `http://127.0.0.1:5174/` for the consumer-path demo that installs
-`tweakpane-compact-kit@latest` from npm and renders the same showcase through
-the published package entrypoint.
+Open `http://127.0.0.1:5174/` to check the published package through the npm
+install path a user would take.
 
 MIT. Issues and PRs are welcome.

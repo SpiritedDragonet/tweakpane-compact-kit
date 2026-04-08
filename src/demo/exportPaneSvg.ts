@@ -28,7 +28,50 @@ function cloneTargetForExport(target: HTMLElement, width: number, height: number
   clone.style.height = `${height}px`;
   clone.style.boxSizing = 'border-box';
   clone.style.margin = '0';
+  syncLiveFormState(target, clone);
   return clone;
+}
+
+function syncLiveFormState(sourceRoot: HTMLElement, cloneRoot: HTMLElement) {
+  const sourceFields = sourceRoot.querySelectorAll('input, textarea, select');
+  const cloneFields = cloneRoot.querySelectorAll('input, textarea, select');
+
+  sourceFields.forEach((sourceField, index) => {
+    const cloneField = cloneFields[index];
+    if (!cloneField) {
+      return;
+    }
+
+    if (sourceField instanceof HTMLInputElement && cloneField instanceof HTMLInputElement) {
+      cloneField.value = sourceField.value;
+      cloneField.setAttribute('value', sourceField.value);
+
+      if (sourceField.checked) {
+        cloneField.setAttribute('checked', '');
+      } else {
+        cloneField.removeAttribute('checked');
+      }
+      return;
+    }
+
+    if (sourceField instanceof HTMLTextAreaElement && cloneField instanceof HTMLTextAreaElement) {
+      cloneField.value = sourceField.value;
+      cloneField.textContent = sourceField.value;
+      return;
+    }
+
+    if (sourceField instanceof HTMLSelectElement && cloneField instanceof HTMLSelectElement) {
+      cloneField.value = sourceField.value;
+      Array.from(cloneField.options).forEach((cloneOption, optionIndex) => {
+        const sourceOption = sourceField.options[optionIndex];
+        if (sourceOption?.selected) {
+          cloneOption.setAttribute('selected', '');
+        } else {
+          cloneOption.removeAttribute('selected');
+        }
+      });
+    }
+  });
 }
 
 function serializeForeignObjectMarkup(
