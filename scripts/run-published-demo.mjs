@@ -23,13 +23,13 @@ export function createPublishedDemoSteps(options = {}) {
     {
       label: 'install:published-demo-deps',
       command: npm,
-      args: ['install'],
+      args: ['install', '--no-package-lock'],
       cwd: 'demo/published',
     },
     {
       label: 'install:published-package',
       command: npm,
-      args: ['install', packageSpec, '--no-save'],
+      args: ['install', packageSpec, '--no-save', '--no-package-lock'],
       cwd: 'demo/published',
     },
     {

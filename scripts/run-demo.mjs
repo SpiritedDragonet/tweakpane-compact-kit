@@ -37,16 +37,40 @@ export function parseDemoOptions(argv = []) {
   return { capture: argv.includes('--capture') };
 }
 
-export function runStep(step, options = {}) {
+export function createSpawnLaunch(step, options = {}) {
   const cwd = resolve(options.cwd ?? repoRoot, step.cwd ?? '.');
-  const command = step.command ?? process.execPath;
-  const args = step.command
-    ? step.args
-    : [resolve(cwd, step.args[0]), ...step.args.slice(1)];
+  const platform = options.platform ?? process.platform;
+
+  if (step.command) {
+    const commandText = String(step.command);
+    if (platform === 'win32' && /\.(cmd|bat)$/i.test(commandText)) {
+      return {
+        cwd,
+        command: 'cmd.exe',
+        args: ['/d', '/s', '/c', commandText, ...step.args],
+      };
+    }
+
+    return {
+      cwd,
+      command: commandText,
+      args: step.args,
+    };
+  }
+
+  return {
+    cwd,
+    command: process.execPath,
+    args: [resolve(cwd, step.args[0]), ...step.args.slice(1)],
+  };
+}
+
+export function runStep(step, options = {}) {
+  const launch = createSpawnLaunch(step, options);
 
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(command, args, {
-      cwd,
+    const child = spawn(launch.command, launch.args, {
+      cwd: launch.cwd,
       stdio: 'inherit',
       shell: false,
     });

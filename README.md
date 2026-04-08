@@ -214,7 +214,7 @@ const state = {
   value: 64,
   thickness: 10,
   rounded: true,
-  detailLevel: 0.42,
+  color: '#22d3ee',
 };
 
 const split = pane.addBlade({
@@ -234,7 +234,7 @@ controls.addBinding(state, 'thickness', { min: 4, max: 20, step: 1, label: 'Thic
 
 const folder = controls.addFolder({ title: 'Details', expanded: false });
 folder.addBinding(state, 'rounded', { label: 'Rounded' });
-folder.addBinding(state, 'detailLevel', { min: 0, max: 1, label: 'Level' });
+folder.addBinding(state, 'color', { label: '' });
 folder.addBinding(state, 'units', { min: 2, max: 6, step: 1, label: 'Units' });
 
 const visual = document.createElement('div');
@@ -246,6 +246,7 @@ visual.appendChild(createDonutGaugeSvg(document, {
   width: Math.max(52, Math.min(96, state.units * 18)),
   height: Math.max(52, Math.min(96, state.units * 18)),
   value: state.value,
+  color: state.color,
 }));
 visualSlot.appendChild(visual);
 ```
@@ -273,20 +274,24 @@ icon stable while the centered text can change length or wrap across lines.
 <summary>View code</summary>
 
 ```ts
-const state = { armed: false };
+const state = { armed: true };
 
 pane.addBinding(state, 'armed', {
   view: 'boolean-button',
   units: 2,
   content: {
-    text: 'System\nStandby',
+    text: 'System\nIdle',
     icon: {
       path: 'M8 2v5M5.2 4.5a4.5 4.5 0 1 0 5.6 0',
       viewBox: '0 0 16 16',
     },
   },
   contentOn: {
-    text: 'System\nArmed',
+    text: 'Signal\nLive',
+    icon: {
+      path: 'M2.5 11.5 6 8l2.5 2.5 5-6M3 3v10h10',
+      viewBox: '0 0 16 16',
+    },
   },
 });
 
@@ -387,15 +392,15 @@ unlabeledPane.addBinding({ mode: 'beta' }, 'mode', {
 ![Composing Layouts](docs/images/composing-layouts.svg)
 
 This is not a separate layout mode. It is the integrated proof that the earlier
-six rules still hold together when semantic slots, nested rows and columns,
-adaptive folders, compact sliders, multi-unit controls, and custom DOM all
-appear in the same pane.
+rules still hold together when nested rows and columns, wrapped panes,
+adaptive folders, multi-unit controls, native bindings, graphs, and button
+grids all appear in the same pane.
 
 The important thing to notice is not the individual widgets. It is that the
 whole example still follows the same contracts from the earlier chapters: one
 horizontal geometry model, one vertical `units` model, the same child-pane
-wrapping rules, the same DOM contract, the same button content contract, and
-the same slider-layout contract.
+wrapping rules, the same button content contract, and the same slider-layout
+inset normalization.
 
 <details>
 <summary>View code</summary>
@@ -422,7 +427,7 @@ root.wrapPane(actionPane);
 actionPane.registerPlugin(CompactKitBundle);
 actionPane.addBlade({
   view: 'sized-button',
-  units: 2,
+  units: 3,
   content: { text: 'Run\nAction' },
 });
 
@@ -447,13 +452,13 @@ folder.addButton({ title: 'Apply' });
 ```bash
 npm run build
 npm run demo
+npm run demo:published
 ```
 
 Open `http://127.0.0.1:5173/` for the guided tour demo.
 
-Open `http://127.0.0.1:5173/?capture=1` when you want to regenerate the
-committed README SVGs from the live page. The demo exposes an `Export README
-SVGs` button in capture mode and writes the approved files back into
-`docs/images/`.
+Open `http://127.0.0.1:5174/` for the consumer-path demo that installs
+`tweakpane-compact-kit@latest` from npm and renders the same showcase through
+the published package entrypoint.
 
 MIT. Issues and PRs are welcome.
