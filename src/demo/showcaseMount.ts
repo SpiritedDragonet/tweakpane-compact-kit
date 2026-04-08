@@ -700,8 +700,7 @@ function mountVisibleComposingLayouts(host: HTMLElement, disposers: Array<() => 
   const rightSlots = c3.getSlotsByCategory?.('gamma') ?? [];
 
   if (leftSlots[0]) {
-    const pane0 = new Pane({ container: leftSlots[0] });
-    ensureRegistered(pane0);
+    const pane0 = createChildPane(c3, leftSlots[0]);
     pane0.addBinding({ p: { x: 0.3, y: 0.7 } }, 'p', {
       x: { min: 0, max: 1 },
       y: { min: 0, max: 1 },
@@ -709,8 +708,7 @@ function mountVisibleComposingLayouts(host: HTMLElement, disposers: Array<() => 
     });
   }
   if (leftSlots[1]) {
-    const pane1 = new Pane({ container: leftSlots[1] });
-    ensureRegistered(pane1, { essentials: true });
+    const pane1 = createChildPane(c3, leftSlots[1], { essentials: true });
     const folder = pane1.addFolder({ title: 'Details', expanded: false }) as unknown as FolderLike;
     folder.addBinding({ level: 0.5 }, 'level', { min: 0, max: 1, label: 'Level' });
     folder.addBinding({ mode: 'A' }, 'mode', {
@@ -720,8 +718,7 @@ function mountVisibleComposingLayouts(host: HTMLElement, disposers: Array<() => 
     folder.addButton?.({ title: 'Apply' });
   }
   if (leftSlots[2]) {
-    const pane2 = new Pane({ container: leftSlots[2] });
-    ensureRegistered(pane2, { essentials: true });
+    const pane2 = createChildPane(c3, leftSlots[2], { essentials: true });
     pane2.addBinding({ volume: 50 }, 'volume', { min: 0, max: 100, label: 'Volume' });
     pane2.addBinding({ txt: 'note' }, 'txt', { label: '' });
   }

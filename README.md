@@ -83,7 +83,8 @@ creates one leaf cell. Once you have that cell, you can mount another pane,
 another split, or plain DOM into it.
 
 `wrapPane()` is the step that makes a child pane read like content of the cell.
-Without it, the child pane keeps Tweakpane's usual nested inset.
+Without it, the child pane keeps Tweakpane's usual nested inset, and wrapped
+full-width cleanup such as hidden-label rows will not kick in.
 
 <details>
 <summary>View code</summary>
@@ -391,9 +392,10 @@ pane.addBlade({
 leaf. The binding and slider logic stay the same. In the demo, the left side
 keeps the native layout and the right side turns on the compact layout.
 
-`Wrapped Labels` shows the other half of the same idea. If you give a wrapped
-control a label, the label stays visible. If you omit the label, the control
-can use the full width of the split leaf.
+`Wrapped Labels` shows the other half of the same idea. Start by mounting the
+child pane into the split leaf and calling `wrapPane()` on that child pane. Then
+controls with a real `label` keep their inline title area, while controls with
+`label: ''` or no `label` use the full width of the split leaf.
 
 <details>
 <summary>View code</summary>
@@ -459,8 +461,10 @@ const unlabeledPane = new Pane({ container: unlabeledSlot });
 labels.wrapPane(unlabeledPane);
 unlabeledPane.registerPlugin(CompactKitBundle);
 
-// When `label` is omitted, the wrapped control can use the full split width.
+// Hidden-label layout is only applied after wrapPane().
+// Use `label: ''` or omit `label` when the control should fill the whole leaf.
 unlabeledPane.addBinding({ mode: 'beta' }, 'mode', {
+  label: '',
   options: { Alpha: 'alpha', Beta: 'beta', Gamma: 'gamma' },
 });
 ```
