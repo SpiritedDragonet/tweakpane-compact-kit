@@ -209,6 +209,8 @@ content box.
 <summary>View code</summary>
 
 ```ts
+import { setSplitDomUnits } from 'tweakpane-compact-kit';
+
 // One row with two slots: one will declare its span, the other will rely on
 // measurement.
 const split = pane.addBlade({
@@ -257,6 +259,8 @@ directly, so that block grows and shrinks through its declared span.
 <summary>View code</summary>
 
 ```ts
+import { setSplitDomUnits } from 'tweakpane-compact-kit';
+
 // Keep the demo state in one object so bindings and the visual preview stay in
 // sync.
 const state = {
@@ -302,13 +306,14 @@ folder.addBinding(state, 'units', { min: 2, max: 6, step: 1, label: 'Units' });
 const visual = document.createElement('div');
 setSplitDomUnits(visual, state.units);
 
-// The donut graphic itself is just regular SVG inserted into that DOM host.
-visual.appendChild(createDonutGaugeSvg(document, {
-  width: Math.max(52, Math.min(96, state.units * 18)),
-  height: Math.max(52, Math.min(96, state.units * 18)),
-  value: state.value,
-  color: state.color,
-}));
+// Put any DOM content you want inside that host.
+// This example uses a simple centered badge instead of a private demo helper.
+visual.style.display = 'grid';
+visual.style.placeItems = 'center';
+visual.style.borderRadius = '10px';
+visual.style.background = 'color-mix(in srgb, #22d3ee 14%, transparent)';
+visual.style.border = '1px solid color-mix(in srgb, #22d3ee 45%, transparent)';
+visual.textContent = `${state.units}u`;
 visualSlot.appendChild(visual);
 ```
 
