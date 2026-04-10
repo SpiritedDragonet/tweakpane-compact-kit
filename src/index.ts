@@ -24,6 +24,15 @@ export {
   type BooleanButtonOptions,
 } from './core/BooleanButtonPlugin';
 
+export {
+  readDeclaredUnitState,
+  setDeclaredUnitState,
+  setSplitDomUnits,
+  type DeclaredUnitBehavior,
+  type DeclaredUnitState,
+  type SplitDomUnitOptions,
+} from './core/split/domUnitState';
+
 /**
  * Convenience bundle for `pane.registerPlugin(...)`.
  *

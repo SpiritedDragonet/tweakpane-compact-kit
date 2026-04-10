@@ -18,6 +18,20 @@ Peer dependency: `tweakpane` v4.
 
 ## Quick Start
 
+Start with three moves:
+
+1. Register `CompactKitBundle` on the pane that will host the custom blades.
+2. Create a `split-layout` and take its slots with `getSlots()`.
+3. If a slot hosts a child `Pane`, call `split.wrapPane(childPane)` so the
+   nested pane sits flush with the split cell.
+
+Strings in `children` create leaf cells in order. Those strings also act as
+category names. A leaf can host a child `Pane`, another split, or plain DOM.
+Later sections expand each of those cases.
+
+<details>
+<summary>View quick start code</summary>
+
 ```ts
 import { Pane } from 'tweakpane';
 import { CompactKitBundle } from 'tweakpane-compact-kit';
@@ -50,18 +64,9 @@ leftPane.addBlade({
   title: 'Launch',
   units: 2,
 });
-
-// Plain DOM can live in a split cell too.
-const rightHost = document.createElement('div');
-right.appendChild(rightHost);
 ```
 
-Each string in `children` creates one leaf cell and also gives that cell a
-category name. A child `Pane`, another split, or plain DOM can all live inside
-that cell. When the cell hosts a child `Pane`, register `CompactKitBundle` on
-that child too and call `split.wrapPane(childPane)` so the nested pane sits
-flush with the cell. Later examples show object entries in `children`, which
-create nested split nodes.
+</details>
 
 Jump to:
 
@@ -85,6 +90,9 @@ another split, or plain DOM into it.
 `wrapPane()` is the step that makes a child pane read like content of the cell.
 Without it, the child pane keeps Tweakpane's usual nested inset, and wrapped
 full-width cleanup such as hidden-label rows will not kick in.
+
+Section 3 covers the two DOM sizing paths in detail: declare a fixed span when
+you already know it, or let the layout measure the content box.
 
 <details>
 <summary>View code</summary>
@@ -119,10 +127,9 @@ leftPane.addBlade({
 });
 
 // A split cell can also host plain DOM directly.
+// Section 3 shows how to declare a fixed span or let the DOM size be measured.
 const domHost = document.createElement('div');
-
-// This DOM block is given the same visual height as a 3u control.
-domHost.style.height = 'calc(3 * var(--cnt-usz) + 8px)';
+domHost.textContent = 'Plain DOM';
 right.appendChild(domHost);
 ```
 
@@ -189,8 +196,9 @@ addRow('1fr 3fr 20%', ['1fr', '3fr', '20%']);
 
 ![Custom DOM](docs/images/split-custom-dom.svg)
 
-Plain DOM has two paths in a split. If you already know the span, publish that
-span and give the host a matching CSS height. If the height should come from
+Plain DOM has two paths in a split. If you already know the span, import and
+call `setSplitDomUnits()` from this package and let the plugin publish the
+split metadata and matching host height for you. If the height should come from
 content, append plain DOM and let the layout measure it.
 
 In the demo, the left block says "I am 4u tall" and stays there. The right
@@ -215,16 +223,11 @@ const [declaredSlot, measuredSlot] = split.getSlots();
 
 // Declared DOM: you already know that this block should behave like a 4u item.
 const declared = document.createElement('div');
+declared.textContent = 'Fixed 4u DOM host';
 
-// The CSS height and the published split units should describe the same span.
-declared.style.height = 'calc(4 * var(--cnt-usz) + 12px)';
-
-// baseUnits = baseline height
-// liveUnits = current visible height
-// fixed      = do not auto-grow beyond the declared span
-declared.dataset.splitBaseUnits = '4';
-declared.dataset.splitLiveUnits = '4';
-declared.dataset.splitUnitBehavior = 'fixed';
+// One helper call publishes the unit contract and stretches the host box to the
+// same visual span.
+setSplitDomUnits(declared, 4);
 declaredSlot.appendChild(declared);
 
 // Measured DOM: no split metadata is needed here.
@@ -297,10 +300,7 @@ folder.addBinding(state, 'units', { min: 2, max: 6, step: 1, label: 'Units' });
 
 // The visual preview is plain DOM. Here it follows declared units.
 const visual = document.createElement('div');
-visual.style.height = 'calc(state.units * var(--cnt-usz) + (state.units - 1) * 4px)';
-visual.dataset.splitBaseUnits = String(state.units);
-visual.dataset.splitLiveUnits = String(state.units);
-visual.dataset.splitUnitBehavior = 'fixed';
+setSplitDomUnits(visual, state.units);
 
 // The donut graphic itself is just regular SVG inserted into that DOM host.
 visual.appendChild(createDonutGaugeSvg(document, {
@@ -324,6 +324,10 @@ Buttons use one content format. Use `boolean-button` for a true/false value.
 Use `sized-button` for a plain action button. Both support text only, icon
 only, or icon + text.
 
+`boolean-button` uses the same bound boolean field that a native Tweakpane
+toggle would use. Clicking it updates that field, and anything else in your app
+that reads or writes the same field stays in sync.
+
 Use the full `content` object when you want more control, or the shorter
 `title` and `icon` fields for quick cases. `contentOn` only needs the parts
 that change in the pressed state. Think of `content` as the face drawn on the
@@ -336,7 +340,8 @@ button. `iconSize` applies to the whole button, so both states stay aligned.
 const state = { armed: true };
 
 // boolean-button is a real binding, so use addBinding().
-// The blade reads and writes `state.armed`.
+// Clicking it updates `state.armed`.
+// Anything else that reads or writes `state.armed` stays in sync.
 pane.addBinding(state, 'armed', {
   view: 'boolean-button',
 
@@ -352,8 +357,8 @@ pane.addBinding(state, 'armed', {
     },
   },
 
-  // `contentOn` only needs to provide the pieces that change when the boolean
-  // becomes true.
+  // `contentOn` only changes the on-state face.
+  // The actual boolean value still lives in `state.armed`.
   contentOn: {
     text: 'Signal\nLive',
     icon: {

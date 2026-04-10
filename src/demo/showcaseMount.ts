@@ -1,6 +1,7 @@
 import * as Essentials from '@tweakpane/plugin-essentials';
 import { Pane } from 'tweakpane';
 
+import { setSplitDomUnits } from '../core/split/domUnitState';
 import { createDonutGaugeSvg } from './donutGaugeSvg';
 import { collectShowcaseSvgExports, type ShowcaseSvgExport } from './exportPaneSvg';
 
@@ -95,12 +96,7 @@ function mountDomUnits(slot: HTMLElement, units: number, render?: (box: HTMLElem
 }
 
 function setDomUnits(el: HTMLElement, units: number) {
-  const safeUnits = Math.max(1, Math.floor(units || 1));
-  const gutter = 4;
-  el.style.height = `calc(${safeUnits} * var(--cnt-usz) + ${(safeUnits - 1) * gutter}px)`;
-  el.dataset.splitBaseUnits = String(safeUnits);
-  el.dataset.splitLiveUnits = String(safeUnits);
-  el.dataset.splitUnitBehavior = 'fixed';
+  setSplitDomUnits(el, units);
 }
 
 function applyDemoCardChrome(

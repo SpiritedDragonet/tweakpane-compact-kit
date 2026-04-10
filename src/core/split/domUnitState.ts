@@ -12,6 +12,13 @@ export type DeclaredUnitState = {
   behavior: DeclaredUnitBehavior;
 };
 
+export type SplitDomUnitOptions = {
+  liveUnits?: number;
+  behavior?: DeclaredUnitBehavior;
+  syncHeight?: boolean;
+  gutterPx?: number;
+};
+
 function toUnits(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return Math.max(0, Math.floor(value));
@@ -57,6 +64,44 @@ export function setDeclaredUnitState(el: HTMLElement, state: DeclaredUnitState) 
   el.dataset.splitBaseUnits = String(baseUnits);
   el.dataset.splitLiveUnits = String(liveUnits);
   el.dataset.splitUnitBehavior = state.behavior;
+}
+
+function formatDeclaredHeight(units: number, gutterPx: number) {
+  const safeUnits = Math.max(0, Math.floor(units));
+  if (safeUnits <= 0) {
+    return '0px';
+  }
+  return `calc(var(--cnt-usz) * ${safeUnits} + ${(safeUnits - 1) * Math.max(0, gutterPx)}px)`;
+}
+
+/**
+ * Public helper for plain DOM hosts that should opt into the split unit
+ * contract.
+ *
+ * Use this when a DOM region should occupy a declared number of units and let
+ * the plugin keep both the split metadata and the host height in sync.
+ */
+export function setSplitDomUnits(
+  el: HTMLElement,
+  baseUnits: number,
+  options?: SplitDomUnitOptions,
+) {
+  const safeBaseUnits = Math.max(0, Math.floor(baseUnits));
+  const safeLiveUnits = Math.max(
+    safeBaseUnits,
+    Math.floor(options?.liveUnits ?? safeBaseUnits),
+  );
+  const behavior = options?.behavior ?? 'fixed';
+
+  setDeclaredUnitState(el, {
+    baseUnits: safeBaseUnits,
+    liveUnits: safeLiveUnits,
+    behavior,
+  });
+
+  if (options?.syncHeight !== false) {
+    el.style.height = formatDeclaredHeight(safeLiveUnits, options?.gutterPx ?? 4);
+  }
 }
 
 /**
